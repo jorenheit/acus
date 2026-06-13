@@ -437,7 +437,7 @@ auto p = literal::struct_t(point)
 
 ### Global Variables
 
-Global variables are declared inside a program, before the first function-definition. Every function that needs access to the globals, or a subset thereof, must first call `referGlobals` with a list of variables that need to be accessible within the scope of that function. In the example below, both `main` and `foo` refer to the global variable `g`. After `foo` is called, `main` sees the updated version of `g` and will print `F` instead of `A`.
+Global variables are declared inside a program, before the first function-definition. Every function will then be able to access this variable through its name:
 
 ```cpp
 a.program("globals", "main").begin(); {
@@ -445,7 +445,6 @@ a.program("globals", "main").begin(); {
   a.declareGlobal("g", ts::u8());
 
   a.function("main").begin(); {
-    a.referGlobals({"g"});
     a.assign("g", literal::u8('A'));
     a.callFunction("foo").done();
     a.write("g"); // writes F
@@ -453,7 +452,6 @@ a.program("globals", "main").begin(); {
   } a.endFunction();
 
   a.function("foo").begin(); {
-    a.referGlobals({"g"});
     a.assign("g", literal::u8('F'));
     a.returnFromFunction();
   } a.endFunction();
