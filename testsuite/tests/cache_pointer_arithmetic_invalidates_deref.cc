@@ -1,3 +1,8 @@
+// Acus - A C++ library for generating Brainfuck programs.
+// Copyright (C) 2026 Joren Heit
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Cache a dereferenced pointer, change it with pointer arithmetic, then dereference it again.
 // Expected: "AB"
 

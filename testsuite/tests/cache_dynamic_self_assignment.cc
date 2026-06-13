@@ -1,3 +1,8 @@
+// Acus - A C++ library for generating Brainfuck programs.
+// Copyright (C) 2026 Joren Heit
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Assign a dynamic array element to itself; this should be a no-op and not corrupt cache storage.
 // Expected: "ABC"
 

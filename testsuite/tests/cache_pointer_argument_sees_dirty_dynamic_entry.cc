@@ -1,3 +1,8 @@
+// Acus - A C++ library for generating Brainfuck programs.
+// Copyright (C) 2026 Joren Heit
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Dirty a dynamic array field, pass a pointer to it, and read it in the callee.
 // Expected: "X"
 

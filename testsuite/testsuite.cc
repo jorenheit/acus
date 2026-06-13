@@ -392,7 +392,7 @@ namespace bftest {
 
     for (std::size_t i = 0; i < tests.size(); ++i) {
       TestOutcome r = runSingleInSubprocess(tests, i, selfPath);
-
+      
       std::cout << (r.passed ? "[PASS] " : "[FAIL] ") << r.name;
       if (!r.passed) {
 	std::cout << "\n"
@@ -1482,8 +1482,6 @@ tests.push_back(expectOutput("Integer Decimal Print Variables",
 #include "tests/integer_decimal_print_variables.cc"
                              })); 
 
-
- 
  return tests;
 }
 
