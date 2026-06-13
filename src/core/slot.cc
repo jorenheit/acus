@@ -20,18 +20,6 @@ Slot Slot::sub(types::TypeHandle subType, int subOffset) const {
   };
 }
 
-bool Slot::valid() const { return kind != Invalid; }
-  
-Slot Slot::invalid() {
-  return Slot {
-    .name = "",
-    .type = types::null,
-    .kind = Invalid,
-    .offset = 0,
-    .scope = nullptr
-  };
-}
-
 Slot Slot::unsignedView() const {
   assert(types::isInteger(type));
   Slot view = *this;

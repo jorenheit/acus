@@ -25,6 +25,7 @@ namespace acus::ts::impl {
 namespace acus::ts {
 
   FunctionTypeBuilder & FunctionTypeBuilder::ret(types::TypeHandle returnType) & {
+    BuilderBase::check();
     API_REQUIRE(_ret == types::null,
 		error::ErrorCode::ReturnTypeSpecifiedMultipleTimes,
 		"return-type was already specified.");
@@ -33,19 +34,23 @@ namespace acus::ts {
   }
 
   FunctionTypeBuilder && FunctionTypeBuilder::ret(types::TypeHandle returnType) && {
+    BuilderBase::check();
     return std::move(this->ret(returnType));
   }
   
   FunctionTypeBuilder & FunctionTypeBuilder::param(types::TypeHandle paramType) & {
+    BuilderBase::check();
     _paramTypes.push_back(paramType);
     return *this;
   }
 
   FunctionTypeBuilder && FunctionTypeBuilder::param(types::TypeHandle paramType) && {
+    BuilderBase::check();
     return std::move(this->param(paramType));
   }
 
   types::FunctionType const *FunctionTypeBuilder::done() {
+    BuilderBase::check();
     _finalized.done();
     
     if (_ret == types::null) _ret = ts::void_t();
@@ -88,15 +93,18 @@ namespace acus::ts {
   {}
 
   StructTypeBuilder & StructTypeBuilder::field(std::string const &name, types::TypeHandle type) &{
+    BuilderBase::check();
     _fields.emplace_back(name, type);
     return *this;
   }
 
   StructTypeBuilder && StructTypeBuilder::field(std::string const &name, types::TypeHandle type) && {
+    BuilderBase::check();
     return std::move(this->field(name, type));
   }
   
   types::StructType const *StructTypeBuilder::done() {
+    BuilderBase::check();
     _finalized.done();
     if (struct_t(_structName) != nullptr) return nullptr; // already defined a struct with this name
     impl::_structTypes.emplace_back(std::make_unique<types::StructType>(_structName, _fields));

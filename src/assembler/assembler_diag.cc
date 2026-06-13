@@ -22,12 +22,12 @@ bool Assembler::globalDeclarationsAllowed() const {
 }
 
 bool Assembler::inScope(std::string const &name) const {
-  return local(name).valid();
+  return localSlot(name).has_value();
 }
 
 bool Assembler::inCurrentScope(std::string const &name) const {
-  Slot const slot = local(name);
-  return slot.valid() && slot.scope == _currentScope;
+  std::optional<Slot> slot = localSlot(name);
+  return slot.has_value() && slot->scope == _currentScope;
 }
 
 int Assembler::currentScopeDepth() const {

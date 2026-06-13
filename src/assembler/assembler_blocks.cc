@@ -6,7 +6,14 @@
 #include "assembler.ih"
 
 void Assembler::beginBlock(std::string const &name) {
-
+  // New code-blocks should be started with an empty cache
+  // if (! _cache.empty()) {
+  //   std::cerr << "Block: " << name << '\n';
+  //   std::cerr << "Function: " << _currentFunction->name << '\n';
+  //   _cache.print();
+  // }
+  // assert(_cache.empty());
+  
   Function::Block &block = _currentFunction->createBlock(name);
   _program.registerBlock(block);
 
@@ -69,11 +76,13 @@ void Assembler::label(std::string const &labelName, API_FUNC) {
   API_FUNC_BEGIN();
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
-  
+
+  _cache.controlBoundary();  
   if (_currentBlock != nullptr) {
     setNextBlock(_currentFunction->name, labelName);    
     endBlock();
   }
+
   beginBlock(labelName);
 }
 
@@ -111,9 +120,8 @@ void Assembler::setNextBlock(Expression const &obj) {
   };
   
   if (obj.hasSlot()) {
-    Slot const ptrSlot = obj.slot()->materialize(*this);
+    Slot const ptrSlot = materialize(obj.slot(), false);
     assignSlot(targetSlot, ptrSlot);
-    if (not obj.slot()->direct()) freeTemp(ptrSlot);
   } else {
     assignSlot(targetSlot, obj.literal());
   }
@@ -130,6 +138,7 @@ void Assembler::jump(std::string const &jumpLabel, API_FUNC) {
   // After a jump, a label is expected to prevent unreachable code.
 
   assert(_currentBlock != nullptr);
+  _cache.controlBoundary();
   setNextBlock(_currentFunction->name, jumpLabel);
   endBlock();
 
@@ -143,7 +152,7 @@ void Assembler::jumpIfImpl(Expression const &obj, std::string const &trueLabel,
   API_REQUIRE_IS_INTEGER(obj.type());
 
   if (obj.hasSlot()) {
-    branchIfSlot(obj.slot()->materialize(*this), trueLabel, falseLabel);
+    branchIfSlot(materialize(obj.slot(), false), trueLabel, falseLabel);
   } else {  
     bool const value = literal::cast<types::IntegerType>(obj.literal())->encodedValue();
     setNextBlock(_currentFunction->name, value ? trueLabel : falseLabel);
@@ -151,6 +160,7 @@ void Assembler::jumpIfImpl(Expression const &obj, std::string const &trueLabel,
 
   deferLabelCheck(_currentFunction->name, trueLabel, API_FWD);
   deferLabelCheck(_currentFunction->name, falseLabel, API_FWD);
+  _cache.controlBoundary();  
   endBlock();
   
   API_EXPECT_NEXT("label");
@@ -174,22 +184,15 @@ void Assembler::constructMetaBlocks() {
 	fetchReturnData();
       }
       else {
+	assert(m.returnSlot.has_value());
 	SlotProxy returnSlot = *m.returnSlot;
 	assert(returnType == returnSlot->type());	
-
-	if (returnSlot->direct()) {
-	  Slot const ret = returnSlot->materialize(*this);
-	  fetchReturnData(ret);
-	  if (ret.kind == Slot::GlobalReference) {
-	    syncGlobal<&Assembler::putGlobal>(ret);
-	  }
-	}
-	else {
-	  Slot const ret = getTemp(returnType);
-	  fetchReturnData(ret);
-	  returnSlot->write(*this, ret);
-	  freeTemp(ret);
-	}
+	Slot const tmp = getTemp(returnType); //materialize(returnSlot, true);
+	fetchReturnData(tmp);
+	_cache.write(returnSlot, tmp);
+	freeTempSlot(tmp);
+	_cache.controlBoundary();
+	// TODO: this has an additional copy that can be avoided
       }
 
       // Check if the run-state has become 0. If so, unwind the stack
@@ -204,7 +207,6 @@ void Assembler::constructMetaBlocks() {
 	zeroCell();
 	switchField(MacroCell::Scratch1);
 	zeroCell();
-	syncGlobalToLocal();
 	setNextBlock(m.caller, m.nextBlockName);
 	switchField(MacroCell::Scratch0);	
       } loopClose();

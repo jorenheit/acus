@@ -14,7 +14,6 @@ auto u8p = ts::pointer(u8);
 c.declareGlobal("g", u8);
 
 c.function("main").begin(); {
-  c.referGlobals({"g"});
   c.declareLocal("p", u8p);
 
   c.assign("g", literal::u8('G'));

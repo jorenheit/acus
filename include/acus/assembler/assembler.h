@@ -33,6 +33,9 @@ namespace acus {
 
   class Assembler {
   public:
+    
+    inline Assembler(): _cache(*this) {}
+    
     // TODO: API_FUNC 
     std::string primitives(std::string const &name) const;
     std::string brainfuck(std::string const &name) const;
@@ -52,7 +55,6 @@ namespace acus {
 
     Expression declareLocal(std::string const &name, types::TypeHandle type, API_FUNC);
     void declareGlobal(std::string const &name, types::TypeHandle type, API_FUNC);
-    void referGlobals(std::vector<std::string> const &names, API_FUNC);
 
     void returnFromFunction(auto const &ret, API_FUNC);
     void returnFromFunction(API_FUNC);
@@ -147,6 +149,7 @@ namespace acus {
     friend class proxy::impl::ArrayElement;
     friend class proxy::impl::StructField;
     friend class proxy::impl::DereferencedPointer;
+    friend class proxy::impl::GlobalReference;
     friend class api::impl::Context;
 
     // program name -> brainfuck output:    
@@ -197,8 +200,68 @@ namespace acus {
     };
     std::vector<LabelCheck> _deferredLabelChecks;
 
-    std::unordered_set<std::string> _aliasedGlobals;
-  
+    class Cache {
+      struct Entry;
+      using EntryPtr = std::unique_ptr<Entry>;
+      using EntryVector = std::vector<EntryPtr>;
+      using EntryIterator = EntryVector::iterator;
+
+      EntryVector _entries;
+      Assembler& _self;
+      bool _flushing = false;
+      bool _aliasWriteMode = false;
+      
+      struct Entry {
+	SlotProxy proxy;
+	Slot slot;
+	bool dirty = false;
+	bool pendingWrite = false;
+	bool markedForDelete = false;
+	Entry *parent = nullptr;
+	std::vector<Entry*> children;
+      };
+
+      Entry* findEntry(SlotProxy proxy) const;
+      Entry* findCachedOwner(SlotProxy proxy) const;
+      
+      Entry &findOrCreateEntry(SlotProxy proxy, bool const skipMaterialization = false);
+      Entry* ensureParentEntry(SlotProxy proxy);
+      
+      void flushSubtree(SlotProxy proxy);
+      void flushSubtree(Entry &root, bool const includeRoot);
+      void markSubtreeForDelete(SlotProxy proxy);
+      void markSubtreeForDelete(Entry &root, bool const includeRoot);
+      void flushAndDeleteSubtree(SlotProxy proxy);
+      void flushAndDeleteSubtree(Entry &root, bool const includeRoot);
+      void flushEntryIfDirty(Entry &entry);
+      void deleteMarkedEntries();
+      void invalidateDependencies(SlotProxy modifiedProxy);      
+      void flushAndClearEntireCache();
+      bool storageResolvedThroughPointerDeref(SlotProxy proxy) const;
+
+      void forEntireSubtree(SlotProxy root, auto&& action);
+      void forEntireSubtree(Entry& root, bool const sortBeforeAction, auto&& action);      
+      std::vector<Entry*> findEntries(auto&& predicate);
+
+      void writeAliasSensitive(SlotProxy dest, auto&& src);
+      void writeDirect(SlotProxy dest, auto&& src);
+      void writeIndirect(SlotProxy dest, auto&& assign);
+      
+    public:
+      inline explicit Cache(Assembler &self): _self(self) {}
+      Slot materialize(SlotProxy proxy, bool const writeIntent = false);
+      void write(SlotProxy dest, SlotProxy src);
+      void write(SlotProxy dest, literal::Literal src);
+      
+      void controlBoundary();
+      void returnBoundary();
+      void reset(); 
+      bool empty() const; 
+    }; // Cache
+
+    Cache _cache;
+    Slot materialize(SlotProxy proxy, bool const writeIntent = false);
+    
     // Diagnostics (assembler_diag.cc)
     std::string currentFunction() const;
     bool programStarted() const;
@@ -251,6 +314,7 @@ namespace acus {
     
     void jumpIfImpl(Expression const &condition, std::string const &trueLabel, std::string const &falseLabel, API_CTX);
     void writeImpl(Expression const &rhs, API_CTX); 
+    void writeSlot(Slot const &slot);
     void readImpl(Expression const &rhs, API_CTX); 
     void printImpl(Expression const &rhs, API_CTX);
 
@@ -305,7 +369,15 @@ namespace acus {
     static const Mop addSpec, subSpec, mulSpec, divSpec, modSpec;
     static const Lop landSpec, lnandSpec, lorSpec, lnorSpec, lxorSpec, lxnorSpec;
     static const Cop eqSpec, neqSpec, ltSpec, leSpec, gtSpec, geSpec;
-  
+
+
+    template <typename SpecType>
+    void binOpAssignSlot(Slot const lhs, Slot const rhs, SpecType const &spec);
+
+    template <typename SpecType>
+    void binOpAssignConst(Slot const lhs, literal::Literal const rhs, SpecType const &spec);
+    
+    
     template <typename SpecType>
     Expression binOpAssignImpl(Expression const &lhs, Expression const &rhs, SpecType const &spec, API_CTX);
 
@@ -316,8 +388,11 @@ namespace acus {
     template <typename TrueBranch, typename FalseBranch>
     void branchOnSignBit(Slot const &slot, Cell const &flagCell, TrueBranch&& trueBranch, FalseBranch&& falseBranch);
     void setSlotToBool(Slot const &slot, bool val);
+
+    std::optional<Slot> localSlot(std::string const &varName) const;
+    std::optional<Slot> globalSlot(std::string const &varName) const;
+    SlotProxy proxyFromVariableName(std::string const& name, API_CTX) const;
     
-    Slot local(std::string const& name, bool globalReference = false) const;
     void assignSlot(Slot const &dest, Slot const &src);
     void assignSlot(Slot const &slot, literal::Literal const &val);
     void assignSlotBytewise(Slot const &dest, Slot const &src);
@@ -396,7 +471,6 @@ namespace acus {
     void slotGreaterEqualConst(Slot const &lhs, int val);
     void slotGreaterEqualConstSigned(Slot const &lhs, int val);
     void slotGreaterEqualConstUnsigned(Slot const &lhs, int val);
-    
 
     void slotLessSlot(Slot const &lhs, Slot const &rhs);
     void slotLessSlotUnsigned(Slot const &lhs, Slot const &rhs, bool const destroyRhs = false);
@@ -416,9 +490,12 @@ namespace acus {
   
     void branchIfSlot(Slot const &slot, std::string const &trueLabel, std::string const &falseLabel);
     void copySlotIntoElement(Slot const &srcSlot, Slot const &arrSlot, Slot const &indexSlot);
+    void copyConstIntoElement(literal::Literal const srcSlot, Slot const &arrSlot, Slot const &indexSlot);
     void copyElementIntoSlot(Slot const &elementSlot, Slot const &arrSlot, Slot const &indexSlot);
     void dereferencePointerIntoSlot(Slot const &ptrSlot, Slot const &derefSlot);
     void writeSlotThroughDereferencedPointer(Slot const &ptrSlot, Slot const &srcSlot);
+    void writeConstThroughDereferencedPointer(Slot const &ptrSlot, literal::Literal const value);
+    
     Slot addressOfSlot(Slot const &slot);
   
     // Algorithms: all applied to the current DP (assembler_algorithms.cc)
@@ -562,7 +639,6 @@ namespace acus {
     void greaterOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
     void greaterOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8>);
 
-  
     // Frame Navigation (assembler_framenav.cc)
     void resetOrigin();
     void pushPtr();
@@ -581,29 +657,28 @@ namespace acus {
     void moveToPointee(Slot const &ptrSlot);
 
     // Temporaries and memory management (assembler_memory.cc)
+    std::string makeFullName(std::string const &name);
+    std::string makeFullGlobalName(std::string const &name);
+    
     void freeSlot(Slot &slot);
-    void freeTemps();
-    void freeTemp(Slot const &slot);
+    void freeTempSlots();
+    void freeTempSlot(Slot const &slot);
+    void freeCacheSlots();
+    void freeCacheSlot(Slot const &slot);
+    
     void freeScope(Function::Scope const *scope);
     Slot allocSlot(std::string const &name, types::TypeHandle type, Slot::Kind kind);
+    void mergeAvailableSlots();
     Slot getTemp(types::TypeHandle type);
     Slot getTemp(literal::Literal const &val);
-    void swapLocalWithTemp(Slot const &local, Slot const &tmp);
-    Slot declareGlobalReference(Slot const &globalSlot);
+    Slot getCache(types::TypeHandle type);
+    Slot getCache(literal::Literal const &val);
   
     // Global Data Synchronization (assembler_globals.cc)
     void fetchGlobal(Slot const &globalSlot, Slot const &localSlot);
     void putGlobal(Slot const &globalSlot, Slot const &localSlot);
+    void putGlobal(Slot const &globalSlot, literal::Literal const value);
 
-    template <auto FetchOrPut>
-    void syncGlobal(Slot const &localSlot, bool onlyAliasedGlobals = false);
-
-    template <auto FetchOrPut>
-    void syncGlobals(bool onlyAliasedGlobals = false);
-
-    void syncGlobalToLocal(bool onlyAliasedGlobals = false);
-    void syncLocalToGlobal(bool onlyAliasedGlobals = false);
-  
     // Code generation (assembler_codegen.cc)
     std::string builtinFunctionName(BuiltinFunction func);
     void constructBuiltinFunctions();    

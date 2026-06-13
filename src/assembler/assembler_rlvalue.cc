@@ -11,8 +11,7 @@ Expression Assembler::rValue(Expression const &val, API_CTX) const {
 }
 
 Expression Assembler::rValue(std::string const &var, API_CTX) const {
-  API_REQUIRE_IN_SCOPE(var);
-  return Expression{local(var)};
+  return Expression{proxyFromVariableName(var, API_FWD)};
 }
 
 Expression Assembler::rValue(SlotProxy const &slot, API_CTX) const {
@@ -32,8 +31,7 @@ Expression Assembler::lValue(Expression const &val, API_CTX) const {
 }
 
 Expression Assembler::lValue(std::string const &var, API_CTX) const {
-  API_REQUIRE_IN_SCOPE(var);
-  return Expression{local(var)};
+  return Expression{proxyFromVariableName(var, API_FWD)};
 }
   
 Expression Assembler::lValue(SlotProxy const &slot, API_CTX) const {

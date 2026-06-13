@@ -86,7 +86,7 @@ void Assembler::slotEqualSlot(Slot const &lhs, Slot const &rhs) {
   }
 
   popPtr();
-  freeTemp(rhsCopy);
+  freeTempSlot(rhsCopy);
 }
 
 void Assembler::slotNotEqualConst(Slot const &lhs, int val) {
@@ -128,7 +128,7 @@ void Assembler::slotLessConstUnsigned(Slot const &lhs, int val) {
 
   Slot const valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotLessSlotUnsigned(lhs, valSlot, true);
-  freeTemp(valSlot);
+  freeTempSlot(valSlot);
 
   popPtr();
 }
@@ -204,7 +204,7 @@ void Assembler::slotLessSlotUnsigned(Slot const &lhs, Slot const &rhs, bool cons
   }
 
   popPtr();
-  if (freeRhsCopy) freeTemp(rhsCopy);
+  if (freeRhsCopy) freeTempSlot(rhsCopy);
 }
 
 void Assembler::slotLessSlotSigned(Slot const &lhs, Slot const &rhs) {
@@ -226,7 +226,7 @@ void Assembler::slotLessSlotSigned(Slot const &lhs, Slot const &rhs) {
 				      assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotGreaterSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
-				      freeTemp(rhsCopy);
+				      freeTempSlot(rhsCopy);
 				    },
 				    [&] /* rhs >= 0 */ {
 				      // lhs negative but rhs is not, so lhs is always less
@@ -277,7 +277,7 @@ void Assembler::slotLessEqualConstUnsigned(Slot const &lhs, int val) {
   
   Slot const valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotLessEqualSlotUnsigned(lhs, valSlot);
-  freeTemp(valSlot);
+  freeTempSlot(valSlot);
 
   popPtr();
 }
@@ -350,7 +350,7 @@ void Assembler::slotLessEqualSlotUnsigned(Slot const &lhs, Slot const &rhs, bool
   }
 
   popPtr();
-  if (freeRhsCopy) freeTemp(rhsCopy);
+  if (freeRhsCopy) freeTempSlot(rhsCopy);
 }
 
 void Assembler::slotLessEqualSlotSigned(Slot const &lhs, Slot const &rhs) {
@@ -372,7 +372,7 @@ void Assembler::slotLessEqualSlotSigned(Slot const &lhs, Slot const &rhs) {
 				      assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotGreaterEqualSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
-				      freeTemp(rhsCopy);
+				      freeTempSlot(rhsCopy);
 				    },
 				    [&] /* rhs >= 0 */ {
 				      setSlotToBool(lhs, true);
@@ -421,7 +421,7 @@ void Assembler::slotGreaterConstUnsigned(Slot const &lhs, int val) {
 
   Slot const valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotGreaterSlotUnsigned(lhs, valSlot, true);
-  freeTemp(valSlot);
+  freeTempSlot(valSlot);
   
   popPtr();
 }
@@ -476,7 +476,7 @@ void Assembler::slotGreaterSlotUnsigned(Slot const &lhs, Slot const &rhs, bool c
 
   popPtr();
 
-  if (freeRhsCopy) freeTemp(rhsCopy);
+  if (freeRhsCopy) freeTempSlot(rhsCopy);
 }
 
 void Assembler::slotGreaterSlotSigned(Slot const &lhs, Slot const &rhs) {
@@ -498,7 +498,7 @@ void Assembler::slotGreaterSlotSigned(Slot const &lhs, Slot const &rhs) {
 				      assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotLessSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
-				      freeTemp(rhsCopy);
+				      freeTempSlot(rhsCopy);
 				    },
 				    [&] /* rhs >= 0 */ {
 				      setSlotToBool(lhs, false);
@@ -546,7 +546,7 @@ void Assembler::slotGreaterEqualConstUnsigned(Slot const &lhs, int val) {
 
   Slot const valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotGreaterEqualSlotUnsigned(lhs, valSlot, true);
-  freeTemp(valSlot);
+  freeTempSlot(valSlot);
 
   popPtr();
 }
@@ -602,7 +602,7 @@ void Assembler::slotGreaterEqualSlotUnsigned(Slot const &lhs, Slot const &rhs, b
 
   popPtr();
 
-  if (freeRhsCopy) freeTemp(rhsCopy);
+  if (freeRhsCopy) freeTempSlot(rhsCopy);
 }
 
 void Assembler::slotGreaterEqualSlotSigned(Slot const &lhs, Slot const &rhs) {
@@ -624,7 +624,7 @@ void Assembler::slotGreaterEqualSlotSigned(Slot const &lhs, Slot const &rhs) {
 				      assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotLessEqualSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
-				      freeTemp(rhsCopy);
+				      freeTempSlot(rhsCopy);
 				    },
 				    [&] /* rhs >= 0 */ {
 				      setSlotToBool(lhs, false);

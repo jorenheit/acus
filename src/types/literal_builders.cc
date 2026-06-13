@@ -8,6 +8,7 @@
 namespace acus::literal {
   
   StructLiteralBuilder & StructLiteralBuilder::init(std::string const &name, Literal val) & {
+    BuilderBase::check();
     API_REQUIRE(not _fields.contains(name),
 		error::ErrorCode::MultipleInitializationsOfSameField,
 		"field '", name, "' was initialized multiple times.");
@@ -16,10 +17,12 @@ namespace acus::literal {
   }
 
   StructLiteralBuilder && StructLiteralBuilder::init(std::string const &name, Literal val) && {
+    BuilderBase::check();
     return std::move(this->init(name, val));
   }
   
   Literal StructLiteralBuilder::done() {
+    BuilderBase::check();
     _finalized.done();
     return std::make_shared<impl::structT>(_structType, _fields, API_FWD);
   }
@@ -30,6 +33,7 @@ namespace acus::literal {
   {}
     
   ArrayLiteralBuilder &ArrayLiteralBuilder::push(Literal value) & {
+    BuilderBase::check();
     API_REQUIRE(_elements.size() < _length,
 		error::ErrorCode::TooManyElementsInArrayInitialization,
 		"too many elements for this array-type.");
@@ -39,10 +43,12 @@ namespace acus::literal {
   }
 
   ArrayLiteralBuilder && ArrayLiteralBuilder::push(Literal value) && {
+    BuilderBase::check();
     return std::move(this->push(value));
   }
     
   Literal ArrayLiteralBuilder::done() {
+    BuilderBase::check();
     API_REQUIRE(_elements.size() == _length,
 		error::ErrorCode::TooFewElementsInArrayInitialization,
 		"too few elements for this array-type.");

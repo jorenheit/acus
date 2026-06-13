@@ -11,7 +11,6 @@ TEST_BEGIN
 c.declareGlobal("g", ts::u8());
 
 c.function("main").begin(); {
-  c.referGlobals({"g"});
 
   c.assign("g", literal::u8('G'));
   c.callFunction("foo").arg("g").done();

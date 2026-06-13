@@ -6,6 +6,52 @@
 #include "assembler.ih"
 
 template <typename SpecType>
+void Assembler::binOpAssignSlot(Slot const lhs, Slot const rhs, SpecType const &spec) {
+
+ pushPtr();
+
+ auto const [targetSlot, operandSlot, freeOperandSlot] = [&] -> std::tuple<Slot, Slot, bool> {
+   if (not types::isPointer(lhs.type)) return {lhs, rhs, false};
+   assert(spec.op == BinOp::Add || spec.op == BinOp::Sub);     
+   Slot const targetSlot = lhs.sub(ts::u16(), RuntimePointer::Offset);
+   int const stride = types::cast<types::PointerType>(lhs.type)->pointeeType()->size();
+   if (stride == 1) return {targetSlot, rhs, false};
+
+   Slot const copy = getTemp(rhs.type);
+   assignSlot(copy, rhs);
+   mulSlotByConst(copy, stride);
+   return {targetSlot, copy, true};
+ }();
+
+ (this->*spec.applyWithSlot)(targetSlot, operandSlot);
+ if (freeOperandSlot) freeTempSlot(operandSlot);
+
+ popPtr();
+}
+
+
+template <typename SpecType>
+void Assembler::binOpAssignConst(Slot const lhs, literal::Literal const rhs, SpecType const &spec) {
+
+  pushPtr();
+  auto const [targetSlot, operandVal] = [&] -> std::tuple<Slot, int> {
+    assert(types::isInteger(rhs->type()));
+    int const rhsVal = literal::cast<types::IntegerType>(rhs)->semanticValue();
+    if (not types::isPointer(lhs.type)) return {lhs, rhsVal};
+    assert(spec.op == BinOp::Add || spec.op == BinOp::Sub);     
+
+    Slot const targetSlot = lhs.sub(ts::u16(), RuntimePointer::Offset);
+    int const stride = types::cast<types::PointerType>(lhs.type)->pointeeType()->size();
+    std::cerr << "here: stride = " << stride << '\n';
+    return {targetSlot, rhsVal * stride};
+  }();
+
+  (this->*spec.applyWithConst)(targetSlot, operandVal);
+  popPtr();
+}
+
+
+template <typename SpecType>
 Expression Assembler::binOpAssignImpl(Expression const &lhs, Expression const &rhs, SpecType const &spec, API_CTX) {
   assert(not lhs.isLiteral());
 
@@ -13,57 +59,16 @@ Expression Assembler::binOpAssignImpl(Expression const &lhs, Expression const &r
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   auto opResult = types::rules::binOpResult(spec.op, lhs.type(), rhs.type());
   API_REQUIRE(opResult, error::ErrorCode::IncompatibleOperands, opResult.errorMsg);
+  assert(not lhs.isLiteral());
 
-  pushPtr();
-
-  int stride = 1;
-  Slot const lhsBase = lhs.slot()->materialize(*this);
-  Slot targetSlot = lhsBase;
-  if (types::isPointer(lhs.type())) {
-    targetSlot = lhsBase.sub(ts::u16(), RuntimePointer::Offset);
-    stride = types::cast<types::PointerType>(lhs.type())->pointeeType()->size();
-  }
-  
-  if (stride != 1) {
-    assert(spec.op == BinOp::Add || spec.op == BinOp::Sub);
-  }
-
+  Slot const lhsSlot = materialize(lhs.slot(), true);
   if (rhs.hasSlot()) {
-    Slot operandSlot = rhs.slot()->materialize(*this);
-    bool freeOperandSlot = not rhs.slot()->direct();
-    if (stride != 1) {
-      // rhs operand needs to be multiplied, so we need a copy unless
-      // this was an indirect access, in which case we can simply
-      // modify the temporary materialized slot.
-      
-      if (rhs.slot()->direct()) {
-	// Direct -> we need a temp copy
-	Slot const operandCopy = getTemp(operandSlot.type);
-	assignSlot(operandCopy, operandSlot);
-	mulSlotByConst(operandCopy, stride);
-	operandSlot = operandCopy;
-	freeOperandSlot = true;
-      } else {
-	// Indirect -> we can can modify the slot 
-	mulSlotByConst(operandSlot, stride);
-      }
-    }
-    (this->*spec.applyWithSlot)(targetSlot, operandSlot);
-    if (freeOperandSlot) freeTemp(operandSlot);
-
+    Slot const rhsSlot = materialize(rhs.slot());
+    binOpAssignSlot(lhsSlot, rhsSlot, spec);
+  } else {
+    binOpAssignConst(lhsSlot, rhs.literal(), spec);
   }
-  else {
-    int const delta = literal::cast<types::IntegerType>(rhs.literal())->semanticValue();
-    (this->*spec.applyWithConst)(targetSlot, stride * delta);
-  }
-
   
-  if (not lhs.slot()->direct()) {
-    lhs.slot()->write(*this, lhsBase);
-    freeTemp(lhsBase);
-  }
-
-  popPtr();
   return lhs;
 }
 
@@ -75,6 +80,7 @@ Expression Assembler::binOpImpl(Expression const &lhs, Expression const &rhs, Sp
   auto opResult = types::rules::binOpResult(spec.op, lhs.type(), rhs.type());
   API_REQUIRE(opResult, error::ErrorCode::IncompatibleOperands, opResult.errorMsg);
 
+  // Two literals -> fold
   if (lhs.isLiteral() && rhs.isLiteral()) {
     assert(types::isInteger(lhs.type()) && types::isInteger(rhs.type()));
     
@@ -91,11 +97,35 @@ Expression Assembler::binOpImpl(Expression const &lhs, Expression const &rhs, Sp
   }
 
   Slot result = getTemp(opResult.workType);
-  assignImpl(Expression{result}, lhs, API_FWD); // TODO: this should be assignSlot
+  assignImpl(Expression{result}, lhs, API_FWD);
   binOpAssignImpl(Expression{result}, rhs, spec, API_FWD);
 
   result.type = opResult.type;
   return Expression{result};
+  
+  // // Two slots
+  // if (lhs.hasSlot() && rhs.hasSlot()) {
+  //   Slot const lhsSlot = materialize(lhs.slot());
+  //   Slot const rhsSlot = materialize(rhs.slot());
+  //   Slot result = getTemp(opResult.workType);
+  //   assignSlot(result, lhsSlot);
+  //   binOpAssignSlot(result, rhsSlot, spec);
+  //   result.type = opResult.type;
+  //   return Expression{result};
+  // }
+
+  // // Mixed
+  // auto const [slot, value] = [&] -> std::pair<Slot, literal::Literal> {
+  //   return lhs.hasSlot()
+  //   ? std::make_pair(materialize(lhs.slot(), true), rhs.literal())
+  //   : std::make_pair(materialize(rhs.slot(), true), lhs.literal());
+  // }();
+  
+  // Slot result = getTemp(opResult.workType);
+  // assignSlot(result, slot);
+  // binOpAssignConst(result, value, spec);
+  // result.type = opResult.type;
+  // return Expression{result};
 }
 
 // Explicit instantiations for Mop, Cop and Lop

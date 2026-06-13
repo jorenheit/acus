@@ -11,13 +11,22 @@ namespace acus::proxy {
   impl::SlotProxy::SlotProxy(Slot const &slot):
     BasePtr(proxy::direct(slot))
   {}
+  
+  bool impl::SlotProxy::operator==(SlotProxy const &other) const {
+    return (*this)->uniqueName() == other->uniqueName();
+  }
 
-  Slot impl::Direct::materialize(Assembler &) const {
+  
+  Slot impl::Direct::materialize(Assembler &, bool const) const {
     return _slot;
+  }
+
+  void impl::Direct::materialize(Assembler &, Slot const &, bool const) const {
+    assert(false && "trying to materialize a direct proxy into another slot");
   }
   
   void impl::Direct::write(Assembler &a, SlotProxy src) const {
-    a.assignSlot(_slot, src->materialize(a));
+    a.assignSlot(_slot, a.materialize(src));
   }
 
   void impl::Direct::write(Assembler &a, literal::Literal src) const {
@@ -33,57 +42,45 @@ namespace acus::proxy {
   }
 
   // Materialize a slot at known offset
-  Slot impl::ArrayElement::materializeImpl(Assembler &a, int index) const {
-    return getElementSlot(_arr->materialize(a), index);
+  Slot impl::ArrayElement::materializeImpl(Assembler &a, int index, bool const writeIntent) const {
+    return getElementSlot(a.materialize(_arr, writeIntent), index);
   }
 
   // Materialize a slot at unknown offset
-  Slot impl::ArrayElement::materializeImpl(Assembler &a, SlotProxy index) const {
-    Slot const arrSlot = _arr->materialize(a);
-    Slot const indexSlot = index->materialize(a);
-    Slot const elementSlot = a.getTemp(this->type());
-
-    a.copyElementIntoSlot(elementSlot, arrSlot, indexSlot);
-    return elementSlot;
+  void impl::ArrayElement::materializeImpl(Assembler &a, SlotProxy index, Slot const &target, bool const) const {
+    Slot const arrSlot = a.materialize(_arr); // not intending to write directly to this slot, even for writeIntent = true
+    Slot const indexSlot = a.materialize(index);
+    a.copyElementIntoSlot(target, arrSlot, indexSlot);
   }
 
   // Write an anonymous value to a slot at known offset
   void impl::ArrayElement::writeImpl(Assembler &a, int index, literal::Literal src) const {
-    Slot const arrSlot = _arr->materialize(a);
+    Slot const arrSlot = a.materialize(_arr, true); // known offset -> we're about to write to this slot
     Slot const elementSlot = getElementSlot(arrSlot, index);
-
     a.assignSlot(elementSlot, src);
-    if (not _arr->direct()) {
-      _arr->write(a, arrSlot);
-    }
   }
 
   // Write a slot-proxy to a slot at known offset
   void impl::ArrayElement::writeImpl(Assembler &a, int index, SlotProxy src) const {
-    Slot const srcSlot = src->materialize(a);
-    Slot const arrSlot = _arr->materialize(a);
+    Slot const arrSlot = a.materialize(_arr, true); // known offset -> we're about to write to this slot
+    Slot const srcSlot = a.materialize(src);
     Slot const elementSlot = getElementSlot(arrSlot, index);
-
     a.assignSlot(elementSlot, srcSlot);
-    if (not _arr->direct()) {
-      _arr->write(a, arrSlot);
-    }
   }
 
   // Write an anonymous value to a dynamic offset
   void impl::ArrayElement::writeImpl(Assembler &a, SlotProxy index, literal::Literal src) const {
-    writeImpl(a, index, a.getTemp(src));
+    Slot const arrSlot   = a.materialize(_arr, true); // known offset -> we're about to write to this slot
+    Slot const indexSlot = a.materialize(index);
+    a.copyConstIntoElement(src, arrSlot, indexSlot);
   }
 
   // Write a slot-proxy to a dynamic offset
   void impl::ArrayElement::writeImpl(Assembler &a, SlotProxy index, SlotProxy src) const {
-    Slot const srcSlot = src->materialize(a);
-    Slot const arrSlot = _arr->materialize(a);
-    Slot const indexSlot = index->materialize(a);
+    Slot const arrSlot = a.materialize(_arr, true);
+    Slot const srcSlot = a.materialize(src);
+    Slot const indexSlot = a.materialize(index);
     a.copySlotIntoElement(srcSlot, arrSlot, indexSlot);
-    if (not _arr->direct()) {
-      _arr->write(a, arrSlot);
-    }
   }
 
   Slot impl::ArrayElement::addressOf(Assembler &a) const {
@@ -114,33 +111,29 @@ namespace acus::proxy {
       .offset = obj.offset + _fieldOffset
     };  
   }
-  
-  
-  Slot impl::StructField::materialize(Assembler &a) const {
-    return getFieldSlot(_obj->materialize(a));
+    
+  Slot impl::StructField::materialize(Assembler &a, bool const writeIntent) const {
+    return getFieldSlot(a.materialize(_obj, writeIntent));
   }
 
+  void impl::StructField::materialize(Assembler &, Slot const &, bool const) const {
+    assert(false && "struct field materialization never requires a target slot");
+    std::unreachable();
+  }
+  
   // Write an anonymous value to a slot at known offset
   void impl::StructField::write(Assembler &a, literal::Literal src) const {
-    Slot const objSlot = _obj->materialize(a);
+    Slot const objSlot = a.materialize(_obj, true);
     Slot const fieldSlot = getFieldSlot(objSlot);
-
     a.assignSlot(fieldSlot, src);
-    if (not _obj->direct()) {
-      _obj->write(a, objSlot);
-    }
   }
 
   // Write a slot-proxy to a slot at known offset
   void impl::StructField::write(Assembler &a, SlotProxy src) const {
-    Slot const srcSlot = src->materialize(a);
-    Slot const objSlot = _obj->materialize(a);
+    Slot const objSlot = a.materialize(_obj, true);
+    Slot const srcSlot = a.materialize(src);
     Slot const fieldSlot = getFieldSlot(objSlot);
-
     a.assignSlot(fieldSlot, srcSlot);
-    if (not _obj->direct()) {
-      _obj->write(a, objSlot);
-    }
   }
 
   Slot impl::StructField::addressOf(Assembler &a) const {
@@ -149,28 +142,54 @@ namespace acus::proxy {
     a.addAssign(ptr, literal::u16(_fieldOffset));
     return ptr;
   }
-  
-  Slot impl::DereferencedPointer::materialize(Assembler &a) const {
-    Slot const ptrSlot = _ptr->materialize(a);
-    Slot const destSlot = a.getTemp(this->type());
-    a.dereferencePointerIntoSlot(ptrSlot, destSlot);
-    return destSlot;
+
+  Slot impl::DereferencedPointer::materialize(Assembler &, bool const) const {
+    assert(false && "dereferenced pointer materialization always requires a target slot");
+    std::unreachable();
+  }
+
+  void impl::DereferencedPointer::materialize(Assembler &a, Slot const &target, bool const writeIntent) const {
+    Slot const ptrSlot = a.materialize(_ptr);
+    a.dereferencePointerIntoSlot(ptrSlot, target);
   }
 
   void impl::DereferencedPointer::write(Assembler &a, SlotProxy src) const {
-    Slot const ptrSlot = _ptr->materialize(a);
-    Slot const srcSlot = src->materialize(a);
+    Slot const ptrSlot = a.materialize(_ptr);
+    Slot const srcSlot = a.materialize(src);
     a.writeSlotThroughDereferencedPointer(ptrSlot, srcSlot);
   }
 
   void impl::DereferencedPointer::write(Assembler &a, literal::Literal src) const {
-    Slot const ptrSlot = _ptr->materialize(a);
-    Slot const srcSlot = a.getTemp(src);
-    a.writeSlotThroughDereferencedPointer(ptrSlot, srcSlot);
+    Slot const ptrSlot = a.materialize(_ptr);
+    a.writeConstThroughDereferencedPointer(ptrSlot, src);
   }
 
   Slot impl::DereferencedPointer::addressOf(Assembler &a) const {
-    return _ptr->materialize(a);
+    return a.materialize(_ptr);
   }
+
+
+  // Global References
+  Slot impl::GlobalReference::materialize(Assembler &a, bool const writeIntent) const {
+    assert(false && "global reference materialization always requires a target slot");
+  }
+  
+  void impl::GlobalReference::materialize(Assembler &a, Slot const &dest, bool const) const {
+    a.fetchGlobal(_slot, dest);
+  }
+      
+  void impl::GlobalReference::write(Assembler &a, SlotProxy src) const {
+    Slot const srcSlot = a.materialize(src);
+    a.putGlobal(_slot, srcSlot);
+  }
+      
+  void impl::GlobalReference::write(Assembler &a, acus::literal::Literal src) const {
+    a.putGlobal(_slot, src);
+  }
+      
+  Slot impl::GlobalReference::addressOf(Assembler &a) const {
+    return a.addressOfSlot(_slot);
+  }
+
   
 } // namespace proxy

@@ -9,6 +9,7 @@
 namespace acus {
 
   void Assembler::ProgramBuilder::begin() {
+    BuilderBase::check();
     _finalized.done();
     _assembler.beginProgramImpl(_name, _entry, API_FWD);
   }
@@ -35,19 +36,23 @@ namespace acus {
   }
 
   Assembler::FunctionBuilder && Assembler::FunctionBuilder::ret(types::TypeHandle returnType) && {
+    BuilderBase::check();  
     return std::move(this->ret(returnType));
   }
   
   Assembler::FunctionBuilder & Assembler::FunctionBuilder::param(std::string const &varName, types::TypeHandle varType) & {
+    BuilderBase::check();  
     _params.emplace_back(varName, varType);
     return *this;
   }
 
   Assembler::FunctionBuilder && Assembler::FunctionBuilder::param(std::string const &varName, types::TypeHandle varType) && {
+    BuilderBase::check();  
     return std::move(this->param(varName, varType));
   }
   
   void Assembler::FunctionBuilder::begin() {
+      BuilderBase::check();
     _finalized.done();
 
     std::vector<std::string> varNames;

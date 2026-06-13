@@ -12,37 +12,36 @@
 namespace acus {
 
 struct Slot {
-
+  // TODO: what kinds do I actually need now. 
   enum Kind {
     Local,
     Global,
-    GlobalReference,
     ArrayElement,
     StructField,
     Dummy,
     Available,
     Temp,
-    Invalid
+    Cache
   };
 
-  std::string name;  
+  std::string name;
+  std::string uniqueName;
   types::TypeHandle type;
   Kind kind;
   int offset;
-  void const *scope;
+  void const *scope = nullptr;
+  
 	 
   int size() const;
   operator int() const { return offset; }
 
   Slot sub(types::TypeHandle subType, int subOffset) const;
   Slot unsignedView() const;
-
-  bool valid() const;
-  static Slot invalid();
 };
 
   inline bool operator==(Slot const &s1, Slot const &s2) {
-    return s1.offset == s2.offset && s1.size() == s2.size();
+    // TODO: need better heuristic?
+    return s1.offset == s2.offset && s1.size() == s2.size(); // kinds?
   }
 
   

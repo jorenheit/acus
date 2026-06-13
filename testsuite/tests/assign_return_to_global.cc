@@ -10,7 +10,6 @@ TEST_BEGIN
 c.declareGlobal("g", ts::u8());
 
 c.function("main").begin(); {
-  c.referGlobals({"g"});
 
   c.callFunction("foo").into("g").done();
   c.write("g");
@@ -25,7 +24,6 @@ c.function("foo").ret(ts::u8()).begin(); {
 } c.endFunction();
 
 c.function("bar").begin(); {
-  c.referGlobals({"g"});
   c.write("g");
   c.returnFromFunction();
 } c.endFunction();

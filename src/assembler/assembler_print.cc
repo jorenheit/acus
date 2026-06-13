@@ -16,33 +16,27 @@ void Assembler::readImpl(Expression const &rhs, API_CTX) {
   assert(not rhs.isLiteral());
 
   pushPtr();
-  Slot const targetSlot = rhs.slot()->materialize(*this);
+  Slot const targetSlot = materialize(rhs.slot());
   moveTo(targetSlot);
   emit<primitive::In>();
   popPtr();
-
-  if (not rhs.slot()->direct()) {
-    rhs.slot()->write(*this, targetSlot);
-    freeTemp(targetSlot);
-  }
 }
 
 void Assembler::writeImpl(Expression const &rhs, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  pushPtr();
-
-  bool freeSlot = false;
   Slot const slot = [&] {
-    if (rhs.hasSlot()) {
-      freeSlot = not rhs.slot()->direct();
-      return rhs.slot()->materialize(*this);
-    }
-    freeSlot = true;
+    if (rhs.hasSlot()) return materialize(rhs.slot());
     return getTemp(rhs.literal());
   }();
 
+  writeSlot(slot);
+  if (slot.kind == Slot::Temp) freeTempSlot(slot);
+}
+
+void Assembler::writeSlot(Slot const &slot) {
+  pushPtr();
   for (int i = 0; i != slot.type->size(); ++i) {
     moveTo(slot + i, MacroCell::Value0);
     emit<primitive::Out>();
@@ -52,8 +46,6 @@ void Assembler::writeImpl(Expression const &rhs, API_CTX) {
     }
   }
   popPtr();
-
-  if (freeSlot) freeTemp(slot);
 }
 
 void Assembler::printImpl(Expression const &val, API_CTX) {
@@ -93,9 +85,8 @@ void Assembler::printDecimal(Expression const &expr) {
   assert(types::isInteger(expr.type()));
   
   if (expr.hasSlot()) {
-    Slot const slot = expr.slot()->materialize(*this);
+    Slot const slot = materialize(expr.slot());
     printDecimalSlot(slot);
-    if (not expr.slot()->direct()) freeTemp(slot);
     return;
   }
 
@@ -177,8 +168,8 @@ void Assembler::printDecimalSlotUnsigned(Slot const &slot, bool const destroySlo
   _dp.set(Cell{digits, MacroCell::Value0});
 
   popPtr();
-  freeTemp(digits);
-  if (freeValSlot) freeTemp(valSlot);
+  freeTempSlot(digits);
+  if (freeValSlot) freeTempSlot(valSlot);
 }
 
 void Assembler::printDecimalSlotSigned(Slot const &slot) {
@@ -214,9 +205,8 @@ void Assembler::printString(Expression const &expr) {
   assert(types::isString(expr.type()));
   
   if (expr.hasSlot()) {
-    Slot const slot = expr.slot()->materialize(*this);
+    Slot const slot = materialize(expr.slot());
     printStringSlot(slot);
-    if (not expr.slot()->direct()) freeTemp(slot);
     return;
   }
   assert(expr.isLiteral());
@@ -243,7 +233,7 @@ void Assembler::printStringConst(std::string const &str) {
   zeroCell();
   popPtr();
 
-  freeTemp(ch);
+  freeTempSlot(ch);
 }
  
 void Assembler::printStringSlot(Slot const &slot) {

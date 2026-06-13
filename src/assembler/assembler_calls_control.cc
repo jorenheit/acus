@@ -19,9 +19,6 @@ void Assembler::callFunctionImpl(std::string const &functionName, std::optional<
   deferFunctionCallTypeCheck(functionName, args, API_FWD);
 
   std::string const nextBlockName = generateUniqueBlockName();
-  
-  // Sync globals
-  syncLocalToGlobal();
 
   // Schedule metablock
   std::string const metaBlockName = std::string("__ret_meta_")
@@ -38,13 +35,17 @@ void Assembler::callFunctionImpl(std::string const &functionName, std::optional<
 
   setNextBlock(_currentFunction->name, metaBlockName);
 
-  // Prepare frame (set target, copy args) and push next frame onto the stack  
+  // Prepare frame (set target, copy args) and push next frame onto the stack
+  _cache.controlBoundary();  
   prepareNextFrame(functionName, args, API_FWD);
   pushFrame();
+  _cache.reset();
+  
 
   // Start the next block
   assert(_currentBlock != nullptr);
   endBlock();
+
   beginBlock(nextBlockName);
 }
 
@@ -58,9 +59,6 @@ void Assembler::callFunctionImpl(Expression const &fPtr, std::optional<Expressio
   functionCallTypeCheck(functionType, args, API_FWD);
 
   std::string const nextBlockName = generateUniqueBlockName();
-  
-  // Sync Globals
-  syncLocalToGlobal();
 
   // Schedule metablock
   std::string const metaBlockName = std::string("__ret_meta_")
@@ -78,8 +76,10 @@ void Assembler::callFunctionImpl(Expression const &fPtr, std::optional<Expressio
     });
 
   // Prepare frame (set target, copy args) and push next frame onto the stack
+  _cache.controlBoundary();
   prepareNextFrame(fPtr, args, API_FWD);
   pushFrame();
+  _cache.reset();
 
   // Start next block
   assert(_currentBlock != nullptr);
@@ -183,7 +183,8 @@ void Assembler::returnFromFunctionImpl(std::optional<Expression> const &ret, API
     assignImpl(Expression{returnSlot}, *ret, API_FWD);
   }
   
-  syncLocalToGlobal();
+  //  syncLocalToGlobal();
+  _cache.returnBoundary();
   popFrame();
 
   assert(_currentBlock != nullptr);
@@ -219,7 +220,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
   auto const constructInNextFrame = [&](auto&& self, int &offset, Expression const &arg) -> void {
 
     if (arg.hasSlot()) { // Already stored on tape -> copy to next frame
-      Slot const argSlot = arg.slot()->materialize(*this);
+      Slot const argSlot = materialize(arg.slot(), false);
       switch (argSlot.type->tag()) {
       case types::U8:
       case types::U16:
@@ -274,8 +275,6 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
 	std::unreachable();
       }
       } // switch (tag)
-
-      if (not arg.slot()->direct()) freeTemp(argSlot);
     }
     else { // anonymous value -> construct in-place
       types::TypeHandle argType = arg.type();
@@ -375,13 +374,8 @@ void Assembler::prepareNextFrame(Expression const &fptr, std::vector<Expression>
   
   
   // Set target block
-  bool freeFptrSlot = false;
   Slot const fptrSlot = [&] {
-    if (fptr.hasSlot()) {
-      freeFptrSlot = not fptr.slot()->direct();
-      return fptr.slot()->materialize(*this);
-    }
-    freeFptrSlot = true;
+    if (fptr.hasSlot()) return materialize(fptr.slot(), false);
     return getTemp(fptr.literal());
   }();
 
@@ -398,7 +392,7 @@ void Assembler::prepareNextFrame(Expression const &fptr, std::vector<Expression>
   emit<primitive::CopyData>(sourceCell1, targetCell1, scratchCell);
   popPtr();
 
-  if (freeFptrSlot) freeTemp(fptrSlot);
+  if (fptrSlot.kind == Slot::Temp) freeTempSlot(fptrSlot);
 }
 
 
@@ -490,5 +484,5 @@ void Assembler::branchIfSlot(Slot const &slot, std::string const &trueLabel, std
 
   popPtr();
 
-  freeTemp(tmp);
+  freeTempSlot(tmp);
 }

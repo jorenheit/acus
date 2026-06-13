@@ -45,6 +45,7 @@ struct Function {
 
   struct Scope {
     Scope *parent = nullptr;
+    size_t id = -1;
   };
   
   size_t functionIndex = 0;
@@ -84,6 +85,7 @@ struct Function {
   }
 
   inline Scope &createScope(Scope *parent) {
+    static size_t scopeID = 0;
     bool valid = false;
     for (auto const &scope: scopes) {
       if (scope.get() == parent) {
@@ -92,7 +94,7 @@ struct Function {
       }
     }
     assert(valid || parent == nullptr);
-    scopes.emplace_back(std::make_unique<Scope>(parent));
+    scopes.emplace_back(std::make_unique<Scope>(parent, scopeID++));
     return *scopes.back();
   }
 };

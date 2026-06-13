@@ -14,7 +14,6 @@ auto point = ts::defineStruct("Point").field("x", ts::u8()).field("y", ts::u8())
 c.declareGlobal("g", point);
 
 c.function("main").begin(); {
-  c.referGlobals({"g"});
 
   auto gx = c.structField("g", "x");
   auto gy = c.structField("g", "y");
@@ -29,7 +28,6 @@ c.function("main").begin(); {
 } c.endFunction();
 
 c.function("foo").begin(); {
-  c.referGlobals({"g"});
 
   auto gy = c.structField("g", "y");
   c.assign(gy, literal::u8('C'));

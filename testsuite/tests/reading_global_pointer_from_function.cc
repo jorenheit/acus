@@ -15,7 +15,6 @@ TypeHandle u8p = ts::pointer(ts::u8());
 c.declareGlobal("g", u8);
 
 c.function("main").begin(); {
-  c.referGlobals({"g"});
   c.declareLocal("pg", u8p);
   c.declareLocal("x", u8);
 

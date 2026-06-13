@@ -97,8 +97,6 @@ void Assembler::endProgram(API_FUNC) {
   _bf[_program.name] = simplifyBrainfuck(prog.dumpCode(ctx));
 }
 
-
-
 Assembler::FunctionBuilder Assembler::function(std::string const &name, API_FUNC) {
   API_FUNC_BEGIN();
   return FunctionBuilder { *this, name, API_FWD };
@@ -114,7 +112,8 @@ void Assembler::beginFunctionImpl(std::string const &name, types::TypeHandle typ
   API_REQUIRE_PARAM_COUNT_MATCHES_FUNCTION(fType, params);
   
   _state.allowGlobalDeclarations = false;
-  _currentFunction = &_program.createFunction(name, fType);  
+  _currentFunction = &_program.createFunction(name, fType);
+  _cache.reset();
 
   std::unordered_set<std::string> paramSet;
   for (size_t i = 0; i != params.size(); ++i) {
@@ -136,7 +135,7 @@ void Assembler::endFunction(API_FUNC) {
   API_REQUIRE_NO_SCOPE();
 
   endBlock();
-  freeTemps();
+  freeTempSlots();
  
   _currentFunction = nullptr;
 }
@@ -149,7 +148,7 @@ Assembler::ScopeBuilder Assembler::scope(API_FUNC) {
 void Assembler::beginScopeImpl(API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
-  
+
   _currentScope = &_currentFunction->createScope(_currentScope);
 }
 

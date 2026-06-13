@@ -805,6 +805,126 @@ tests.push_back(expectOutput("Struct with two pointer fields",
 #include "tests/mixed_named_and_pointer_global_access.cc"
 			      })); 
 
+tests.push_back(expectOutput("Cache Dynamic Array Field Write",
+                             "AXC", []() {
+#include "tests/cache_dynamic_array_field_write.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Nested Dynamic Array Write",
+                             "ABXD", []() {
+#include "tests/cache_nested_dynamic_array_write.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Direct Relative Gap Struct Array",
+                             "AQCD", []() {
+#include "tests/cache_direct_relative_gap_struct_array.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Source After Destination Preparation",
+                             "BBC", []() {
+#include "tests/cache_source_after_destination_preparation.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Dynamic Self Assignment",
+                             "ABC", []() {
+#include "tests/cache_dynamic_self_assignment.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Alias Read Flushes Dirty Dynamic Entry",
+                             "AXC", []() {
+#include "tests/cache_alias_read_flushes_dirty_dynamic_entry.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Alias Write Struct Field After Cached Read",
+                             "BX", []() {
+#include "tests/cache_alias_write_struct_field_after_cached_read.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Pointer Reassignment Invalidates Deref",
+                             "AB", []() {
+#include "tests/cache_pointer_reassignment_invalidates_deref.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Pointer Arithmetic Invalidates Deref",
+                             "AB", []() {
+#include "tests/cache_pointer_arithmetic_invalidates_deref.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Pointer Write After Arithmetic Struct Array",
+                             "AXC", []() {
+#include "tests/cache_pointer_write_after_arithmetic_struct_array.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Global Struct Field Call Boundary",
+                             "AB", []() {
+#include "tests/cache_global_struct_field_call_boundary.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Source From Pointer To Dynamic Destination",
+                             "BBC", []() {
+#include "tests/cache_source_from_pointer_to_dynamic_destination.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Dynamic Source To Pointer Destination",
+                             "BBBC", []() {
+#include "tests/cache_dynamic_source_to_pointer_destination.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Index Change Invalidates Clean Dynamic Entry",
+                             "AC", []() {
+#include "tests/cache_index_change_invalidates_clean_dynamic_entry.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Dirty Dynamic Entry Before Index Change",
+                             "XBC", []() {
+#include "tests/cache_dirty_dynamic_entry_before_index_change.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Nested Dirty Entry Before Inner Index Change",
+                             "ABXD", []() {
+#include "tests/cache_nested_dirty_entry_before_inner_index_change.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Cross Index Copy",
+                             "CBCD", []() {
+#include "tests/cache_cross_index_copy.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Runtime Same Index Copy",
+                             "ABC", []() {
+#include "tests/cache_runtime_same_index_copy.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Alias Write Invalidates Clean Structural Entry",
+                             "BX", []() {
+#include "tests/cache_alias_write_invalidates_clean_structural_entry.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Alias Write After Dirty Structural Entry",
+                             "X", []() {
+#include "tests/cache_alias_write_after_dirty_structural_entry.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Pointer Argument Sees Dirty Dynamic Entry",
+                             "X", []() {
+#include "tests/cache_pointer_argument_sees_dirty_dynamic_entry.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Pointer Read After Dirty Global Field",
+                             "X", []() {
+#include "tests/cache_pointer_read_after_dirty_global_field.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Alias Write Then Structural Owner Write",
+                             "XY", []() {
+#include "tests/cache_alias_write_then_structural_owner_write.cc"
+                             }));
+
+tests.push_back(expectOutput("Cache Structural Write Then Alias Write Same Owner",
+                             "XY", []() {
+#include "tests/cache_structural_write_then_alias_write_same_owner.cc"
+                             }));
+ 
  tests.push_back(expectOutput("Logical NOT",
 			      "BABABABABB", []() {
 #include "tests/logical_not.cc"

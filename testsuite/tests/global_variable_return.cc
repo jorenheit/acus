@@ -19,13 +19,11 @@ c.function("main").begin(); {
 } c.endFunction();
 
 c.function("foo").ret(ts::u8()).begin(); {
-  c.referGlobals({"g"});
   c.assign("g", literal::u8('G'));
   c.returnFromFunction("g");
 } c.endFunction();
 
 c.function("bar").begin(); {
-  c.referGlobals({"g"});
   c.write("g");
   c.returnFromFunction();
 } c.endFunction();

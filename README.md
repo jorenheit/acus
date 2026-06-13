@@ -236,7 +236,7 @@ The usage of C++ scope blocks is mainly for convenience (the C++ scope matches t
 ### Functions
 #### Defining a Function
 
-A function is defined using `Assembler::function`, which returns a `FunctionBuilder` object. This object is not meant to be stored in a variable; instead you call the `param` and `ret` methods on it until the entire function signature has been completed, at which point you call `begin` to start the body of the function:
+A function is defined using `Assembler::function`, which returns a `FunctionBuilder` object. You then call the `param` and `ret` methods on this object until the entire function signature has been completed, at which point you call `begin` to start the body of the function:
 
 ```cpp
 a.function("foo")

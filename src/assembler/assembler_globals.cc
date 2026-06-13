@@ -5,36 +5,6 @@
 
 #include "assembler.ih"
 
-template <auto FetchOrPut>
-void Assembler::syncGlobal(Slot const &localSlot, bool onlyAliasedGlobals) {
-  assert(localSlot.kind == Slot::GlobalReference);
-  
-  std::string globalName = localSlot.name.substr(std::string("__g_").size());
-  assert(_program.isGlobal(globalName));
-  if (onlyAliasedGlobals && not _aliasedGlobals.contains(globalName)) return;
-  
-  Slot const &globalSlot = _program.globalSlot(globalName);
-  assert(globalSlot.size() == localSlot.size());
-
-  (this->*FetchOrPut)(globalSlot, localSlot);
-}
-
-template <auto FetchOrPut>
-void Assembler::syncGlobals(bool onlyAliasedGlobals) {
-  auto const &locals = _currentFunction->frame.locals;
-  for (auto const &localSlot: locals) {
-    if (localSlot.kind != Slot::GlobalReference) continue;
-    syncGlobal<FetchOrPut>(localSlot, onlyAliasedGlobals);
-  }  
-}
-
-void Assembler::syncGlobalToLocal(bool onlyAliasedGlobals) {
-  syncGlobals<&Assembler::fetchGlobal>(onlyAliasedGlobals);
-}
-
-void Assembler::syncLocalToGlobal(bool onlyAliasedGlobals) {
-  syncGlobals<&Assembler::putGlobal>(onlyAliasedGlobals);
-}
 
 void Assembler::fetchGlobal(Slot const &globalSlot, Slot const &localSlot) {
   assert(globalSlot.type == localSlot.type);
@@ -87,7 +57,6 @@ void Assembler::fetchGlobal(Slot const &globalSlot, Slot const &localSlot) {
 
 void Assembler::putGlobal(Slot const &globalSlot, Slot const &localSlot) {
   assert(globalSlot.type == localSlot.type);
-  assert(globalSlot.size() == localSlot.size());
 
   bool const useValue1 = globalSlot.type->usesValue1();
   int const size = globalSlot.type->size();
@@ -126,11 +95,28 @@ void Assembler::putGlobal(Slot const &globalSlot, Slot const &localSlot) {
   }
   
   // Return to origin frame
+  moveToOrigin();
   seek(MacroCell::SeekMarker, primitive::Right, {}, false);
   resetSeekMarker();
-  switchField(static_cast<MacroCell::Field>(0));
-  resetOrigin();
   
+  popPtr();
+}
+
+void Assembler::putGlobal(Slot const &globalSlot, literal::Literal const value) {
+  assert(globalSlot.type == value->type());
+
+  // Move to the global frame (no payload)
+  pushPtr();  
+
+  moveToOrigin();
+  setSeekMarker();
+  seek(MacroCell::SeekMarker, primitive::Left, {}, false);
+  assignSlot(globalSlot, value);
+  
+  // Return to origin frame
+  moveToOrigin();
+  seek(MacroCell::SeekMarker, primitive::Right, {}, false);
+  resetSeekMarker();
   popPtr();
 }
 

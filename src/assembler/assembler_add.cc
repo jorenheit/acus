@@ -30,7 +30,7 @@ void Assembler::addSlotToSlot(Slot const &lhs, Slot const &rhs) {
     addDestructive(Cell{rhsCopy, MacroCell::Value0});
   }
   popPtr();
-  freeTemp(rhsCopy);
+  freeTempSlot(rhsCopy);
 }
 
 void Assembler::addConstToSlot(Slot const &lhs, int delta) {

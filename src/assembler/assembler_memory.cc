@@ -5,12 +5,11 @@
 
 #include "assembler.ih"
 
-Slot Assembler::local(std::string const& varName, bool globalReference) const {
-  assert(_currentFunction != nullptr);
 
+std::optional<Slot> Assembler::localSlot(std::string const &varName) const {
   Function::Scope *targetScope = _currentScope;
   while (true) {
-    for (auto &slot: _currentFunction->frame.locals) {
+    for (Slot const &slot: _currentFunction->frame.locals) {
       if (slot.name == varName && slot.scope == targetScope) {
 	return slot;
       }
@@ -18,13 +17,48 @@ Slot Assembler::local(std::string const& varName, bool globalReference) const {
     if (targetScope == nullptr) break;
     targetScope = targetScope->parent;
   }
+  
+  return {};
+}
 
-  if (not globalReference) {
-    std::string const globalReferenceName = std::string("__g_") + varName;
-    return local(globalReferenceName, true);
+std::optional<Slot> Assembler::globalSlot(std::string const &varName) const {
+ for (Slot const &slot: _program.globals) {
+    if (slot.name == varName) {
+      return slot;
+    }
+  }
+ 
+ return {};
+}
+
+SlotProxy Assembler::proxyFromVariableName(std::string const& varName, API_CTX) const {
+  assert(_currentFunction != nullptr);
+
+  // Try to find local slot
+  if (auto const result = localSlot(varName); result.has_value()) {
+    return proxy::direct(*result);
+  }
+  
+  // Not found in local scope, check globals
+  if (auto const result = globalSlot(varName); result.has_value()) {
+    return proxy::globalReference(*result);
   }
 
-  return Slot::invalid();
+  API_REQUIRE(false, error::ErrorCode::NameNotInScope, "'", varName, "' was not declared in this scope.");
+  std::unreachable();
+}
+
+std::string Assembler::makeFullName(std::string const &name) {
+  std::string result = _currentFunction->name + "::";
+  if (_currentScope != nullptr) {
+    result += "scope<" + std::to_string(_currentScope->id) + ">::";
+  }
+  result += name;
+  return result;
+}
+
+std::string Assembler::makeFullGlobalName(std::string const &name) {
+  return "global::" + name;
 }
 
 
@@ -44,22 +78,24 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, Slot:
 
 	// Reuse this slot
 	slot.name = name;
+	slot.uniqueName = makeFullName(name);
 	slot.type = type;
 	slot.kind = kind;
 	slot.scope = _currentScope;
-
+	
 	// Store the slot in case the reference is invalidated below
 	Slot const result = slot;
 
 	// Split the slot if there is still room
-	auto const dummyName = []() {
-	  static int counter = 0; return std::string("__dummy_") + std::to_string(counter++);
-	};
+	std::string const dummyName = [] {
+	  static int counter = 0; return "__dummy_" + std::to_string(counter++);
+	}();
 
 	if (diff > 0) {
 	  // Might invalidate the reference -> use result below
 	  frame.locals.push_back(Slot{
-	      .name = dummyName(),
+	      .name = dummyName,
+	      .uniqueName = makeFullName(dummyName),
 	      .type = ts::raw(diff),
 	      .kind = Slot::Available,
 	      .offset = slot.offset + slot.type->size(),
@@ -79,6 +115,7 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, Slot:
     auto &frame = _currentFunction->frame;
     Slot newSlot {
       .name = name,
+      .uniqueName = makeFullName(name),
       .type = type,
       .kind = kind,
       .offset = frame.localBase() + frame.localAreaSize(),
@@ -94,15 +131,53 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, Slot:
   return newSlot(name, type, kind);
 }
 
+void Assembler::mergeAvailableSlots() {
+  auto &locals = _currentFunction->frame.locals;
+
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    
+    for (size_t i = 0; i < locals.size() && !changed; ++i) {
+      Slot &a = locals[i];
+      if (a.kind != Slot::Available) continue;
+
+      for (size_t j = 0; j < locals.size(); ++j) {
+        if (i == j) continue;
+	Slot &b = locals[j];
+        if (b.kind != Slot::Available) continue;
+
+	// a just before b
+        if (a.offset + a.size() == b.offset) {
+          a.type = ts::raw(a.size() + b.size());
+          locals.erase(locals.begin() + static_cast<std::ptrdiff_t>(j));
+          changed = true;
+          break;
+        }
+
+	// b just before a
+        if (b.offset + b.size() == a.offset) {
+          b.type = ts::raw(b.size() + a.size());
+          locals.erase(locals.begin() + static_cast<std::ptrdiff_t>(i));
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+}
 
 void Assembler::freeSlot(Slot &slot) {
   slot.name = "";
-  slot.type = ts::raw(slot.type->size());
+  slot.uniqueName = "";
+  slot.type = ts::raw(slot.size());
   slot.kind = Slot::Available;
   slot.scope = nullptr;
+
+  mergeAvailableSlots();
 }
 
-void Assembler::freeTemp(Slot const &target) {
+void Assembler::freeTempSlot(Slot const &target) {
   assert(target.kind == Slot::Temp);
   
   // Find this slot in the current frame and free it.
@@ -118,9 +193,28 @@ void Assembler::freeTemp(Slot const &target) {
 }
 
 
-void Assembler::freeTemps() {
+void Assembler::freeTempSlots() {
   for (auto &slot: _currentFunction->frame.locals) {
     if (slot.kind == Slot::Temp) freeSlot(slot);
+  }
+}
+
+void Assembler::freeCacheSlot(Slot const &target) {
+  assert(target.kind == Slot::Cache);
+  
+  // Find this slot in the current frame and free it.
+  for (auto &slot: _currentFunction->frame.locals) {
+    if (slot == target) {
+      freeSlot(slot);
+      return;
+    }
+  }
+  assert(false && "trying to free a cache slot that does not exist");
+}
+
+void Assembler::freeCacheSlots() {
+  for (auto &slot: _currentFunction->frame.locals) {
+    if (slot.kind == Slot::Cache) freeSlot(slot);
   }
 }
 
@@ -134,7 +228,8 @@ void Assembler::freeScope(Function::Scope const *scope) {
 
 Slot Assembler::getTemp(types::TypeHandle type) {
   assert(_currentBlock != nullptr);
-  return allocSlot("__tmp", type, Slot::Temp);
+  static size_t tmpID = 0;
+  return allocSlot("__tmp_" + std::to_string(tmpID++), type, Slot::Temp);
 }
 
 Slot Assembler::getTemp(literal::Literal const &value) {
@@ -142,6 +237,19 @@ Slot Assembler::getTemp(literal::Literal const &value) {
   assignSlot(tmp, value);
   return tmp;
 }
+
+Slot Assembler::getCache(types::TypeHandle type) {
+  assert(_currentBlock != nullptr);
+  static size_t cacheID = 0;
+  return allocSlot("__cache_" + std::to_string(cacheID++), type, Slot::Cache);
+}
+
+Slot Assembler::getCache(literal::Literal const &value) {
+  Slot const slot = getCache(value->type());
+  assignSlot(slot, value);
+  return slot;
+}
+
 
 void Assembler::declareGlobal(std::string const &name, types::TypeHandle type, API_FUNC) {
   API_FUNC_BEGIN();
@@ -154,6 +262,7 @@ void Assembler::declareGlobal(std::string const &name, types::TypeHandle type, A
   int const offset = _program.globalVariableFrameSize();
   Slot slot {
     .name = name,
+    .uniqueName = makeFullGlobalName(name),
     .type = type,
     .kind = Slot::Global,
     .offset = offset,
@@ -173,40 +282,3 @@ Expression Assembler::declareLocal(std::string const& name, types::TypeHandle ty
   return Expression{allocSlot(name, type, Slot::Local)};
 }
 
-Slot Assembler::declareGlobalReference(Slot const &globalSlot) {
-  assert(globalSlot.kind == Slot::Global);
-  assert(_currentFunction != nullptr);
-  assert(_currentBlock != nullptr);
-  
-  FrameLayout &frame = _currentFunction->frame;
-  int const offset = frame.localBase() + frame.localAreaSize();
-  Slot slot {
-    .name = std::string("__g_") + globalSlot.name,
-    .type = globalSlot.type,
-    .kind = Slot::GlobalReference,
-    .offset = offset,
-    .scope = _currentScope
-  };
-  frame.locals.emplace_back(std::move(slot));
-  return frame.locals.back();
-}
-
-
-void Assembler::referGlobals(std::vector<std::string> const &names, API_FUNC) {
-  API_FUNC_BEGIN();
-  API_CHECK_EXPECTED();
-  API_REQUIRE_INSIDE_FUNCTION_BLOCK();
-  
-  std::unordered_set<std::string> declared;
-  for (std::string const &name: names) {
-    API_REQUIRE_IS_GLOBAL(name);
-
-    auto [_, unique] = declared.insert(name);
-    API_REQUIRE(unique,
-		error::ErrorCode::DuplicateGlobalReferences,
-		"multiple references to ", name, ".");
-    declareGlobalReference(_program.globalSlot(name));      
-  }
-
-  syncGlobalToLocal();
-}

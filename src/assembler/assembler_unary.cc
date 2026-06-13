@@ -5,6 +5,8 @@
 
 #include "assembler.ih"
 
+// TODO: use virtual functions for this stuff, same bfor Binops
+
 Assembler::Bop const Assembler::lnotSpec {
   .op = UnOp::Not,
   .fold = [](int x) -> bool { return !x; },
@@ -42,11 +44,8 @@ Expression Assembler::unOpAssignImpl(Expression const &obj, SpecType const &spec
   API_REQUIRE_IS_INTEGER(obj.type());
   assert(not obj.isLiteral());
 
-  Slot const objSlot = obj.slot()->materialize(*this);
+  Slot const objSlot = materialize(obj.slot(), true);
   (this->*spec.apply)(objSlot);
-  if (not obj.slot()->direct()) {
-    obj.slot()->write(*this, objSlot);
-  }
   return obj;
 }
 
@@ -82,7 +81,7 @@ Expression Assembler::unOpImpl(Expression const &obj, SpecType const &spec, API_
 
   // Apply to temp copy
   Slot result = getTemp(obj.type());
-  assignSlot(result, obj.slot()->materialize(*this));
+  assignSlot(result, materialize(obj.slot(), false));
   unOpAssignImpl(Expression{result}, spec, API_FWD);
   result.type = returnType(result.type, spec.fold);
   return Expression { result };  
@@ -107,12 +106,7 @@ Expression Assembler::castImpl(Expression const &obj, types::TypeHandle toType, 
   assert(types::isInteger(toType));
   assert(toType == opResult.type);
 
-  Slot const slot = obj.slot()->materialize(*this);
-  if (slot.type == toType && not obj.slot()->direct()) {
-    // fast path: we already have a temp and the type is the same
-    return Expression{slot};
-  }
-
+  Slot const slot = materialize(obj.slot(), false);
   Slot const result = getTemp(toType);
   if (slot.type == toType) {
     // same type but direct slot, so we copy it directly into our temp
@@ -207,7 +201,7 @@ void Assembler::negateSlot(Slot const &rhs) {
 					 tmp, MacroCell::Scratch1,
 					 tmp, MacroCell::Payload0, 
 					 tmp, MacroCell::Payload1));
-    freeTemp(tmp);
+    freeTempSlot(tmp);
   } else {
     negateDestructive(Temps<2>::select(rhs, MacroCell::Scratch0,
 				       rhs, MacroCell::Scratch1));

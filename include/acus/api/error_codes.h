@@ -64,6 +64,7 @@ namespace acus::error {
     InvalidReadType,
     
     BuilderNotFinalized,
+    BuilderUsedAfterFinalize,    
     ReturnTypeSpecifiedMultipleTimes    
   };
   

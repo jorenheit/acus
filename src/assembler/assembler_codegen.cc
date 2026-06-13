@@ -56,7 +56,9 @@ void Assembler::constructBuiltinFunctions() {
     std::string const funcName = builtinFunctionName(func);
     
     function(funcName).param("x", paramType).begin(); {
-      printDecimal(Expression{ local("x") });
+      std::optional<Slot> slot = localSlot("x");
+      assert(slot.has_value());
+      printDecimal(Expression{ *slot });
       returnFromFunction();
     } endFunction();
     

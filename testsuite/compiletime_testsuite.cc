@@ -83,6 +83,7 @@ std::string codeName(ErrorCode code) {
   case ErrorCode::FunctionParameterCountMismatch: return "FunctionParameterCountMismatch";
   case ErrorCode::InvalidFunctionPointerCall: return "InvalidFunctionPointerCall";
   case ErrorCode::BuilderNotFinalized: return "BuilderNotFinalized";
+  case ErrorCode::BuilderUsedAfterFinalize: return "BuilderUsedAfterFinalize";
   case ErrorCode::ReturnTypeSpecifiedMultipleTimes: return "ReturnTypeSpecifiedMultipleTimes";
   case ErrorCode::EntryFunctionNotDefined: return "EntryFunctionNotDefined";
   case ErrorCode::WrongEntryFunctionType: return "WrongEntryFunctionType";
@@ -217,21 +218,6 @@ std::vector<TestCase> buildTests() {
     beginProgram(c);
     c.declareGlobal("g", ts::u8());
     c.declareGlobal("g", ts::u8());
-  });
-
-  add("referGlobals requires declared global", ExpectedGlobal, [] {
-    Assembler c;
-    beginBasicMain(c);
-    c.referGlobals({"missing"});
-  });
-
-  add("duplicate global reference", DuplicateGlobalReferences, [] {
-    Assembler c;
-    beginProgram(c);
-    c.declareGlobal("g", ts::u8());
-    beginMain(c);
-    c.label("start");
-    c.referGlobals({"g", "g"});
   });
 
   add("unknown variable", NameNotInScope, [] {
@@ -512,7 +498,7 @@ std::vector<TestCase> buildTests() {
     c.endFunction();
     c.endProgram();
   });
-  
+
   return tests;
 }
 

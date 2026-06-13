@@ -43,7 +43,7 @@ void Assembler::subSlotFromSlot(Slot const &lhs, Slot const &rhs) {
     subDestructive(Cell{rhsCopy, MacroCell::Value0});
   }
   popPtr();
-  freeTemp(rhsCopy);
+  freeTempSlot(rhsCopy);
 }
 
 void Assembler::subConst(int delta) {

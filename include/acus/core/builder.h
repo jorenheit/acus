@@ -58,6 +58,11 @@ namespace acus::builder {
 		    "'", _finalizeMethod, "' was never called the ", _builderName , ".");
     }
 
+    void check() {
+      API_REQUIRE(not _finalized, error::ErrorCode::BuilderUsedAfterFinalize,
+		  "builder object '", _builderName, "' can not be used after calling '", _finalizeMethod, "'.");
+    }
+    
     BuilderBase(BuilderBase const&) = delete;
     BuilderBase& operator=(BuilderBase const&) = delete;
 

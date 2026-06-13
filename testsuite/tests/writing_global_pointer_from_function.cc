@@ -15,7 +15,6 @@ auto u8p = ts::pointer(u8);
 c.declareGlobal("g", u8);
 
 c.function("main").begin(); {
-  c.referGlobals({"g"});
   c.declareLocal("p", u8p);
 
   c.assign("g", literal::u8('G'));
@@ -26,7 +25,6 @@ c.function("main").begin(); {
 } c.endFunction();
 
 c.function("foo").param("p", u8p).ret(ts::void_t()).begin(); {
-  c.referGlobals({"g"});
   auto pDeref = c.dereferencePointer("p");
   c.assign(pDeref, literal::u8('H'));
   c.write("g");

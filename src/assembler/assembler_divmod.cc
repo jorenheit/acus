@@ -69,7 +69,7 @@ void Assembler::divSlotByConstUnsigned(Slot const &lhs, int denom, std::optional
     if (modSlot.has_value()) moveField(Cell{*modSlot, MacroCell::Value1});
     else zeroCell();
 
-    freeTemp(tmp);
+    freeTempSlot(tmp);
   } else {
     Slot const tmp = getTemp(ts::raw(1));
     moveTo(lhs, MacroCell::Value0);    
@@ -83,7 +83,7 @@ void Assembler::divSlotByConstUnsigned(Slot const &lhs, int denom, std::optional
     moveTo(lhs, MacroCell::Payload0);    
     if (modSlot.has_value()) moveField(Cell{*modSlot, MacroCell::Value0});
     else zeroCell();
-    freeTemp(tmp);
+    freeTempSlot(tmp);
   }
   
   popPtr();
@@ -126,7 +126,7 @@ void Assembler::divSlotByConstSigned(Slot const &lhs, int denom, std::optional<S
   } loopClose();
 
   popPtr();
-  freeTemp(tmp);
+  freeTempSlot(tmp);
 }
 
 
@@ -201,7 +201,7 @@ void Assembler::divSlotBySlotUnsigned(Slot const &lhs, Slot const &rhs, std::opt
     if (modSlot.has_value()) moveField(Cell{*modSlot, MacroCell::Value1});
     else zeroCell();
 
-    if (freeTmpDonor) freeTemp(tmpDonor);
+    if (freeTmpDonor) freeTempSlot(tmpDonor);
 
   } else {
     moveTo(lhs, MacroCell::Value0);    
@@ -220,7 +220,7 @@ void Assembler::divSlotBySlotUnsigned(Slot const &lhs, Slot const &rhs, std::opt
   
   popPtr();
 
-  if (freeRhsCopy) freeTemp(rhsCopy);
+  if (freeRhsCopy) freeTempSlot(rhsCopy);
 }
 
 void Assembler::divSlotBySlotSigned(Slot const &lhs, Slot const &rhs, std::optional<Slot> const &modSlot) {
@@ -280,7 +280,7 @@ void Assembler::divSlotBySlotSigned(Slot const &lhs, Slot const &rhs, std::optio
   } loopClose();
 
   popPtr();
-  freeTemp(tmp);
+  freeTempSlot(tmp);
 }
 
 
@@ -329,7 +329,7 @@ void Assembler::modSlotByConstUnsigned(Slot const &lhs, int denom, std::optional
     moveField(Cell{lhs, MacroCell::Value0});
     moveTo(lhs, MacroCell::Payload1);
     moveField(Cell{lhs, MacroCell::Value1});
-    freeTemp(tmp);
+    freeTempSlot(tmp);
   } else {
     Slot const tmp = getTemp(ts::raw(1));
     divModConst(denom, Cell{lhs, MacroCell::Payload0},
@@ -344,7 +344,7 @@ void Assembler::modSlotByConstUnsigned(Slot const &lhs, int denom, std::optional
     if (divSlot.has_value())  moveField(Cell{*divSlot, MacroCell::Value0});
     moveTo(lhs, MacroCell::Payload0);
     moveField(Cell{lhs, MacroCell::Value0});
-    freeTemp(tmp);    
+    freeTempSlot(tmp);    
   }
 
   popPtr();
@@ -385,7 +385,7 @@ void Assembler::modSlotByConstSigned(Slot const &lhs, int denom, std::optional<S
   } loopClose();
   
   popPtr();
-  freeTemp(tmp);
+  freeTempSlot(tmp);
 }
 
 
@@ -463,7 +463,7 @@ void Assembler::modSlotBySlotUnsigned(Slot const &lhs, Slot const &rhs, std::opt
     moveField(Cell{lhs, MacroCell::Value0});
     moveTo(lhs, MacroCell::Payload1);
     moveField(Cell{lhs, MacroCell::Value1});
-    if (freeTmpDonor) freeTemp(tmpDonor);
+    if (freeTmpDonor) freeTempSlot(tmpDonor);
         
   } else {
     moveTo(lhs, MacroCell::Value0);    
@@ -483,7 +483,7 @@ void Assembler::modSlotBySlotUnsigned(Slot const &lhs, Slot const &rhs, std::opt
   }
 
   popPtr();
-  if (freeRhsCopy) freeTemp(rhsCopy);
+  if (freeRhsCopy) freeTempSlot(rhsCopy);
 }
 
 void Assembler::modSlotBySlotSigned(Slot const &lhs, Slot const &rhs, std::optional<Slot> const &divSlot) {
@@ -527,7 +527,7 @@ void Assembler::modSlotBySlotSigned(Slot const &lhs, Slot const &rhs, std::optio
   } loopClose();
 
   popPtr();
-  freeTemp(tmp);
+  freeTempSlot(tmp);
 }
 
 

@@ -11,7 +11,6 @@ TEST_BEGIN
 c.declareGlobal("x", ts::array(ts::u8(), 10));
 
 c.function("main").begin(); {
-  c.referGlobals({"x"});
 
   auto x0 = c.arrayElement("x", 0);
   auto x1 = c.arrayElement("x", 1);
@@ -28,7 +27,6 @@ c.function("main").begin(); {
 } c.endFunction();
 
 c.function("foo").begin(); {
-  c.referGlobals({"x"});
 
   auto x0 = c.arrayElement("x", literal::u8(0));
   auto x1 = c.arrayElement("x", literal::u8(1));
