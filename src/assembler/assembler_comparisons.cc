@@ -5,48 +5,6 @@
 
 #include "assembler.ih"
 
-Assembler::Cop const Assembler::eqSpec {
-  .op = BinOp::Eq,
-  .fold = [](int x, int y) -> bool { return x == y; },
-  .applyWithSlot = &Assembler::slotEqualSlot,
-  .applyWithConst = &Assembler::slotEqualConst
-};
-
-Assembler::Cop const Assembler::neqSpec {
-  .op = BinOp::Neq,
-  .fold = [](int x, int y) -> bool { return x != y; },
-  .applyWithSlot = &Assembler::slotNotEqualSlot,
-  .applyWithConst = &Assembler::slotNotEqualConst
-};
-
-Assembler::Cop const Assembler::ltSpec {
-  .op = BinOp::Lt,
-  .fold = [](int x, int y) -> bool { return x < y; },
-  .applyWithSlot = &Assembler::slotLessSlot,
-  .applyWithConst = &Assembler::slotLessConst
-};
-
-Assembler::Cop const Assembler::leSpec {
-  .op = BinOp::Le,
-  .fold = [](int x, int y) -> bool { return x <= y; },
-  .applyWithSlot = &Assembler::slotLessEqualSlot,
-  .applyWithConst = &Assembler::slotLessEqualConst
-};
-
-Assembler::Cop const Assembler::gtSpec {
-  .op = BinOp::Gt,
-  .fold = [](int x, int y) -> bool { return x > y; },
-  .applyWithSlot = &Assembler::slotGreaterSlot,
-  .applyWithConst = &Assembler::slotGreaterConst
-};
-
-Assembler::Cop const Assembler::geSpec {
-  .op = BinOp::Ge,
-  .fold = [](int x, int y) -> bool { return x >= y; },
-  .applyWithSlot = &Assembler::slotGreaterEqualSlot,
-  .applyWithConst = &Assembler::slotGreaterEqualConst
-};
-
 void Assembler::setSlotToBool(Slot const &slot, bool value) {
   moveTo(slot, MacroCell::Value0); setToValue(value);
   moveTo(slot, MacroCell::Value1); setToValue(0);

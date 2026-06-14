@@ -6,13 +6,6 @@
 #include "assembler.ih"
 
 void Assembler::beginBlock(std::string const &name) {
-  // New code-blocks should be started with an empty cache
-  // if (! _cache.empty()) {
-  //   std::cerr << "Block: " << name << '\n';
-  //   std::cerr << "Function: " << _currentFunction->name << '\n';
-  //   _cache.print();
-  // }
-  // assert(_cache.empty());
   
   Function::Block &block = _currentFunction->createBlock(name);
   _program.registerBlock(block);
@@ -120,7 +113,7 @@ void Assembler::setNextBlock(Expression const &obj) {
   };
   
   if (obj.hasSlot()) {
-    Slot const ptrSlot = materialize(obj.slot(), false);
+    Slot const ptrSlot = materialize(obj.slot());
     assignSlot(targetSlot, ptrSlot);
   } else {
     assignSlot(targetSlot, obj.literal());
@@ -152,7 +145,7 @@ void Assembler::jumpIfImpl(Expression const &obj, std::string const &trueLabel,
   API_REQUIRE_IS_INTEGER(obj.type());
 
   if (obj.hasSlot()) {
-    branchIfSlot(materialize(obj.slot(), false), trueLabel, falseLabel);
+    branchIfSlot(materialize(obj.slot()), trueLabel, falseLabel);
   } else {  
     bool const value = literal::cast<types::IntegerType>(obj.literal())->encodedValue();
     setNextBlock(_currentFunction->name, value ? trueLabel : falseLabel);
@@ -186,12 +179,13 @@ void Assembler::constructMetaBlocks() {
       else {
 	assert(m.returnSlot.has_value());
 	SlotProxy returnSlot = *m.returnSlot;
-	assert(returnType == returnSlot->type());	
-	Slot const tmp = getTemp(returnType); //materialize(returnSlot, true);
-	fetchReturnData(tmp);
-	_cache.write(returnSlot, tmp);
-	freeTempSlot(tmp);
+	assert(returnType == returnSlot->type());
+
+	_cache.write(returnSlot, [&](Slot const &slot){
+	  fetchReturnData(slot);
+	});
 	_cache.controlBoundary();
+	
 	// TODO: this has an additional copy that can be avoided
       }
 

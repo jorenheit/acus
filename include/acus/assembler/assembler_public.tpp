@@ -101,27 +101,22 @@ Expression Assembler::unOpAssign(UnOp op, auto const &obj, API_FUNC_SOURCE) {
   std::unreachable();
 }
 
-// The implementation for unOpImpl and unOpAssignImpl is in assembler_unop_general.cc
-#define UNOP(OP)							\
-  Expression Assembler::OP##Assign(auto const &obj, API_FUNC_SOURCE) {	\
+#define UNOP(func, op)							\
+  Expression Assembler::func(auto const &obj, API_FUNC_SOURCE) {	\
     API_FUNC_BEGIN();							\
-    return unOpAssignImpl(lValue(obj, API_FWD), OP##Spec, API_FWD);	\
+    return unOpImpl<op>(rValue(obj, API_FWD), API_FWD);			\
   }									\
 									\
-  Expression Assembler::OP(auto const &obj, API_FUNC_SOURCE) {		\
+  Expression Assembler::func##Assign(auto const &obj, API_FUNC_SOURCE) { \
     API_FUNC_BEGIN();							\
-    return unOpImpl(rValue(obj, API_FWD), OP##Spec, API_FWD);		\
+    return unOpAssignImpl<op>(rValue(obj, API_FWD), API_FWD);		\
   }
 
-// Boolean operations (Bop)
-UNOP(lnot);
-UNOP(lbool);
-UNOP(signBit);
-
-// Integer operations (Iop)
-UNOP(negate);
-UNOP(abs);
-
+UNOP(lnot, LogicalNot);
+UNOP(lbool, LogicalBool);
+UNOP(signBit, SignBit);
+UNOP(negate, Negate);
+UNOP(abs, Abs);
 #undef UNOP
 
 // Binary operations
@@ -175,40 +170,35 @@ Expression Assembler::binOpAssign(BinOp op, auto const &lhs, auto const &rhs, AP
   std::unreachable();
 }
 
-// The implementation for binOpImpl and binOpAssignImpl is in assembler_binop_general.cc
-#define BINOP(OP)							\
-  Expression Assembler::OP##Assign(auto const &lhs, auto const &rhs, API_FUNC_SOURCE) { \
+#define BINOP(func, op)							\
+  Expression Assembler::func##Assign(auto const &lhs, auto const &rhs, API_FUNC_SOURCE) { \
     API_FUNC_BEGIN();							\
-    return binOpAssignImpl(lValue(lhs, API_FWD), rValue(rhs, API_FWD), OP##Spec, API_FWD); \
+    return binOpAssignImpl<op>(lValue(lhs, API_FWD), rValue(rhs, API_FWD), API_FWD); \
   }									\
 									\
-  Expression Assembler::OP(auto const &lhs, auto const &rhs, API_FUNC_SOURCE) { \
+  Expression Assembler::func(auto const &lhs, auto const &rhs, API_FUNC_SOURCE) { \
     API_FUNC_BEGIN();							\
-    return binOpImpl(rValue(lhs, API_FWD), rValue(rhs, API_FWD), OP##Spec, API_FWD); \
+    return binOpImpl<op>(rValue(lhs, API_FWD), rValue(rhs, API_FWD), API_FWD); \
   }
 
-// Arithmetic
-BINOP(add);
-BINOP(sub);
-BINOP(mul);
-BINOP(div);
-BINOP(mod);
+BINOP(add, Add);
+BINOP(sub, Sub);
+BINOP(mul, Mul);
+BINOP(div, Div);
+BINOP(mod, Mod);
 
-// Logic
-BINOP(land);
-BINOP(lnand);
-BINOP(lor);
-BINOP(lnor);
-BINOP(lxor);
-BINOP(lxnor);
+BINOP(land, And);
+BINOP(lnand, Nand);
+BINOP(lor, Or);
+BINOP(lnor, Nor);
+BINOP(lxor, Xor);
+BINOP(lxnor, Xnor);
 
-// Comparisons
-BINOP(eq);
-BINOP(neq);
-BINOP(lt);
-BINOP(le);
-BINOP(gt);
-BINOP(ge);
+BINOP(eq, Eq);
+BINOP(neq, Neq);
+BINOP(lt, Lt);
+BINOP(le, Le);
+BINOP(gt, Gt);
+BINOP(ge, Ge);
 
 #undef BINOP
-

@@ -121,17 +121,17 @@ primitive::Sequence Assembler::compilePrimitives(API_CTX) {
   return result;
 }
 
-std::string Assembler::brainfuck(std::string const &name) const {
-  // TODO: API_REQUIRE
+std::string Assembler::brainfuck(std::string const &name, API_FUNC) const {
+  API_FUNC_BEGIN();
+  API_REQUIRE(_bf.contains(name), acus::error::ErrorCode::NoSuchProgram, "program '", name, "' does not exist.");
   return simplifyBrainfuck(_bf.at(name));
 }
 
-std::string Assembler::primitives(std::string const &name) const {
-  // TODO: API_REQUIRE
+std::string Assembler::primitives(std::string const &name, API_FUNC) const {
+  API_FUNC_BEGIN();
+  API_REQUIRE(_bf.contains(name), acus::error::ErrorCode::NoSuchProgram, "program '", name, "' does not exist.");
   return _txt.at(name);
 }
-
-
 
 primitive::Sequence Assembler::simplifySequence(primitive::Sequence const &seq) {
   primitive::Sequence result;

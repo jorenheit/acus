@@ -5,14 +5,6 @@
 
 #include "assembler.ih"
 
-Assembler::Mop const Assembler::addSpec {
-  .op = BinOp::Add,
-  .fold = [](int x, int y) -> int { return x + y; },
-  .applyWithSlot = &Assembler::addSlotToSlot,
-  .applyWithConst = &Assembler::addConstToSlot
-};
-
-
 void Assembler::addSlotToSlot(Slot const &lhs, Slot const &rhs) {
   pushPtr();
   Slot const rhsCopy = getTemp(rhs.type);

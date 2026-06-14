@@ -21,21 +21,17 @@ namespace acus::error {
     WrongEntryFunctionType,
     ExecutionPathWithoutReturn,
     UnreachableCodeSection,
-    
     ExpectedOutsideProgramBlock,
     ExpectedInsideProgramBlock,
     ExpectedOutsideFunctionBlock,
     ExpectedInsideFunctionBlock,
     ExpectedNoScope,
-
     GlobalDeclarationNotAllowed,
     GlobalNameUnavailable,
     ExpectedGlobal,
-
     NameNotInScope,
     NameAlreadyInScope,
     NameAlreadyInCurrentScope,
-
     ExpectedInteger,
     ExpectedSignedInteger,
     ExpectedUnsignedInteger,
@@ -46,7 +42,6 @@ namespace acus::error {
     ExpectedPointer,
     ExpectedFunctionType,
     ExpectedFunctionPointer,
-
     FieldIndexOutOfBounds,
     FieldCountMismatch,
     MissingField,
@@ -56,16 +51,15 @@ namespace acus::error {
     NegativeIndex,
     TooManyElementsInArrayInitialization,
     TooFewElementsInArrayInitialization,
-    
     AssignmentTypeMismatch,
     UnexpectedType,
     FunctionParameterCountMismatch,
     InvalidFunctionPointerCall,    
     InvalidReadType,
-    
     BuilderNotFinalized,
     BuilderUsedAfterFinalize,    
-    ReturnTypeSpecifiedMultipleTimes    
+    ReturnTypeSpecifiedMultipleTimes,
+    NoSuchProgram
   };
   
 } // namespace acus::error

@@ -5,48 +5,6 @@
 
 #include "assembler.ih"
 
-Assembler::Lop const Assembler::landSpec {
-  .op = BinOp::And,
-  .fold = [](bool x, bool y) -> bool { return x && y; },
-  .applyWithSlot = &Assembler::andSlotWithSlot,
-  .applyWithConst = &Assembler::andSlotWithConst
-};
-
-Assembler::Lop const Assembler::lnandSpec {
-  .op = BinOp::Nand,
-  .fold = [](bool x, bool y) -> bool { return !(x && y); },
-  .applyWithSlot = &Assembler::nandSlotWithSlot,
-  .applyWithConst = &Assembler::nandSlotWithConst
-};
-
-Assembler::Lop const Assembler::lorSpec {
-  .op = BinOp::Or,
-  .fold = [](bool x, bool y) -> bool { return x || y; },
-  .applyWithSlot = &Assembler::orSlotWithSlot,
-  .applyWithConst = &Assembler::orSlotWithConst
-};
-
-Assembler::Lop const Assembler::lnorSpec {
-  .op = BinOp::Nor,
-  .fold = [](bool x, bool y) -> bool { return !(x || y); },
-  .applyWithSlot = &Assembler::norSlotWithSlot,
-  .applyWithConst = &Assembler::norSlotWithConst
-};
-
-Assembler::Lop const Assembler::lxorSpec {
-  .op = BinOp::Xor,
-  .fold = [](bool x, bool y) -> bool { return x != y; },
-  .applyWithSlot = &Assembler::xorSlotWithSlot,
-  .applyWithConst = &Assembler::xorSlotWithConst
-};
-
-Assembler::Lop const Assembler::lxnorSpec {
-  .op = BinOp::Xnor,
-  .fold = [](bool x, bool y) -> bool { return x == y; },
-  .applyWithSlot = &Assembler::xnorSlotWithSlot,
-  .applyWithConst = &Assembler::xnorSlotWithConst
-};
-
 void Assembler::andSlotWithConst(Slot const &lhs, int val) {
   pushPtr();
   moveTo(lhs);

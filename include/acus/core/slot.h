@@ -12,12 +12,10 @@
 namespace acus {
 
 struct Slot {
-  // TODO: what kinds do I actually need now. 
+
   enum Kind {
     Local,
     Global,
-    ArrayElement,
-    StructField,
     Dummy,
     Available,
     Temp,
@@ -40,8 +38,7 @@ struct Slot {
 };
 
   inline bool operator==(Slot const &s1, Slot const &s2) {
-    // TODO: need better heuristic?
-    return s1.offset == s2.offset && s1.size() == s2.size(); // kinds?
+    return s1.offset == s2.offset && s1.size() == s2.size();
   }
 
   

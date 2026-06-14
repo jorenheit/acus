@@ -5,14 +5,6 @@
 
 #include "assembler.ih"
 
-Assembler::Mop const Assembler::mulSpec {
-  .op = BinOp::Mul,
-  .fold = [](int x, int y) -> int { return x * y; },
-  .applyWithSlot = &Assembler::mulSlotBySlot,
-  .applyWithConst = &Assembler::mulSlotByConst
-};
-
-
 void Assembler::mulSlotByConst(Slot const &lhs, int factor) {
   assert(types::isInteger(lhs.type));
   

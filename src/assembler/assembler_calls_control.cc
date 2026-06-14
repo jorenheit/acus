@@ -220,7 +220,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
   auto const constructInNextFrame = [&](auto&& self, int &offset, Expression const &arg) -> void {
 
     if (arg.hasSlot()) { // Already stored on tape -> copy to next frame
-      Slot const argSlot = materialize(arg.slot(), false);
+      Slot const argSlot = materialize(arg.slot());
       switch (argSlot.type->tag()) {
       case types::U8:
       case types::U16:
@@ -375,7 +375,7 @@ void Assembler::prepareNextFrame(Expression const &fptr, std::vector<Expression>
   
   // Set target block
   Slot const fptrSlot = [&] {
-    if (fptr.hasSlot()) return materialize(fptr.slot(), false);
+    if (fptr.hasSlot()) return materialize(fptr.slot());
     return getTemp(fptr.literal());
   }();
 

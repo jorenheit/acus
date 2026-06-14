@@ -5,13 +5,6 @@
 
 #include "assembler.ih"
 
-Assembler::Mop const Assembler::subSpec {
-  .op = BinOp::Sub,
-  .fold = [](int x, int y) -> int { return x - y; },
-  .applyWithSlot = &Assembler::subSlotFromSlot,
-  .applyWithConst = &Assembler::subConstFromSlot
-};
-
 void Assembler::subConstFromSlot(Slot const &lhs, int delta) {
   pushPtr();
   moveTo(lhs, MacroCell::Value0);    

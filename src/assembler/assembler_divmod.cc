@@ -5,25 +5,6 @@
 
 #include "assembler.ih"
 
-// TODO: add a flag to not throw away the other result, but keep it in the payload.
-// This will greatly reduce the code for decimal printing because the mod and div will
-// be able to be done in a single go. Don't forget to clear the payload though.
-
-Assembler::Mop const Assembler::divSpec {
-  .op = BinOp::Div,
-  .fold = [](int x, int y) -> int { return x / y; },
-  .applyWithSlot = &Assembler::divSlotBySlot,
-  .applyWithConst = &Assembler::divSlotByConst
-};
-
-Assembler::Mop const Assembler::modSpec {
-  .op = BinOp::Mod,
-  .fold = [](int x, int y) -> int { return x % y; },
-  .applyWithSlot = &Assembler::modSlotBySlot,
-  .applyWithConst = &Assembler::modSlotByConst
-};
-
-
 void Assembler::divSlotByConst(Slot const &lhs, int denom, Slot const &modSlot) {
   assert(types::isInteger(lhs.type));
   

@@ -36,9 +36,8 @@ namespace acus {
     
     inline Assembler(): _cache(*this) {}
     
-    // TODO: API_FUNC 
-    std::string primitives(std::string const &name) const;
-    std::string brainfuck(std::string const &name) const;
+    std::string primitives(std::string const &name, API_FUNC) const;
+    std::string brainfuck(std::string const &name, API_FUNC) const;
 
     struct ProgramBuilder;
     struct ScopeBuilder;
@@ -161,15 +160,13 @@ namespace acus {
     Function::Block* _currentBlock = nullptr;
     Function::Scope* _currentScope = nullptr;
     primitive::Sequence* _currentSeq = nullptr; 
+    std::stack<Cell> _ptrStack;
+    DataPointer _dp;
     
     struct {
       bool begun = false;
       bool allowGlobalDeclarations = true;
-      int  builtinFunctionCallCount = 0;
     } _state;
-
-    std::stack<Cell> _ptrStack;
-    DataPointer _dp;
 
     struct MetaBlock {
       std::string name;
@@ -223,10 +220,8 @@ namespace acus {
 
       Entry* findEntry(SlotProxy proxy) const;
       Entry* findCachedOwner(SlotProxy proxy) const;
-      
       Entry &findOrCreateEntry(SlotProxy proxy, bool const skipMaterialization = false);
       Entry* ensureParentEntry(SlotProxy proxy);
-      
       void flushSubtree(SlotProxy proxy);
       void flushSubtree(Entry &root, bool const includeRoot);
       void markSubtreeForDelete(SlotProxy proxy);
@@ -237,21 +232,18 @@ namespace acus {
       void deleteMarkedEntries();
       void invalidateDependencies(SlotProxy modifiedProxy);      
       void flushAndClearEntireCache();
-      bool storageResolvedThroughPointerDeref(SlotProxy proxy) const;
-
       void forEntireSubtree(SlotProxy root, auto&& action);
       void forEntireSubtree(Entry& root, bool const sortBeforeAction, auto&& action);      
-      std::vector<Entry*> findEntries(auto&& predicate);
-
       void writeAliasSensitive(SlotProxy dest, auto&& src);
       void writeDirect(SlotProxy dest, auto&& src);
       void writeIndirect(SlotProxy dest, auto&& assign);
       
     public:
       inline explicit Cache(Assembler &self): _self(self) {}
-      Slot materialize(SlotProxy proxy, bool const writeIntent = false);
+      Slot materialize(SlotProxy proxy);
       void write(SlotProxy dest, SlotProxy src);
       void write(SlotProxy dest, literal::Literal src);
+      void write(SlotProxy dest, std::function<void(Slot const &)> const &writeInto);
       
       void controlBoundary();
       void returnBoundary();
@@ -260,7 +252,7 @@ namespace acus {
     }; // Cache
 
     Cache _cache;
-    Slot materialize(SlotProxy proxy, bool const writeIntent = false);
+    Slot materialize(SlotProxy proxy);
     
     // Diagnostics (assembler_diag.cc)
     std::string currentFunction() const;
@@ -280,7 +272,6 @@ namespace acus {
     Expression lValue(Expression const &val, API_CTX) const;
     Expression lValue(std::string const &var, API_CTX) const;  
     Expression lValue(SlotProxy const &slot, API_CTX) const;
-
 
     // Block management (assembler_blocks.cc)
     std::string generateUniqueBlockName();
@@ -329,60 +320,6 @@ namespace acus {
     void printDecimalSlotUnsigned(Slot const &slot, bool const destroySlot = false);
     void printDecimalSlotSigned(Slot const &slot);
 
-    // Unrary operators implementation
-    template <typename Fold>
-    struct UnOpSpec {
-      using Apply = void(Assembler::*)(Slot const &);
-      UnOp op;
-      Fold *fold;
-      Apply apply;
-    };
-
-    using Bop = UnOpSpec<bool(int)>;
-    using Iop = UnOpSpec<int(int)>;
-
-    static const Bop lnotSpec, lboolSpec, signBitSpec;
-    static const Iop negateSpec, absSpec;
-
-    template <typename SpecType>
-    Expression unOpAssignImpl(Expression const &obj, SpecType const &spec, API_CTX);
-
-    template <typename SpecType>  
-    Expression unOpImpl(Expression const &obj, SpecType const &spec, API_CTX);
-    
-    // binary operators implementation
-    template <typename Fold>
-    struct BinOpSpec {
-      using ApplyWithSlot   = void(Assembler::*)(Slot const &, Slot const &);
-      using ApplyWithConst  = void(Assembler::*)(Slot const &, int);
-
-      BinOp op;
-      Fold *fold;
-      ApplyWithSlot applyWithSlot;
-      ApplyWithConst applyWithConst;
-    };
-
-    using Mop = BinOpSpec<int(int, int)>;
-    using Lop = BinOpSpec<bool(bool, bool)>;
-    using Cop = BinOpSpec<bool(int, int)>;
-
-    static const Mop addSpec, subSpec, mulSpec, divSpec, modSpec;
-    static const Lop landSpec, lnandSpec, lorSpec, lnorSpec, lxorSpec, lxnorSpec;
-    static const Cop eqSpec, neqSpec, ltSpec, leSpec, gtSpec, geSpec;
-
-
-    template <typename SpecType>
-    void binOpAssignSlot(Slot const lhs, Slot const rhs, SpecType const &spec);
-
-    template <typename SpecType>
-    void binOpAssignConst(Slot const lhs, literal::Literal const rhs, SpecType const &spec);
-    
-    
-    template <typename SpecType>
-    Expression binOpAssignImpl(Expression const &lhs, Expression const &rhs, SpecType const &spec, API_CTX);
-
-    template <typename SpecType>  
-    Expression binOpImpl(Expression const &lhs, Expression const &rhs, SpecType const &spec, API_CTX);
   
     // Slot operations
     template <typename TrueBranch, typename FalseBranch>
@@ -699,6 +636,69 @@ namespace acus {
     void deferLabelCheck(std::string const &f, std::string const &b, API_CTX);
     void deferredLabelChecks();
 
+    // Unary and Binary Operators
+    template <typename Operator> Expression unOpAssignImpl(Expression const &obj, API_CTX);
+    template <typename Operator> Expression unOpImpl(Expression const &obj, API_CTX);
+    template <typename Operator> Expression binOpAssignImpl(Expression const &lhs, Expression const &rhs, API_CTX);
+    template <typename Operator> Expression binOpImpl(Expression const &lhs, Expression const &rhs, API_CTX);
+    template <typename Operator> void binOpAssignSlot(Slot const lhs, Slot const rhs);
+    template <typename Operator> void binOpAssignConst(Slot const lhs, literal::Literal const rhs);
+
+    template <typename Ret> struct UnaryOperator  { using ReturnType = Ret; };
+    template <typename Ret> struct BinaryOperator { using ReturnType = Ret; };
+ 
+#define DEFINE_UNARY_OPERATOR(name, type, ret, foldExpr, slotOp)	\
+    struct name: BinaryOperator<ret> {					\
+      static ret fold(int x) { return foldExpr; }			\
+      static void applyToSlot(Assembler &self, Slot const &slot) {	\
+	return self.slotOp(slot);					\
+      }									\
+      static UnOp opType() { return type; }				\
+    };
+    
+    DEFINE_UNARY_OPERATOR(LogicalNot,  UnOp::Not,     bool,  !x,          notSlot);
+    DEFINE_UNARY_OPERATOR(LogicalBool, UnOp::Bool,    bool,  !!x,         boolSlot);
+    DEFINE_UNARY_OPERATOR(SignBit,     UnOp::SignBit, bool,  x<0,         signBitSlot);
+    DEFINE_UNARY_OPERATOR(Negate,      UnOp::Neg,     int,   -x,          negateSlot);
+    DEFINE_UNARY_OPERATOR(Abs,         UnOp::Abs,     int,   std::abs(x), absSlot);
+
+#undef DEFINE_UNARY_OPERATOR
+    
+    
+#define DEFINE_BINARY_OPERATOR(name, type, ret, foldExpr, slotOp, constOp) \
+    struct name: BinaryOperator<ret> {					\
+      static ret fold(int x, int y) { return foldExpr; }		\
+      static void applyWithSlot(Assembler &self, Slot const &lhs, Slot const &rhs) { \
+	return self.slotOp(lhs, rhs);					\
+      }									\
+      static void applyWithConst(Assembler &self, Slot const &lhs, int rhs) { \
+	return self.constOp(lhs, rhs);					\
+      }									\
+      static BinOp opType() { return type; }				\
+    };
+
+    DEFINE_BINARY_OPERATOR(Add, BinOp::Add, int, x+y, addSlotToSlot,   addConstToSlot);
+    DEFINE_BINARY_OPERATOR(Sub, BinOp::Sub, int, x-y, subSlotFromSlot, subConstFromSlot);
+    DEFINE_BINARY_OPERATOR(Mul, BinOp::Mul, int, x*y, mulSlotBySlot,   mulSlotByConst);
+    DEFINE_BINARY_OPERATOR(Div, BinOp::Div, int, x/y, divSlotBySlot,   divSlotByConst);
+    DEFINE_BINARY_OPERATOR(Mod, BinOp::Mod, int, x%y, modSlotBySlot,   modSlotByConst);
+
+    DEFINE_BINARY_OPERATOR(And,  BinOp::And,  bool, x&&y,    andSlotWithSlot,  andSlotWithConst);
+    DEFINE_BINARY_OPERATOR(Nand, BinOp::Nand, bool, !(x&&y), nandSlotWithSlot, nandSlotWithConst);
+    DEFINE_BINARY_OPERATOR(Or,   BinOp::Or,   bool, x||y,    orSlotWithSlot,   orSlotWithConst);
+    DEFINE_BINARY_OPERATOR(Nor,  BinOp::Nor,  bool, !(x||y), norSlotWithSlot,  norSlotWithConst);
+    DEFINE_BINARY_OPERATOR(Xor,  BinOp::Xor,  bool, x!=y,    xorSlotWithSlot,  xorSlotWithConst);
+    DEFINE_BINARY_OPERATOR(Xnor, BinOp::Xnor, bool, x==y,    xnorSlotWithSlot, xnorSlotWithConst);
+
+    DEFINE_BINARY_OPERATOR(Eq,  BinOp::Eq,  bool, x==y, slotEqualSlot, slotEqualConst);
+    DEFINE_BINARY_OPERATOR(Neq, BinOp::Neq, bool, x!=y, slotNotEqualSlot, slotNotEqualConst);
+    DEFINE_BINARY_OPERATOR(Lt,  BinOp::Lt,  bool, x<y,  slotLessSlot, slotLessConst);
+    DEFINE_BINARY_OPERATOR(Le,  BinOp::Le,  bool, x<=y, slotLessEqualSlot, slotLessEqualConst);
+    DEFINE_BINARY_OPERATOR(Gt,  BinOp::Gt,  bool, x>y,  slotGreaterSlot, slotGreaterConst);
+    DEFINE_BINARY_OPERATOR(Ge,  BinOp::Ge,  bool, x>=y, slotGreaterEqualSlot, slotGreaterEqualConst);
+
+#undef DEFINE_BINARY_OPERATOR
+    
     // General helpers (inline definitions, assembler_private.tpp)
     template <typename Primitive, typename ... Args>
     void emit(Args&& ... args);

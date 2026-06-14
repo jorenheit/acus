@@ -5,95 +5,68 @@
 
 #include "assembler.ih"
 
-// TODO: use virtual functions for this stuff, same bfor Binops
 
-Assembler::Bop const Assembler::lnotSpec {
-  .op = UnOp::Not,
-  .fold = [](int x) -> bool { return !x; },
-  .apply = &Assembler::notSlot
-};
+template <typename Operator>
+Expression Assembler::unOpAssignImpl(Expression const &obj, API_CTX) {
+  using Ret = Operator::ReturnType;
+  static_assert(std::is_same_v<Ret, bool> || std::is_same_v<Ret, int>);
 
-Assembler::Bop const Assembler::lboolSpec {
-  .op = UnOp::Bool,
-  .fold = [](int x) -> bool { return !!x; },
-  .apply = &Assembler::boolSlot
-};
-
-Assembler::Bop const Assembler::signBitSpec {
-  .op = UnOp::SignBit,
-  .fold = [](int x) -> bool { return x < 0; },
-  .apply = &Assembler::signBitSlot
-};
-
-Assembler::Iop const Assembler::negateSpec {
-  .op = UnOp::Neg,
-  .fold = [](int x) -> int { return -x; },
-  .apply = &Assembler::negateSlot
-};
-
-Assembler::Iop const Assembler::absSpec {
-  .op = UnOp::Abs,
-  .fold = [](int x) -> int { return std::abs(x); },
-  .apply = &Assembler::absSlot
-};
-
-template <typename SpecType>
-Expression Assembler::unOpAssignImpl(Expression const &obj, SpecType const &spec, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_INTEGER(obj.type());
   assert(not obj.isLiteral());
 
-  Slot const objSlot = materialize(obj.slot(), true);
-  (this->*spec.apply)(objSlot);
+  Slot const objSlot = materialize(obj.slot());
+  Operator::applyToSlot(*this, objSlot);
   return obj;
 }
 
+template <typename Operator>
+Expression Assembler::unOpImpl(Expression const &obj, API_CTX) {
+  using Ret = Operator::ReturnType;
+  static_assert(std::is_same_v<Ret, bool> || std::is_same_v<Ret, int>);
 
-namespace {
-  auto returnType(types::TypeHandle slotType, bool(*)(int)) { return ts::u8(); }
-  auto returnType(types::TypeHandle slotType, int(*)(int))  { return slotType; }
-
-  auto folded(int val, types::TypeHandle, bool(*f)(int))  {
-    return literal::u8(f(val));
-  }
-  
-  auto folded(int val, types::TypeHandle type, int(*f)(int))  {
-    if (types::isU8(type)) return literal::u8(f(val));
-    if (types::isS8(type)) return literal::s8(f(val));
-    if (types::isU16(type)) return literal::u16(f(val));
-    if (types::isS16(type)) return literal::s16(f(val));
-    std::unreachable();
-  }
-}
-
-
-template <typename SpecType>
-Expression Assembler::unOpImpl(Expression const &obj, SpecType const &spec, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_INTEGER(obj.type());
+  
+  auto makeLiteral = [&](int x) -> literal::Literal {
+    if constexpr (std::is_same_v<Ret, bool>) return literal::u8(x);
+    else {
+      if (types::isU8(obj.type()))  return literal::u8(x);
+      if (types::isS8(obj.type()))  return literal::s8(x);
+      if (types::isU16(obj.type())) return literal::u16(x);
+      if (types::isS16(obj.type())) return literal::s16(x);
+      std::unreachable();
+    }
+  };
 
   if (obj.isLiteral()) {
     int const val = literal::cast<types::IntegerType>(obj.literal())->encodedValue();
-    return Expression { folded(val, obj.type(), spec.fold) };
+    return Expression { makeLiteral(Operator::fold(val)) };
   }
 
   // Apply to temp copy
   Slot result = getTemp(obj.type());
-  assignSlot(result, materialize(obj.slot(), false));
-  unOpAssignImpl(Expression{result}, spec, API_FWD);
-  result.type = returnType(result.type, spec.fold);
+  assignSlot(result, materialize(obj.slot()));
+  unOpAssignImpl<Operator>(Expression{result}, API_FWD);
+
+  if constexpr (std::is_same_v<Ret, bool>) {
+    result.type = ts::u8();
+  }
   return Expression { result };  
 }
 
-// Explicit instantiations for Mop, Cop and Lop
-template Expression Assembler::unOpImpl<Assembler::Bop>(Expression const&, Assembler::Bop const&, API_CTX);
-template Expression Assembler::unOpImpl<Assembler::Iop>(Expression const&, Assembler::Iop const&, API_CTX);
+#define INSTANTIATE_FOR(op)						\
+  template Expression Assembler::unOpImpl<op>(Expression const&, API_CTX); \
+  template Expression Assembler::unOpAssignImpl<op>(Expression const&, API_CTX);
 
-template Expression Assembler::unOpAssignImpl<Assembler::Bop>(Expression const&, Assembler::Bop const&, API_CTX);
-template Expression Assembler::unOpAssignImpl<Assembler::Iop>(Expression const&, Assembler::Iop const&, API_CTX);
-
+INSTANTIATE_FOR(Assembler::LogicalNot);
+INSTANTIATE_FOR(Assembler::LogicalBool);
+INSTANTIATE_FOR(Assembler::SignBit);
+INSTANTIATE_FOR(Assembler::Negate);
+INSTANTIATE_FOR(Assembler::Abs);
+#undef INSTANTIATE_FOR
 
 Expression Assembler::castImpl(Expression const &obj, types::TypeHandle toType, API_CTX) {
   API_CHECK_EXPECTED();
@@ -106,7 +79,7 @@ Expression Assembler::castImpl(Expression const &obj, types::TypeHandle toType, 
   assert(types::isInteger(toType));
   assert(toType == opResult.type);
 
-  Slot const slot = materialize(obj.slot(), false);
+  Slot const slot = materialize(obj.slot());
   Slot const result = getTemp(toType);
   if (slot.type == toType) {
     // same type but direct slot, so we copy it directly into our temp

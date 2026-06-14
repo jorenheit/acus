@@ -11,8 +11,8 @@ Expression Assembler::addressOfImpl(Expression const &obj, API_CTX) {
   assert(not obj.isLiteral());
   
   if (obj.slot()->directAbsolute()) {
-    Slot const slot = materialize(obj.slot(), false);
-    API_REQUIRE(slot.kind != Slot::Temp && slot.kind != Slot::Cache,
+    Slot const slot = materialize(obj.slot());
+    API_REQUIRE(slot.kind != Slot::Temp,
 		error::ErrorCode::TakingAddressOfTemporary,
 		"Cannot take the address of a temporary value.");
   }
@@ -20,25 +20,12 @@ Expression Assembler::addressOfImpl(Expression const &obj, API_CTX) {
   return Expression(obj.slot()->addressOf(*this));
 }
 
-
 Slot Assembler::addressOfSlot(Slot const &pointeeSlot) {
   assert(pointeeSlot.kind != Slot::Temp && "taking address of temp");
   assert(pointeeSlot.kind != Slot::Cache && "taking address of cache");
 
   types::TypeHandle const pointeeType = pointeeSlot.type;
   types::TypeHandle const pointerType = ts::pointer(pointeeType);
-
-  int const offset = pointeeSlot.offset;
-  // bool localPointer = true;
-  // if (slot.kind == Slot::Kind::Global) {
-  //   std::string const globalName = slot.name.substr(std::string("__g_").size());
-  //   assert(_program.isGlobal(globalName));
-  //   Slot const globalSlot = _program.globalSlot(globalName);
-  //   assert(globalSlot.type == pointeeType);
-  //   offset = globalSlot.offset;
-  //   localPointer = false;
-  //   _aliasedGlobals.insert(globalName);
-  // }
 
   // Set frame-depth to 0 for a local pointer, FrameID for a global pointer
   Slot const ptrSlot = getTemp(pointerType);
@@ -52,6 +39,7 @@ Slot Assembler::addressOfSlot(Slot const &pointeeSlot) {
   }
 
   // Construct offset in second cell
+  int const offset = pointeeSlot.offset;  
   moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value0);
   setToValue(offset & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
   moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value1);
@@ -68,7 +56,6 @@ void Assembler::copyElementIntoSlot(Slot const &elementSlot, Slot const &arrSlot
   
   pushPtr();
 
-  // TODO: use constructive version when I have it
   Slot const scaledIndexSlot = getTemp(ts::u8());
   assignSlot(scaledIndexSlot, indexSlot);
   moveTo(scaledIndexSlot, MacroCell::Value0);
@@ -368,11 +355,6 @@ Expression Assembler::assignImpl(Expression const &lhs, Expression const &rhs, A
   if (rhs.hasSlot()) _cache.write(dest, rhs.slot());
   else _cache.write(dest, rhs.literal());
   return lhs;
-  
-  
-  // if (rhs.hasSlot()) write(lhs.slot(), rhs.slot()); //lhs.slot()->write(*this, rhs.slot());
-  // else               write(lhs.slot(), rhs.literal()); //lhs.slot()->write(*this, rhs.literal());
-  // return lhs;
 }
 
 
