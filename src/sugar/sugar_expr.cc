@@ -2,24 +2,26 @@
 
 namespace acus::sugar {
 
-
-  Expr::Expr(Expression expr):
-    _expr(std::move(expr))
+  Expr::Expr(Expr const &expr, SUGAR_LOC):
+    _expr(expr.get()),
+    _loc(LOC_FWD)
   {}
   
-  Expr::Expr(literal::Literal lit):
-    _expr(lit)
+  Expr::Expr(Expression expr, SUGAR_LOC):
+    _expr(std::move(expr)),
+    _loc(LOC_FWD)
+  {}
+  
+  Expr::Expr(literal::Literal lit, SUGAR_LOC):
+    _expr(lit),
+    _loc(LOC_FWD)
   {}
 
-  Expr::Expr(int val):
-    _expr(impl::toLiteral(val))
+  Expr::Expr(int val, SUGAR_LOC):
+    _expr(impl::toLiteral(val)),
+    _loc(LOC_FWD)
   {}
 
-  Expr::Expr(std::string const &str):
-    _expr(literal::string(str))
-  {}
-    
-    
   Expression const &Expr::get() const {
     return _expr;
   }
@@ -28,58 +30,81 @@ namespace acus::sugar {
     return _expr;
   }
   
-  Expr &Expr::operator=(Expr const &other) {
-    __assembler.assign(get(), other.get());
+
+  Expr Expr::operator-() {
+    return Expr {__assembler.negate(get(), _loc), _loc};
+  }
+
+  Expr Expr::operator+() {
     return *this;
   }
 
+  Expr Expr::operator!() {
+    return Expr {__assembler.lnot(get(), _loc), _loc};
+  }
+  
   Expr &Expr::operator++() {
-    __assembler.addAssign(get(), impl::toLiteral(1, get().type()));
+    __assembler.addAssign(get(), impl::toLiteral(1, get().type()), _loc);
     return *this;
   }
 
   Expr &Expr::operator--() {
-    __assembler.subAssign(get(), impl::toLiteral(1, get().type()));
+    __assembler.subAssign(get(), impl::toLiteral(1, get().type()), _loc);
     return *this;
   }
 
-  Expr &Expr::operator+=(Expr const &other) {
-    __assembler.addAssign(get(), other.get());
-    return *this;
-  }
   
-  Expr &Expr::operator-=(Expr const &other) {
-    __assembler.addAssign(get(), other.get());
-    return *this;
-  }
-  
-  Expr Expr::field(std::string const &name) const {
-    return __assembler.structField(_expr, name);
+  Expr Expr::field(std::string const &name, SUGAR_LOC) const {
+    return Expr(__assembler.structField(get(), name, LOC_FWD), LOC_FWD);
   }
 
   Expr Expr::operator[](size_t index) const {
-    return __assembler.arrayElement(_expr, impl::toLiteral(index));
+    return Expr(__assembler.arrayElement(get(), impl::toLiteral(index), _loc), _loc);
   }
 
   Expr Expr::operator[](Expr const &index) const {
-    return __assembler.arrayElement(_expr, index.get());
+    return Expr(__assembler.arrayElement(get(), index.get(), _loc), _loc);
   }
 
+
+  // Assignment operators
+#define ASSIGN_OPERATOR(symbol, asmFunc)		\
+  Expr &Expr::operator symbol(Expr const &other) {	\
+    __assembler.asmFunc(get(), other.get(), _loc);	\
+    return *this;					\
+  }
+
+  ASSIGN_OPERATOR(=, assign);
+  ASSIGN_OPERATOR(+=, addAssign);
+  ASSIGN_OPERATOR(-=, subAssign);
+  ASSIGN_OPERATOR(*=, mulAssign);
+  ASSIGN_OPERATOR(/=, divAssign);
+  ASSIGN_OPERATOR(%=, modAssign);
+
+#undef ASSIGN_OPERATOR
+  
   
   // Free operators
-  Expr operator+(Expr const &lhs, Expr const &rhs) { return __assembler.add(lhs.get(), rhs.get()); }
-  Expr operator-(Expr const &lhs, Expr const &rhs) { return __assembler.sub(lhs.get(), rhs.get()); }
-  Expr operator*(Expr const &lhs, Expr const &rhs) { return __assembler.mul(lhs.get(), rhs.get()); }
-  Expr operator/(Expr const &lhs, Expr const &rhs) { return __assembler.div(lhs.get(), rhs.get()); }
-  Expr operator%(Expr const &lhs, Expr const &rhs) { return __assembler.mod(lhs.get(), rhs.get()); }
-  Expr operator<(Expr const &lhs, Expr const &rhs) { return __assembler.lt(lhs.get(), rhs.get()); }
-  Expr operator>(Expr const &lhs, Expr const &rhs) { return __assembler.gt(lhs.get(), rhs.get()); }
-  Expr operator<=(Expr const &lhs, Expr const &rhs) { return __assembler.le(lhs.get(), rhs.get()); }
-  Expr operator>=(Expr const &lhs, Expr const &rhs) { return __assembler.ge(lhs.get(), rhs.get()); }
-  Expr operator==(Expr const &lhs, Expr const &rhs) { return __assembler.eq(lhs.get(), rhs.get()); }
-  Expr operator!=(Expr const &lhs, Expr const &rhs) { return __assembler.neq(lhs.get(), rhs.get()); }
-  Expr operator&&(Expr const &lhs, Expr const &rhs) { return __assembler.land(lhs.get(), rhs.get()); }
-  Expr operator||(Expr const &lhs, Expr const &rhs) { return __assembler.lor(lhs.get(), rhs.get()); }
+#define FREE_OPERATOR(symbol, asmFunc)					\
+  Expr operator symbol(Expr const& lhs, Expr const& rhs) {              \
+    auto const loc = lhs.loc();                                         \
+    return Expr{__assembler.asmFunc(lhs.get(), rhs.get(), loc), loc};	\
+  }
   
+  FREE_OPERATOR(+,  add);
+  FREE_OPERATOR(-,  sub);
+  FREE_OPERATOR(*,  mul);
+  FREE_OPERATOR(/,  div);
+  FREE_OPERATOR(%,  mod);
+  FREE_OPERATOR(<,  lt);
+  FREE_OPERATOR(>,  gt);
+  FREE_OPERATOR(<=, le);
+  FREE_OPERATOR(>=, ge);
+  FREE_OPERATOR(==, eq);
+  FREE_OPERATOR(!=, neq);
+  FREE_OPERATOR(&&, land);
+  FREE_OPERATOR(||, lor);
 
+#undef FREE_OPERATOR
+  
 } // namespace sugar

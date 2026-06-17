@@ -1,8 +1,9 @@
 #pragma once
 #include "acus/sugar/sugar_types.h"
+#include <stack>
 
 namespace acus::sugar::impl {
-
+  
   template <typename T>
   inline constexpr bool IsSugarType = std::is_same_v<T, void> || std::is_base_of_v<SugarType, std::remove_cvref_t<T>>;
 
@@ -50,20 +51,37 @@ namespace acus::sugar::impl {
     else return T::type();
   }
 
-  template <typename Signature>
-  struct FunctionType;
+  std::string nextLabel();
 
-  template <typename Ret, typename ... Args>
-  struct FunctionType<Ret(Args...)> {
-    using ReturnType = Ret;
-    using ArgumentTypes = std::tuple<Args ...>;
+  class ControlStack {
 
-    static_assert(IsSugarType<Ret>, "Return value must be void or a type from the sugar API");
-    static_assert(IsTupleOfSugarTypes<ArgumentTypes>, "Argument types must all be types from the sugar API");
+    static std::stack<std::string> _continueStack;
+    static std::stack<std::string> _breakStack;
+
+  public:
+    
+    static std::string getContinueLabel() {
+      assert(not _continueStack.empty());
+      return _continueStack.top();
+    }
+
+    static std::string getBreakLabel() {
+      assert(not _breakStack.empty());
+      return _breakStack.top();
+    }
+
+    static void pop() {
+      assert(not _continueStack.empty());      
+      assert(not _breakStack.empty());
+      _breakStack.pop();
+      _continueStack.pop();
+    }
+
+    static void push(std::string const &continueLabel, std::string const &breakLabel) {
+      _continueStack.push(continueLabel);
+      _breakStack.push(breakLabel);
+    }
+    
   };
-
-
-  struct LabelCount {static size_t count; };
-  
   
 } // impl

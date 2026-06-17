@@ -3,38 +3,53 @@
 #include "acus/sugar/sugar_types.h"
 #include "acus/sugar/sugar_impl.h"
 
+#define LOC loc
+#define LOC_FWD LOC
+#define SUGAR_LOC std::source_location LOC
+#define SUGAR_FUNC SUGAR_LOC = std::source_location::current()
+
 namespace acus::sugar {
 
   extern Assembler __assembler;
 
   class Expr {
     Expression _expr;
-
+    std::source_location _loc;
+    
   public:
-    Expr() = default;
-    Expr(Expression expr);
-    Expr(literal::Literal lit);
-    Expr(int val);
-    Expr(std::string const &str);
+    Expr(SUGAR_FUNC);
+    Expr(Expr const &expr, SUGAR_FUNC);
+    Expr(Expression expr, SUGAR_FUNC);
+    Expr(literal::Literal lit, SUGAR_FUNC);
+    Expr(int val, SUGAR_FUNC);
+
+    template <typename T> requires std::convertible_to<T, std::string>
+    Expr(T const &str, SUGAR_FUNC);
 
     template <typename T> requires impl::IsSugarType<T>
-    Expr(T const &val);
+    Expr(T const &val, SUGAR_FUNC);
     
     Expression const &get() const;
     Expression &get();
+    std::source_location const &loc() const { return _loc; }
 
     template <typename T>
-    Expr cast() const;
+    Expr cast(SUGAR_FUNC) const;
     
-    Expr field(std::string const &name) const;
+    Expr field(std::string const &name, SUGAR_FUNC) const;
     Expr operator[](size_t index) const;
     Expr operator[](Expr const &index) const;    
     Expr &operator=(Expr const &other);
     Expr &operator++();
     Expr &operator--();
+    Expr operator-();
+    Expr operator+();
+    Expr operator!();
     Expr &operator+=(Expr const &other);
     Expr &operator-=(Expr const &other);
-    
+    Expr &operator*=(Expr const &other);
+    Expr &operator/=(Expr const &other);
+    Expr &operator%=(Expr const &other);
   };
 
   Expr operator+(Expr const &lhs, Expr const &rhs);
@@ -52,56 +67,77 @@ namespace acus::sugar {
   Expr operator||(Expr const &lhs, Expr const &rhs);
 
   template <typename T> requires impl::IsSugarType<T>
-  Expr let(std::string const &varName);
+  Expr let(std::string const &varName, SUGAR_FUNC);
 
-  Expr var(std::string const &varName);
+  Expr var(std::string const &varName, SUGAR_FUNC);
   
-  void program(std::string const &name, std::string const &entry = "main");
-  void endProgram();
-  void endFunction();
-  void return_();
-  void return_(Expr const &expr);
-  void print(char c);
-  void print(int x);
-  void print(std::string const &str);
-  void print(Expr const &expr);
-  void println(auto&& arg);
+  void program(std::string const &name, std::string const &entry = "main", SUGAR_FUNC);
+  void endProgram(SUGAR_FUNC);
+  void endFunction(SUGAR_FUNC);
+  void break_(SUGAR_FUNC);
+  void continue_(SUGAR_FUNC);  
+  void return_(SUGAR_FUNC);
+  void return_(Expr const &expr, SUGAR_FUNC);
+  void print(char c, SUGAR_FUNC);
+  void print(int x, SUGAR_FUNC);
+  void print(Expr const &expr, SUGAR_FUNC);
+  void println(auto&& arg, SUGAR_FUNC);
 
-  std::string generateBrainfuck(std::string const &programName);
+  std::string generateBrainfuck(std::string const &programName, SUGAR_FUNC);
 
   template <typename Signature>
   class FunctionHandle;
 
   template <typename Signature>
-  FunctionHandle<Signature> function_fwd(std::string const &name);  
+  FunctionHandle<Signature> function_fwd(std::string const &name, SUGAR_FUNC);  
 
   template <typename Signature>
-  FunctionHandle<Signature> call(std::string const &name);
-  
-  template <typename Signature, typename ... ArgNames>
-  FunctionHandle<Signature> function(std::string const &name, ArgNames&& ... args);
-  
-  template <typename Signature, typename ... ArgNames>
-  FunctionHandle<Signature> function(FunctionHandle<Signature> const &caller, ArgNames&& ... args);  
-  
-  
-#define for_(init, condition, increment, body) do {	\
-  forLoop([&]{ init; },					\
-	  [&]{ return (condition).get(); },		\
-	  [&]{ increment; },				\
-	  [&]{ body; }); } while (0);
+  FunctionHandle<Signature> call(std::string const &name, SUGAR_FUNC);
 
+  template <typename Init, typename Condition, typename Increment>
+  class ForBuilder;
 
-#define while_(condition, body) do {		\
-  whileLoop([&] { return (condition).get(); },	\
-	    [&] { body; }); } while (0); 
+  template <typename Condition>
+  class WhileBuilder;
+
+  template <typename Condition>
+  class IfBuilder;
   
-#define if_(condition, thenBody, ...) do {			\
-  ifCondition([&] { return (condition).get(); },		\
-	      [&] { thenBody; }					\
-	      __VA_OPT__(, [&] { __VA_ARGS__; }));} while (0);	\
+  template <typename Init, typename Condition, typename Increment>
+  auto makeForLoop(Init&& init, Condition&& condition, Increment&& increment, SUGAR_LOC) {
+    return ForBuilder{std::forward<Init>(init),
+		      std::forward<Condition>(condition),
+		      std::forward<Increment>(increment),
+		      LOC_FWD};
+  }
 
+  template <typename Condition>
+  auto makeWhileLoop(Condition&& condition, SUGAR_LOC) {
+    return WhileBuilder{std::forward<Condition>(condition), LOC_FWD};
+  }
 
+  template <typename Condition>
+  auto makeIfStatement(Condition&& condition, SUGAR_LOC) {
+    return IfBuilder{std::forward<Condition>(condition), LOC_FWD};
+  }
+  
+  
+#define for_(init, condition, increment)		\
+  makeForLoop([&]{ init; },				\
+	      [&]{ return (condition).get(); },		\
+	      [&]{ increment; },			\
+	      std::source_location::current()) << [&]
+
+#define while_(condition)				\
+  makeWhileLoop([&]{ return (condition).get(); },	\
+		std::source_location::current()) << [&]
+  
+#define if_(condition)					\
+  makeIfStatement([&]{ return (condition).get(); },	\
+		  std::source_location::current()) << [&]
+
+#define else_ << [&]
+  
 #include "sugar_public.tpp"
   
 } // sugar

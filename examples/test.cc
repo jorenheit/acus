@@ -27,23 +27,23 @@ int main() try {
     
     function<void()>("main");
     {
-      for_(let<u8>("i") = 0, var("i") < 10, ++var("i"), {
-	  hello("you");
-	})
-
-      let<u8>("x") = 5;
-      println(var("x"));
-      if_(var("x") < 10, {
-	  println("small");
-	},{
-	  println("big");
-	})
+      for_(let<u8>("i") = 0, var("i") < 10, ++var("i")) {
+	hello("you");
+      };
+      
+      let<s8>("x") = 5;
+      println(-var("x"));
+      if_(var("x") < 10) {
+	println("small");
+      } else_ {
+	println("big");
+      };
 
       var("x") += 30;
       println(var("x"));
-      if_(var("x") < 10, {
-	  println("small");
-	})
+      if_(var("x") < 10) {
+	println("small");
+      };
 
       let<Point>("p") = Point{'Q','Z'};
       var("p").field("x") = 'X';
@@ -56,10 +56,13 @@ int main() try {
       println(var("v"));
 
       let<u8>("i") = 0;
-      while_(var("i") < 5, {
-	  println(var("i"));
-	  ++var("i");
-	});
+      while_(var("i") < 10) {
+	println(var("i"));
+	if_(var("i") == 7) {
+	  break_();
+	};
+	++var("i");
+      };
       
       return_();
     }
@@ -88,18 +91,18 @@ int main() try {
   {
     function<void()>("main");
     {
-      let<u8>("N") = 20;
+      let<u8>("N") = 10;
 
       let<u16>("a") = 0;
       let<u16>("b") = 1;
-      
-      for_(let<u8>("i") = 0, var("i") < var("N"), ++var("i"), {
-	  println(var("a"));
 
-	  let<u16>("next") = var("a") + var("b");
-	  var("a") = var("b");
-	  var("b") = var("next");
-	});
+      for_(let<u8>("i") = 0, var("i") < var("N"), ++var("i")) {
+	println(var("a"));
+
+	let<u16>("next") = var("a") + var("b");
+	var("a") = var("b");
+	var("b") = var("next");
+      };
 
       return_();
     }
@@ -122,14 +125,13 @@ int main() try {
 
     function<void(u16, u16, u16)>("fib", "n", "a", "b");
     {
-      if_(var("n") < 1, {
-	  return_();
-	},{
-	  println(var("a"));
-
-	  fib(var("n") - 1, var("b"), var("a") + var("b"));
-	  return_();
-	});
+      if_(var("n") < 1) {
+	return_();
+      } else_ {
+	println(var("a"));
+	fib(var("n") - 1, var("b"), var("a") + var("b"));
+	return_();
+      };
     }
     endFunction();
   }
@@ -143,9 +145,9 @@ int main() try {
     {
       let<u16>("N") = 20;
 
-      for_(let<u8>("i") = 0, var("i") < var("N"), ++var("i"), {
-	  println(fib(var("i")));
-	});
+      for_(let<u8>("i") = 0, var("i") < var("N"), ++var("i")) {
+	println(fib(var("i")));
+      };
 
       return_();
     }
@@ -153,17 +155,52 @@ int main() try {
 
     function<u16(u16)>("fib", "n");
     {
-      if_(var("n") < 2, {
-	  return_(var("n"));
-	},{
-	  return_(fib(var("n") - 1) + fib(var("n") - 2));
-	});
+      if_(var("n") < 2) {
+	return_(var("n"));
+      } else_ {
+	return_(fib(var("n") - 1) + fib(var("n") - 2));
+      };
     }
     endFunction();
-
   }
   endProgram();
-  std::cout << generateBrainfuck("fibonacci");
+
+
+  program("break_continue_demo");
+  {
+    function<void()>("main");
+    {
+      println("Numbers from 1 to 20");
+      println("skip multiples of 3");
+      println("stop at 17");
+      println("");
+
+      for_(let<u8>("i") = 1, var("i") <= 20, ++var("i")) {
+        // Stop the loop entirely once i == 17.
+        if_(var("i") == 17) {
+          println("Reached 17, stopping.");
+          break_();
+        };
+
+        // Skip multiples of 3.
+        if_(var("i") % 3 == 0) {
+          continue_();
+        };
+
+        println(var("i"));
+      };
+
+      println("");
+      println("Done.");
+
+      return_();
+    }
+    endFunction();
+  }
+  endProgram();
+
+  
+  std::cout << generateBrainfuck("test");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

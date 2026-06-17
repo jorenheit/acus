@@ -4,43 +4,49 @@ namespace acus::sugar {
 
   Assembler __assembler;
 
-  std::string generateBrainfuck(std::string const &programName) {
+  std::string generateBrainfuck(std::string const &programName, SUGAR_LOC) {
     return __assembler.brainfuck(programName);
   }
   
-  void program(std::string const &name, std::string const &entry) {
+  void program(std::string const &name, std::string const &entry, SUGAR_LOC) {
     __assembler.program(name, entry).begin();
   }
 
-  void endProgram() {
+  void endProgram(SUGAR_LOC) {
     __assembler.endProgram();
   }
 
-  void endFunction() {
+  void endFunction(SUGAR_LOC) {
     __assembler.endFunction();
   }
 
-  void return_() {
+  void break_(SUGAR_LOC) {
+    __assembler.jump(impl::ControlStack::getBreakLabel(), LOC_FWD);
+    __assembler.label(impl::nextLabel(), LOC_FWD);
+  }
+
+  void continue_(SUGAR_LOC) {
+    __assembler.jump(impl::ControlStack::getContinueLabel(), LOC_FWD);
+    __assembler.label(impl::nextLabel(), LOC_FWD);
+  }
+  
+  void return_(SUGAR_LOC) {
     __assembler.returnFromFunction();
   }
 
-  void return_(Expr const &expr) {
+  void return_(Expr const &expr, SUGAR_LOC) {
     __assembler.returnFromFunction(expr.get());
   }
   
-  void print(char c) {
+  void print(char c, SUGAR_LOC) {
     __assembler.write(literal::u8(c));
   }
 
-  void print(int x) {
+  void print(int x, SUGAR_LOC) {
     __assembler.print(impl::toLiteral(x));
   }
   
-  void print(std::string const &str) {
-    __assembler.print(literal::string(str));
-  }
-
-  void print(Expr const &expr) {
+  void print(Expr const &expr, SUGAR_LOC) {
     try {
       __assembler.print(expr.get());
     } catch (error::Error &err) {
@@ -51,8 +57,8 @@ namespace acus::sugar {
     }
   }
 
-  Expr var(std::string const &varName) {
-    return Expr{ __assembler.expr(varName) };
+  Expr var(std::string const &varName, SUGAR_LOC) {
+    return Expr{ __assembler.expr(varName), LOC_FWD };
   }
   
   

@@ -16,25 +16,35 @@ namespace acus::error {
   struct Error: std::exception {
 
     ErrorCode errorCode;
+    std::string filename;
+    int line;
+    int column;
     std::string msg;
 
-    Error(ErrorCode errorCode, std::string const &msgHead = ""):
-      errorCode(errorCode), msg(msgHead) {}
+    Error(ErrorCode errorCode, std::string fname, int ln, int col, std::string message):
+      errorCode(errorCode),
+      filename(std::move(fname)),
+      line(ln),
+      column(col),
+      msg(std::move(message))
+    {}
 
     ErrorCode code() const noexcept {
       return errorCode;
     }
-    
-    template <typename T>
-    Error &operator<<(T const &val) {
-      std::ostringstream oss;
-      oss << val;
-      msg += oss.str();
+
+    Error &relocate(std::string fname, int ln, int col) noexcept {
+      filename = std::move(fname);
+      line = ln;
+      column = col;
       return *this;
     }
-
+    
     virtual char const *what() const noexcept override {
-      return msg.c_str();
+      static std::string str;
+      str.clear();
+      str = filename + ":" + std::to_string(line) + ":" + std::to_string(column) + ": " + msg;
+      return str.c_str();
     }
   };
 
@@ -43,9 +53,9 @@ namespace acus::error {
                 std::string const &filename, int line, int column,
                 Args ... args) {
     if (not condition) return;
-    Error err(errorCode);
-    (err << filename << ":" << line << ":" << column << ": " << ... << args);
-    throw err;
+    std::ostringstream oss;
+    (oss << ... << args);
+    throw Error(errorCode, filename, line, column, oss.str());
     std::unreachable();
   }  
 
