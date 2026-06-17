@@ -167,63 +167,76 @@ void Assembler::mergeAvailableSlots() {
   }
 }
 
-void Assembler::freeSlot(Slot &slot) {
+void Assembler::markSlotAvailable(Slot &slot) {
+  size_t const size = slot.size();
+  
   slot.name = "";
   slot.uniqueName = "";
-  slot.type = ts::raw(slot.size());
+  slot.type = ts::raw(size);
   slot.kind = Slot::Available;
   slot.scope = nullptr;
+}
 
-  mergeAvailableSlots();
+bool Assembler::freeFirstSlot(auto&& condition) {
+  for (auto &slot: _currentFunction->frame.locals) {
+    if (condition(slot)) {
+      markSlotAvailable(slot);
+      mergeAvailableSlots();
+      return true;
+    }
+  }
+  return false;
+}
+
+bool Assembler::freeAllSlots(auto&& condition) {
+  bool success = false;
+  for (auto &slot: _currentFunction->frame.locals) {
+    if (condition(slot)) {
+      markSlotAvailable(slot);
+      success = true;
+    }
+  }
+
+  if (success) mergeAvailableSlots();
+  return success;
 }
 
 void Assembler::freeTempSlot(Slot const &target) {
   assert(target.kind == Slot::Temp);
   
   // Find this slot in the current frame and free it.
-  for (auto &slot: _currentFunction->frame.locals) {
-    if (slot == target) {
-      freeSlot(slot);
-      return;
-    }
-  }
-  // Ignore. The temp slot might be a subslot of a larger materialized temp
-  // Not sure if we should free the entire slot in that case, seems risky.
-  // Just leave (leak) it for now, it will be freed eventually anyway.
+  freeFirstSlot([&](Slot &slot) {
+    return slot == target;
+  });
 }
 
 
 void Assembler::freeTempSlots() {
-  for (auto &slot: _currentFunction->frame.locals) {
-    if (slot.kind == Slot::Temp) freeSlot(slot);
-  }
+  freeAllSlots([&](Slot &slot){
+    return slot.kind == Slot::Temp;
+  });
 }
 
 void Assembler::freeCacheSlot(Slot const &target) {
   assert(target.kind == Slot::Cache);
   
   // Find this slot in the current frame and free it.
-  for (auto &slot: _currentFunction->frame.locals) {
-    if (slot == target) {
-      freeSlot(slot);
-      return;
-    }
-  }
-  assert(false && "trying to free a cache slot that does not exist");
+  bool const success = freeFirstSlot([&](Slot &slot) {
+    return slot == target;
+  });
+  assert(success && "trying to free a cache slot that does not exist");
 }
 
 void Assembler::freeCacheSlots() {
-  for (auto &slot: _currentFunction->frame.locals) {
-    if (slot.kind == Slot::Cache) freeSlot(slot);
-  }
+  freeAllSlots([&](Slot &slot) {
+    return slot.kind == Slot::Cache;
+  });
 }
 
 void Assembler::freeScope(Function::Scope const *scope) {
-  for (auto &slot: _currentFunction->frame.locals) {
-    if (slot.scope == scope) {
-      freeSlot(slot);
-    }
-  }
+  freeAllSlots([&](Slot &slot) {
+    return slot.scope == scope;
+  });
 }
 
 Slot Assembler::getTemp(types::TypeHandle type) {

@@ -62,6 +62,7 @@ namespace acus {
     FunctionCallBuilder callFunction(std::string const &functionName, API_FUNC);
     FunctionCallBuilder callFunctionPointer(auto const &functionPtr, API_FUNC);
 
+    Expression expr(auto const &lhs, API_FUNC);
     Expression assign(auto const &lhs, auto const &rhs, API_FUNC);
     Expression cast(auto const &lhs, types::TypeHandle toType, API_FUNC);
     
@@ -139,7 +140,7 @@ namespace acus {
     void print(auto const &val, API_FUNC);
 
     void label(std::string const &jumpLabel, API_FUNC);
-    void jump(std::string const &jumpLabel, API_FUNC);    
+    void jump(std::string const &jumpLabel, API_FUNC);
     void jumpIf(auto const &condition, std::string const &trueLabel, std::string const &falseLabel, API_FUNC);
     void unreachable(API_FUNC);
   
@@ -596,8 +597,11 @@ namespace acus {
     // Temporaries and memory management (assembler_memory.cc)
     std::string makeFullName(std::string const &name);
     std::string makeFullGlobalName(std::string const &name);
+
+    bool freeFirstSlot(auto&& condition);
+    bool freeAllSlots(auto&& condition);
     
-    void freeSlot(Slot &slot);
+    void markSlotAvailable(Slot &slot);
     void freeTempSlots();
     void freeTempSlot(Slot const &slot);
     void freeCacheSlots();

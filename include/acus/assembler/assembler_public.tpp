@@ -29,6 +29,11 @@ void Assembler::print(auto const &val, API_FUNC_SOURCE) {
   printImpl(rValue(val, API_FWD), API_FWD);
 }
 
+Expression Assembler::expr(auto const &val, API_FUNC_SOURCE) {
+  API_FUNC_BEGIN();
+  return lValue(val, API_FWD);
+}
+
 Expression Assembler::assign(auto const &lhs, auto const &rhs, API_FUNC_SOURCE) {
   API_FUNC_BEGIN();
   return assignImpl(lValue(lhs, API_FWD), rValue(rhs, API_FWD), API_FWD);
