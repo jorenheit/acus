@@ -17,6 +17,12 @@ Expr let(std::string const &varName, SUGAR_LOC) {
   return Expr{__assembler.declareLocal(varName, impl::getTypeHandle<T>(), LOC_FWD), LOC_FWD};
 }
 
+template <typename T> requires impl::IsSugarType<T>
+void global(std::string const &varName, SUGAR_LOC) {
+  __assembler.declareGlobal(varName, impl::getTypeHandle<T>(), LOC_FWD);
+}
+
+
 template <typename T>
 Expr Expr::cast(SUGAR_LOC) const {
   static_assert(std::is_base_of_v<impl::SugarType, T>,

@@ -222,12 +222,12 @@ int main() try {
   endProgram();
 
 
-  using Arr5 = Array<u8, 5>;
-
-  auto foo = function_fwd<void(ptr<u8>)>("foo");
   
   program("pointers");
   {
+    using Arr5 = Array<u8, 5>;
+    auto foo = function_fwd<void(ptr<u8>)>("foo");
+    
     function<void()>("main");
     {
       let<Arr5>("arr") = Arr5{1, 2, 3, 4, 5};
@@ -253,8 +253,36 @@ int main() try {
   }
   endProgram();
 
+  program("globals");
+  {
+    auto foo = function_fwd<void()>("foo");
+    
+    global<string<10>>("g");
+    
+    function<void()>("main");
+    {
+      var("g") = "Hello, ";
+      print(var("g"));
+
+      foo();
+      println(var("g"));
+
+      return_();
+    }
+    endFunction();
+
+    function<void()>("foo");
+    {
+      var("g") = "World!";
+      return_();
+    }
+    endFunction();
+  }
+  endProgram();
+
   
-  std::cout << generateBrainfuck("pointers");
+  
+  std::cout << generateBrainfuck("globals");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

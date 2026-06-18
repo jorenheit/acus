@@ -71,6 +71,9 @@ namespace acus::sugar {
   template <typename T> requires impl::IsSugarType<T>
   Expr let(std::string const &varName, SUGAR_FUNC);
 
+  template <typename T> requires impl::IsSugarType<T>
+  void global(std::string const &varName, SUGAR_FUNC);
+  
   Expr var(std::string const &varName, SUGAR_FUNC);
   
   void program(std::string const &name, std::string const &entry = "main", SUGAR_FUNC);
