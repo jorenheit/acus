@@ -30,7 +30,14 @@ namespace acus::sugar {
     return _expr;
   }
   
+  Expr Expr::operator*() {
+    return Expr {__assembler.dereferencePointer(get(), _loc), _loc};
+  }
 
+  Expr Expr::operator&() {
+    return Expr {__assembler.addressOf(get(), _loc), _loc};
+  }
+  
   Expr Expr::operator-() {
     return Expr {__assembler.negate(get(), _loc), _loc};
   }

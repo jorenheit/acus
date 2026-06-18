@@ -22,6 +22,7 @@ namespace {
   }
 
   bool pointerCanDecayInto(TypeHandle target, TypeHandle t) {
+    // TODO: this shouldnt be an assert
     assert(types::isPointer(t) && types::isPointer(target));
 
     if (t == target) return true;

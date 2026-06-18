@@ -45,6 +45,8 @@ namespace acus::sugar {
     Expr operator-();
     Expr operator+();
     Expr operator!();
+    Expr operator&();
+    Expr operator*();
     Expr &operator+=(Expr const &other);
     Expr &operator-=(Expr const &other);
     Expr &operator*=(Expr const &other);

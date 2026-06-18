@@ -6,6 +6,26 @@ namespace acus::sugar {
 
   namespace impl {
     struct SugarType {};
+
+    template <typename T>
+    inline constexpr bool IsSugarType = std::is_same_v<T, void> || std::is_base_of_v<SugarType, std::remove_cvref_t<T>>;
+
+    template <typename Tuple>
+    struct IsTupleOfSugarTypesImpl: std::false_type {};
+
+    template <typename ... Types>
+    struct IsTupleOfSugarTypesImpl<std::tuple<Types ...>> {
+      static constexpr bool value = (IsSugarType<Types> && ...);
+    };
+  
+    template <typename Tuple>
+    inline constexpr bool IsTupleOfSugarTypes = IsTupleOfSugarTypesImpl<std::remove_cvref_t<Tuple>>::value;
+
+    template <typename T> requires IsSugarType<T>
+    types::TypeHandle getTypeHandle() {
+      if constexpr (std::is_same_v<T, void>) return ts::void_t();
+      else return T::type();
+    }
     
     template <auto typeFactory, auto literalFactory>
     class Int: public SugarType {
@@ -82,7 +102,7 @@ namespace acus::sugar {
 
   template <typename T, size_t N>
   struct Array: impl::SugarType, std::array<T, N> {
-    static_assert(std::is_base_of_v<impl::SugarType, T>, "Arrays can only contain types from the sugar API");
+    static_assert(impl::IsSugarType<T>, "Arrays can only contain types from the sugar API");
     
     using Base = std::array<T, N>;
     using Base::Base;
@@ -95,7 +115,7 @@ namespace acus::sugar {
     {}
     
     static types::TypeHandle type() {
-      return ts::array(T::type(), N);
+      return ts::array(impl::getTypeHandle<T>(), N);
     }
     
     literal::Literal toLiteral() const {
@@ -109,5 +129,14 @@ namespace acus::sugar {
       return builder.done();
     }
   };
-  
+
+
+  template <typename T>
+  struct ptr: impl::SugarType {
+    static_assert(impl::IsSugarType<T>, "Pointers can only point to types from the sugar API");
+
+    static types::TypeHandle type() {
+      return ts::pointer(impl::getTypeHandle<T>());
+    }
+  };
 }

@@ -31,7 +31,7 @@ int main() try {
 	hello("you");
       };
       
-      let<s8>("x") = 5;
+      let<u8>("x") = 5;
       println(-var("x"));
       if_(var("x") < 10) {
 	println("small");
@@ -199,8 +199,62 @@ int main() try {
   }
   endProgram();
 
+  program("nested_loops");
+  {
+    function<void()>("main");
+    {
+      for_(let<u8>("i") = 1, var("i") <= 10, ++var("i")) {
+	for_(let<u8>("j") = var("i"), var("j") <= 10, ++var("j")) {
+	  if_(var("i") * var("j") > 50) {
+	    continue_();
+	  };
+	  print('(');
+	  print(var("i"));
+	  print(',');
+	  print(var("j"));
+	  println(')');
+	};
+      };
+      return_();
+    }
+    endFunction();
+  }
+  endProgram();
+
+
+  using Arr5 = Array<u8, 5>;
+
+  auto foo = function_fwd<void(ptr<u8>)>("foo");
   
-  std::cout << generateBrainfuck("test");
+  program("pointers");
+  {
+    function<void()>("main");
+    {
+      let<Arr5>("arr") = Arr5{1, 2, 3, 4, 5};
+      foo(&var("arr")[0]);
+      
+      
+      let<ptr<u8>>("p") = &var("arr")[0];
+      for_(let<u8>("i") = 0, var("i") < 5, ++var("i")) {
+	println(*var("p"));
+	++var("p");
+      };
+
+      return_();
+    }
+    endFunction();
+
+    function<void(ptr<u8>)>("foo", "p");
+    {
+      *var("p") = 69;
+      return_();
+    }
+    endFunction();
+  }
+  endProgram();
+
+  
+  std::cout << generateBrainfuck("pointers");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

@@ -4,20 +4,6 @@
 
 namespace acus::sugar::impl {
   
-  template <typename T>
-  inline constexpr bool IsSugarType = std::is_same_v<T, void> || std::is_base_of_v<SugarType, std::remove_cvref_t<T>>;
-
-  template <typename Tuple>
-  struct IsTupleOfSugarTypesImpl: std::false_type {};
-
-  template <typename ... Types>
-  struct IsTupleOfSugarTypesImpl<std::tuple<Types ...>> {
-    static constexpr bool value = (IsSugarType<Types> && ...);
-  };
-  
-  template <typename Tuple>
-  inline constexpr bool IsTupleOfSugarTypes = IsTupleOfSugarTypesImpl<std::remove_cvref_t<Tuple>>::value;
-
   
   inline literal::Literal toLiteral(int x) {
     if (x >= 256) return literal::u16(x);
@@ -27,7 +13,11 @@ namespace acus::sugar::impl {
   }
 
   inline literal::Literal toLiteral(int x, types::TypeHandle type) {
-    assert(types::isInteger(type));
+    if (not types::isInteger(type)) {
+      assert(types::isPointer(type));
+      return literal::u16(x);
+    }
+    
     if (type == ts::u8())  return literal::u8(x);
     if (type == ts::u16()) return literal::u16(x);
     if (type == ts::s8())  return literal::s8(x);
@@ -45,11 +35,6 @@ namespace acus::sugar::impl {
   }
 
 
-  template <typename T> requires IsSugarType<T>
-  types::TypeHandle getTypeHandle() {
-    if constexpr (std::is_same_v<T, void>) return ts::void_t();
-    else return T::type();
-  }
 
   std::string nextLabel();
 
