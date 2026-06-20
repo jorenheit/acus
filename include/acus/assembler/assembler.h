@@ -306,10 +306,10 @@ namespace acus {
     
     void jumpIfImpl(Expression const &condition, std::string const &trueLabel, std::string const &falseLabel, API_CTX);
     void writeImpl(Expression const &rhs, API_CTX); 
-    void writeSlot(Slot const &slot);
     void readImpl(Expression const &rhs, API_CTX); 
     void printImpl(Expression const &rhs, API_CTX);
-
+    void writeSlot(Slot const &slot);
+    void readSlot(Slot const &target);
 
     void printString(Expression const &rhs);
     void printStringConst(std::string const &str);

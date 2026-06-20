@@ -37,35 +37,9 @@ namespace acus::sugar {
   void return__(Expr const &expr, SUGAR_LOC) {
     __assembler.returnFromFunction(expr.get(), LOC_FWD);
   }
-  
-  void print(char c, SUGAR_LOC) {
-    __assembler.write(literal::u8(c));
-  }
-
-  void print(int x, SUGAR_LOC) {
-    __assembler.print(impl::toLiteral(x));
-  }
-  
-  void print(Expr const &expr, SUGAR_LOC) {
-    try {
-      __assembler.print(expr.get());
-    } catch (error::Error &err) {
-      if (err.errorCode == error::ErrorCode::NotPrintable) {
-	__assembler.write(expr.get());
-      }
-      else throw;
-    }
-  }
-
-  void println(SUGAR_LOC) {
-    print('\n', LOC_FWD);
-  }
-  
+    
   Expr var(std::string const &varName, SUGAR_LOC) {
     return Expr{ __assembler.expr(varName), LOC_FWD };
   }
 
-  void read(Expr const &expr, SUGAR_LOC) {
-    __assembler.read(expr.get(), LOC_FWD);
-  }
 }

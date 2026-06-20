@@ -80,12 +80,6 @@ namespace acus::sugar {
   void continue__(SUGAR_FUNC);  
   void return__(SUGAR_FUNC);
   void return__(Expr const &expr, SUGAR_FUNC);
-  void print(char c, SUGAR_FUNC);
-  void print(int x, SUGAR_FUNC);
-  void print(Expr const &expr, SUGAR_FUNC);
-  void println(SUGAR_FUNC);
-  void println(auto&& arg, SUGAR_FUNC);
-  void read(Expr const &expr, SUGAR_FUNC);
 
   std::string generateBrainfuck(std::string const &programName, SUGAR_FUNC);
 

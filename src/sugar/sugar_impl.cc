@@ -8,5 +8,10 @@ namespace acus::sugar::impl {
     static size_t count = 0;
     return "__sugar_label_" + std::to_string(count++);
   }
+
+  std::string nextVarName() {
+    static size_t count = 0;
+    return "__sugar_var_" + std::to_string(count++);
+  }
   
 }

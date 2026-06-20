@@ -156,7 +156,8 @@ void Assembler::endScope(API_FUNC) {
   API_FUNC_BEGIN();
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
-  
+
+  _cache.controlBoundary();
   freeScope(_currentScope);
   _currentScope = _currentScope->parent;
 }

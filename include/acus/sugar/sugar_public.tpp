@@ -31,11 +31,6 @@ Expr Expr::cast(SUGAR_LOC) const {
   return Expr{__assembler.cast(get(), impl::getTypeHandle<T>(), LOC_FWD), LOC_FWD};
 }
 
-void println(auto&& arg, SUGAR_LOC) {
-  print(std::forward<decltype(arg)>(arg), LOC_FWD);
-  print('\n', LOC_FWD);
-}
-
 
 template <typename Signature>
 class FunctionHandle;
@@ -94,7 +89,7 @@ template <typename Ret, typename ... Args>
 Expr FunctionHandle<Ret(Args...)>::callWithReturn(SUGAR_LOC, auto&& ... args) const {
   static_assert(std::tuple_size_v<ArgumentTypes> == sizeof ... (args),
 		"Function signature does not match number of arguments.");
-  std::string const retName = impl::nextLabel();
+  std::string const retName = impl::nextVarName();
 
   auto ret = __assembler.declareLocal(retName, returnType(), LOC_FWD);
   auto builder = __assembler.callFunction(_functionName, LOC_FWD).into(ret);

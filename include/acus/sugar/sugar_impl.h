@@ -39,6 +39,7 @@ namespace acus::sugar::impl {
 
 
   std::string nextLabel();
+  std::string nextVarName();
 
   class ControlStack {
 

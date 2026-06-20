@@ -15,9 +15,14 @@ void Assembler::readImpl(Expression const &rhs, API_CTX) {
 	      "input must be read into variable-type of size 1.");
   assert(not rhs.isLiteral());
 
+  _cache.write(rhs.slot(), [&](Slot const &dest){
+    readSlot(dest);
+  });
+}
+
+void Assembler::readSlot(Slot const &target) {
   pushPtr();
-  Slot const targetSlot = materialize(rhs.slot());
-  moveTo(targetSlot);
+  moveTo(target);
   emit<primitive::In>();
   popPtr();
 }

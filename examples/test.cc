@@ -6,8 +6,10 @@
 #include <iostream>
 #include "acus/assembler/assembler.h"
 #include "acus/sugar/sugar.h"
+#include "acus/sugar/std.h"
 using namespace acus;
 using namespace sugar;
+using namespace sugar::io;
 
 
 int main() try {
@@ -258,21 +260,12 @@ int main() try {
     function_<void()>("main") | define {
       print("Enter your name: ");
 
-      let<string<10>>("name");
-      let<u8>("i") = 0;
-      while_(1) {
-	let<u8>("c");
-	read(var("c"));
-	if_(var("c") == '\n') { break_; };
-	var("name")[var("i")] = var("c");
-	++var("i");
-      };
-      var("name")[var("i") + 1] = 0;
-
+      let<string<10>>("name") = io::readLine<10>();
+      auto name = var("name");
+		      
       print("Hello, ");
-      print(var("name"));
+      print(name);
       println("!");
-
       
       return_;
     };
