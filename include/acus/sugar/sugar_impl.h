@@ -1,6 +1,8 @@
 #pragma once
+#include "acus/sugar/sugar_loc.h"
 #include "acus/sugar/sugar_types.h"
 #include <stack>
+#include <functional>
 
 namespace acus::sugar::impl {
   
@@ -68,5 +70,35 @@ namespace acus::sugar::impl {
     }
     
   };
+
+
+  class FunctionDefinition {
+    std::source_location _loc;
+    std::function<void()> _body;
+  public:
+    FunctionDefinition(SUGAR_FUNC): _loc(LOC_FWD) {}
+    
+    template <typename Body>
+    FunctionDefinition &operator<<(Body&& body) {
+      _body = std::forward<Body>(body);
+      return *this;
+    }
+
+    void operator()() const {
+      _body();
+    }
+
+    std::source_location const &loc() const {
+      return _loc;
+    }
+
+  };
+
+  class FunctionDeclaration {
+    std::source_location _loc;
+  public:
+    FunctionDeclaration(SUGAR_FUNC): _loc(LOC_FWD) {}
+  };
+  
   
 } // impl

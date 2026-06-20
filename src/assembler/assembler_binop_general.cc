@@ -61,13 +61,11 @@ Expression Assembler::binOpAssignImpl(Expression const &lhs, Expression const &r
   assert(not lhs.isLiteral());
 
   Slot const lhsSlot = materialize(lhs.slot());
-  if (rhs.hasSlot()) {
-    Slot const rhsSlot = materialize(rhs.slot());
-    binOpAssignSlot<Operator>(lhsSlot, rhsSlot);
-  } else {
-    binOpAssignConst<Operator>(lhsSlot, rhs.literal());
-  }
-  
+  _cache.write(lhs.slot(), [&](Slot const &dest) {
+    if (rhs.hasSlot()) binOpAssignSlot<Operator>(dest, materialize(rhs.slot()));
+    else binOpAssignConst<Operator>(dest, rhs.literal());
+  });
+    
   return lhs;
 }
 

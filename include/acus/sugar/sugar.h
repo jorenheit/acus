@@ -2,11 +2,7 @@
 #include "acus/assembler/assembler.h"
 #include "acus/sugar/sugar_types.h"
 #include "acus/sugar/sugar_impl.h"
-
-#define LOC loc
-#define LOC_FWD LOC
-#define SUGAR_LOC std::source_location LOC
-#define SUGAR_FUNC SUGAR_LOC = std::source_location::current()
+#include "acus/sugar/sugar_loc.h"
 
 namespace acus::sugar {
 
@@ -41,6 +37,7 @@ namespace acus::sugar {
     Expr operator[](Expr const &index) const;    
     Expr &operator=(Expr const &other);
     Expr &operator++();
+    // TODO: post increment
     Expr &operator--();
     Expr operator-();
     Expr operator+();
@@ -79,69 +76,67 @@ namespace acus::sugar {
   void program(std::string const &name, std::string const &entry = "main", SUGAR_FUNC);
   void endProgram(SUGAR_FUNC);
   void endFunction(SUGAR_FUNC);
-  void break_(SUGAR_FUNC);
-  void continue_(SUGAR_FUNC);  
-  void return_(SUGAR_FUNC);
-  void return_(Expr const &expr, SUGAR_FUNC);
+  void break__(SUGAR_FUNC);
+  void continue__(SUGAR_FUNC);  
+  void return__(SUGAR_FUNC);
+  void return__(Expr const &expr, SUGAR_FUNC);
   void print(char c, SUGAR_FUNC);
   void print(int x, SUGAR_FUNC);
   void print(Expr const &expr, SUGAR_FUNC);
+  void println(SUGAR_FUNC);
   void println(auto&& arg, SUGAR_FUNC);
+  void read(Expr const &expr, SUGAR_FUNC);
 
   std::string generateBrainfuck(std::string const &programName, SUGAR_FUNC);
 
-  template <typename Signature>
-  class FunctionHandle;
+  template <typename Signature> class FunctionHandle;
+  template <typename Signature> class FunctionBuilder;
 
   template <typename Signature>
-  FunctionHandle<Signature> function_fwd(std::string const &name, SUGAR_FUNC);  
+  auto function_(std::string const &functionName, auto&& ... argNames);
 
-  template <typename Signature>
-  FunctionHandle<Signature> call(std::string const &name, SUGAR_FUNC);
-
-  template <typename Init, typename Condition, typename Increment>
-  class ForBuilder;
-
-  template <typename Condition>
-  class WhileBuilder;
-
-  template <typename Condition>
-  class IfBuilder;
-  
-  template <typename Init, typename Condition, typename Increment>
-  auto makeForLoop(Init&& init, Condition&& condition, Increment&& increment, SUGAR_LOC) {
-    return ForBuilder{std::forward<Init>(init),
-		      std::forward<Condition>(condition),
-		      std::forward<Increment>(increment),
-		      LOC_FWD};
+  namespace impl {
+    class Return {
+      bool _consumed = false;
+      std::source_location _loc;
+    
+    public:
+      Return(SUGAR_FUNC):
+	_loc(std::move(loc))
+      {}
+    
+      ~Return() {
+	if (!_consumed) return__(_loc);
+      }
+    
+      void operator()(auto&& ... arg) && {
+	_consumed = true;
+	return__(std::forward<decltype(arg)>(arg)..., _loc);
+      }
+    };
   }
 
-  template <typename Condition>
-  auto makeWhileLoop(Condition&& condition, SUGAR_LOC) {
-    return WhileBuilder{std::forward<Condition>(condition), LOC_FWD};
-  }
+  
+#define for_(init, condition, increment)			\
+  impl::makeForLoop([&]{ init; },				\
+		    [&]{ return (condition).get(); },		\
+		    [&]{ increment; },				\
+		    std::source_location::current()) << [&]
 
-  template <typename Condition>
-  auto makeIfStatement(Condition&& condition, SUGAR_LOC) {
-    return IfBuilder{std::forward<Condition>(condition), LOC_FWD};
-  }
+#define while_(condition)					\
+  impl::makeWhileLoop([&]{ return Expr{condition}.get(); },	\
+		      std::source_location::current()) << [&]
   
-  
-#define for_(init, condition, increment)		\
-  makeForLoop([&]{ init; },				\
-	      [&]{ return (condition).get(); },		\
-	      [&]{ increment; },			\
-	      std::source_location::current()) << [&]
-
-#define while_(condition)				\
-  makeWhileLoop([&]{ return (condition).get(); },	\
-		std::source_location::current()) << [&]
-  
-#define if_(condition)					\
-  makeIfStatement([&]{ return (condition).get(); },	\
-		  std::source_location::current()) << [&]
+#define if_(condition)						\
+  impl::makeIfStatement([&]{ return (condition).get(); },	\
+			std::source_location::current()) << [&]
 
 #define else_ << [&]
+#define define impl::FunctionDefinition{} << [&]
+#define declare impl::FunctionDeclaration{}
+#define break_ break__()
+#define continue_ continue__()
+#define return_ impl::Return{}
   
 #include "sugar_public.tpp"
   

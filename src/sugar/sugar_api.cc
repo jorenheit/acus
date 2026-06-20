@@ -20,22 +20,22 @@ namespace acus::sugar {
     __assembler.endFunction();
   }
 
-  void break_(SUGAR_LOC) {
+  void break__(SUGAR_LOC) {
     __assembler.jump(impl::ControlStack::getBreakLabel(), LOC_FWD);
     __assembler.label(impl::nextLabel(), LOC_FWD);
   }
 
-  void continue_(SUGAR_LOC) {
+  void continue__(SUGAR_LOC) {
     __assembler.jump(impl::ControlStack::getContinueLabel(), LOC_FWD);
     __assembler.label(impl::nextLabel(), LOC_FWD);
   }
   
-  void return_(SUGAR_LOC) {
-    __assembler.returnFromFunction();
+  void return__(SUGAR_LOC) {
+    __assembler.returnFromFunction(LOC_FWD);
   }
 
-  void return_(Expr const &expr, SUGAR_LOC) {
-    __assembler.returnFromFunction(expr.get());
+  void return__(Expr const &expr, SUGAR_LOC) {
+    __assembler.returnFromFunction(expr.get(), LOC_FWD);
   }
   
   void print(char c, SUGAR_LOC) {
@@ -57,9 +57,15 @@ namespace acus::sugar {
     }
   }
 
+  void println(SUGAR_LOC) {
+    print('\n', LOC_FWD);
+  }
+  
   Expr var(std::string const &varName, SUGAR_LOC) {
     return Expr{ __assembler.expr(varName), LOC_FWD };
   }
-  
-  
+
+  void read(Expr const &expr, SUGAR_LOC) {
+    __assembler.read(expr.get(), LOC_FWD);
+  }
 }

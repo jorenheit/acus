@@ -50,6 +50,7 @@ class FunctionHandle<Ret(Args...)> {
 public:
   using ReturnType = Ret;
   using ArgumentTypes = std::tuple<Args...>;
+  static constexpr size_t ArgCount = sizeof...(Args);
 
   static_assert(impl::IsSugarType<ReturnType>, "Return value must be void or a type from the sugar API");
   static_assert(impl::IsTupleOfSugarTypes<ArgumentTypes>, "Argument types must all be types from the sugar API");
@@ -112,41 +113,65 @@ void FunctionHandle<Ret(Args...)>::callWithoutReturn(SUGAR_LOC, auto&& ... args)
 }
 
 template <typename Signature>
-FunctionHandle<Signature> function_fwd(std::string const &name, SUGAR_LOC) {
-  return { name };
+auto function_(std::string const &functionName, auto&& ... argNames) {
+  static_assert(sizeof ... (argNames) == FunctionHandle<Signature>::ArgCount || sizeof ... (argNames) == 0,
+		"Invalid number of argument names in function definition.");
+  return FunctionBuilder<Signature>{functionName, std::forward<decltype(argNames)>(argNames) ...};
 }
 
-template <typename Signature>
-FunctionHandle<Signature> call(std::string const &name, SUGAR_LOC) {
-  return { name };
-}
-
-
-template <typename Signature>
-struct FunctionBuilder;
-
-template <typename Ret, typename... Args>
-struct FunctionBuilder<Ret(Args...)> {
+template <typename Ret, typename ... Args>
+class FunctionBuilder<Ret(Args...)> {
 
   template <typename>
   using ArgName = std::string const&;  
 
-  FunctionHandle<Ret(Args...)> operator()(FunctionHandle<Ret(Args...)> const &handle, ArgName<Args>... argNames, SUGAR_FUNC) const {
-    auto builder = __assembler.function(handle.functionName(), LOC_FWD);
-    builder.ret(handle.returnType());
-    (builder.param(argNames, impl::getTypeHandle<Args>()), ...);
-    builder.begin();
-    return FunctionHandle<Ret(Args...)>{handle.functionName()};
-  }
+  using HandleType = FunctionHandle<Ret(Args...)>;
+  HandleType _handle;
+  std::array<std::string, sizeof ... (Args)> _argNames;
+  std::array<types::TypeHandle, sizeof ... (Args)> _argTypes;
+  
+public:
 
-  FunctionHandle<Ret(Args...)> operator()(std::string const& name, ArgName<Args>... argNames, SUGAR_FUNC) const {
-    return this->operator()(call<Ret(Args...)>(name, LOC_FWD), argNames..., LOC_FWD);
+  FunctionBuilder(std::string const &functionName) requires (sizeof ... (Args) > 0):
+    FunctionBuilder(HandleType{functionName})
+  {}
+
+  FunctionBuilder(HandleType const &handle) requires (sizeof ... (Args) > 0):
+    _handle(handle)
+  {}
+  
+  FunctionBuilder(std::string const &functionName, ArgName<Args>... argNames):
+    FunctionBuilder(HandleType{functionName}, argNames...)
+  {}
+  
+  FunctionBuilder(HandleType const &handle, ArgName<Args>... argNames):
+    _handle(handle),
+    _argNames{argNames ...},
+    _argTypes{impl::getTypeHandle<Args>() ...}
+  {}
+
+  FunctionBuilder &operator=(FunctionBuilder const &) = delete;
+  FunctionBuilder &operator=(FunctionBuilder&&) = delete;
+
+  HandleType &operator|(impl::FunctionDeclaration const &decl) && {
+    return _handle;
   }
   
+  HandleType &operator|(impl::FunctionDefinition const &body) && {
+    
+    auto builder = __assembler.function(_handle.functionName(), body.loc());
+    builder.ret(_handle.returnType());
+    for (size_t i = 0; i != sizeof...(Args); ++i) {
+      builder.param(_argNames[i], _argTypes[i]);
+    }
+    builder.begin();
+    
+    body();
+    endFunction(body.loc());
+    return _handle;
+  }
 };
 
-template <typename Signature>
-inline constexpr FunctionBuilder<Signature> function{};
 
 
 template <typename Init, typename Condition, typename Increment>
@@ -326,36 +351,25 @@ public:
 };
 
 
+namespace impl {
 
-// template <typename Condition, typename Then, typename Else>
-// void ifCondition(Condition&& cond, Then&& thenBody, Else&& elseBody, SUGAR_FUNC) {
-//   std::string const thenLabel = "__sugar_label_" + std::to_string(impl::LabelCount::count++);
-//   std::string const elseLabel = "__sugar_label_" + std::to_string(impl::LabelCount::count++);
-//   std::string const breakLabel = "__sugar_label_" + std::to_string(impl::LabelCount::count++);
+  template <typename Init, typename Condition, typename Increment>
+  auto makeForLoop(Init&& init, Condition&& condition, Increment&& increment, SUGAR_LOC) {
+    return ForBuilder{std::forward<Init>(init),
+		      std::forward<Condition>(condition),
+		      std::forward<Increment>(increment),
+		      LOC_FWD};
+  }
 
-//   __assembler.jumpIf(cond(), thenLabel, elseLabel, LOC_FWD);
-//   __assembler.label(thenLabel, LOC_FWD);
-//   __assembler.scope(LOC_FWD).begin();
-//   thenBody();
-//   __assembler.endScope(LOC_FWD);
-//   __assembler.jump(breakLabel, LOC_FWD);
-//   __assembler.label(elseLabel, LOC_FWD);
-//   __assembler.scope(LOC_FWD).begin();
-//   elseBody();
-//   __assembler.endScope(LOC_FWD);
-//   __assembler.label(breakLabel, LOC_FWD);
-// }
+  template <typename Condition>
+  auto makeWhileLoop(Condition&& condition, SUGAR_LOC) {
+    return WhileBuilder{std::forward<Condition>(condition), LOC_FWD};
+  }
 
+  template <typename Condition>
+  auto makeIfStatement(Condition&& condition, SUGAR_LOC) {
+    return IfBuilder{std::forward<Condition>(condition), LOC_FWD};
+  }
 
-// template <typename Condition, typename Then>
-// void ifCondition(Condition&& cond, Then&& thenBody, SUGAR_FUNC) {
-//   std::string const thenLabel = "__sugar_label_" + std::to_string(impl::LabelCount::count++);
-//   std::string const breakLabel = "__sugar_label_" + std::to_string(impl::LabelCount::count++);
+} // impl
 
-//   __assembler.jumpIf(cond(), thenLabel, breakLabel, LOC_FWD);
-//   __assembler.label(thenLabel, LOC_FWD);
-//   __assembler.scope(LOC_FWD).begin();
-//   thenBody();
-//   __assembler.endScope(LOC_FWD);
-//   __assembler.label(breakLabel, LOC_FWD);
-// }

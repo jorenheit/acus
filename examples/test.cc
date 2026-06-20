@@ -22,11 +22,10 @@ int main() try {
     using Vec2 = Array<u8, 2>;
 
     
-    auto hello = function_fwd<void(string<10>)>("hello");
-    auto foo = function_fwd<void(s8)>("foo");
+    auto hello = function_<void(string<10>)>("hello") | declare;
+    auto foo = function_<void(s8)>("foo") | declare;
     
-    function<void()>("main");
-    {
+    function_<void()>("main") | define {
       for_(let<u8>("i") = 0, var("i") < 10, ++var("i")) {
 	hello("you");
       };
@@ -59,29 +58,24 @@ int main() try {
       while_(var("i") < 10) {
 	println(var("i"));
 	if_(var("i") == 7) {
-	  break_();
+	  break_;
 	};
 	++var("i");
       };
       
-      return_();
-    }
-    endFunction();
+      return_;
+    };
 
-    function< void(string<10>) >("hello", "str");
-    {
+    function_< void(string<10>) >("hello", "str") | define {
       print("Hello, ");
       println(var("str"));
-      return_();
-    }
-    endFunction();
+      return_;
+    };
 
-    function< void(s8) >("foo", "x");
-    {
+    function_< void(s8) >("foo", "x") | define {
       println(var("x"));
-      return_();
-    }
-    endFunction();
+      return_;
+    };
     
   }
   endProgram();
@@ -89,8 +83,8 @@ int main() try {
 
   program("fibonacci");
   {
-    function<void()>("main");
-    {
+    function_<void()>("main") | define {
+
       let<u8>("N") = 10;
 
       let<u16>("a") = 0;
@@ -104,72 +98,62 @@ int main() try {
 	var("b") = var("next");
       };
 
-      return_();
-    }
-    endFunction();
+      return_;
+    };
   }
   endProgram();
 
 
   program("fibonacci_recursive");
   {
-    auto fib = function_fwd<void(u16, u16, u16)>("fib");
+    auto fib = function_<void(u16, u16, u16)>("fib") | declare;
 
-    function<void()>("main");
-    {
+    function_<void()>("main") | define {
       let<u8>("N") = 20;
       fib(var("N"), 0, 1);
-      return_();
-    }
-    endFunction();
+      return_;
+    };
 
-    function<void(u16, u16, u16)>("fib", "n", "a", "b");
-    {
+    function_<void(u16, u16, u16)>("fib", "n", "a", "b") | define {
       if_(var("n") < 1) {
-	return_();
+	return_;
       } else_ {
 	println(var("a"));
 	fib(var("n") - 1, var("b"), var("a") + var("b"));
-	return_();
+	return_;
       };
-    }
-    endFunction();
+    };
   }
   endProgram();
  
   program("fibonacci_recursive2");
   {
-    auto fib = function_fwd<u16(u16)>("fib");
+    auto fib = function_<u16(u16)>("fib") | declare;
 
-    function<void()>("main");
-    {
+    function_<void()>("main") | define {
       let<u16>("N") = 20;
 
       for_(let<u8>("i") = 0, var("i") < var("N"), ++var("i")) {
 	println(fib(var("i")));
       };
 
-      return_();
-    }
-    endFunction();
+      return_;
+    };
 
-    function<u16(u16)>("fib", "n");
-    {
+    function_<u16(u16)>("fib", "n") | define {
       if_(var("n") < 2) {
 	return_(var("n"));
       } else_ {
 	return_(fib(var("n") - 1) + fib(var("n") - 2));
       };
-    }
-    endFunction();
+    };
   }
   endProgram();
 
 
   program("break_continue_demo");
   {
-    function<void()>("main");
-    {
+    function_<void()>("main") | define {
       println("Numbers from 1 to 20");
       println("skip multiples of 3");
       println("stop at 17");
@@ -179,12 +163,12 @@ int main() try {
         // Stop the loop entirely once i == 17.
         if_(var("i") == 17) {
           println("Reached 17, stopping.");
-          break_();
+          break_;
         };
 
         // Skip multiples of 3.
         if_(var("i") % 3 == 0) {
-          continue_();
+          continue_;
         };
 
         println(var("i"));
@@ -193,20 +177,18 @@ int main() try {
       println("");
       println("Done.");
 
-      return_();
-    }
-    endFunction();
+      return_;
+    };
   }
   endProgram();
 
   program("nested_loops");
   {
-    function<void()>("main");
-    {
+    function_<void()>("main") | define {
       for_(let<u8>("i") = 1, var("i") <= 10, ++var("i")) {
 	for_(let<u8>("j") = var("i"), var("j") <= 10, ++var("j")) {
 	  if_(var("i") * var("j") > 50) {
-	    continue_();
+	    continue_;
 	  };
 	  print('(');
 	  print(var("i"));
@@ -215,9 +197,8 @@ int main() try {
 	  println(')');
 	};
       };
-      return_();
-    }
-    endFunction();
+      return_;
+    };
   }
   endProgram();
 
@@ -226,10 +207,9 @@ int main() try {
   program("pointers");
   {
     using Arr5 = Array<u8, 5>;
-    auto foo = function_fwd<void(ptr<u8>)>("foo");
+    auto foo = function_<void(ptr<u8>)>("foo") | declare;
     
-    function<void()>("main");
-    {
+    function_<void()>("main") | define {
       let<Arr5>("arr") = Arr5{1, 2, 3, 4, 5};
       foo(&var("arr")[0]);
       
@@ -240,49 +220,68 @@ int main() try {
 	++var("p");
       };
 
-      return_();
-    }
-    endFunction();
+      return_;
+    };
 
-    function<void(ptr<u8>)>("foo", "p");
-    {
+    function_<void(ptr<u8>)>("foo", "p") | define {
       *var("p") = 69;
-      return_();
-    }
-    endFunction();
+      return_;
+    };
   }
   endProgram();
 
   program("globals");
   {
-    auto foo = function_fwd<void()>("foo");
-    
     global<string<10>>("g");
-    
-    function<void()>("main");
-    {
-      var("g") = "Hello, ";
-      print(var("g"));
 
-      foo();
+    auto foo = function_<void(string<10>)>("foo", "str") | define {
+      var("g") = var("str");
+      return_;
+    };
+    
+    function_<void()>("main") | define {      
+      var("g") = "Hello, ";
+
+      print(var("g"));
+      foo("World!");
       println(var("g"));
 
-      return_();
-    }
-    endFunction();
+      return_;
+    };
 
-    function<void()>("foo");
-    {
-      var("g") = "World!";
-      return_();
-    }
-    endFunction();
   }
   endProgram();
 
+  program("io");
+  {
+
+    function_<void()>("main") | define {
+      print("Enter your name: ");
+
+      let<string<10>>("name");
+      let<u8>("i") = 0;
+      while_(1) {
+	let<u8>("c");
+	read(var("c"));
+	if_(var("c") == '\n') { break_; };
+	var("name")[var("i")] = var("c");
+	++var("i");
+      };
+      var("name")[var("i") + 1] = 0;
+
+      print("Hello, ");
+      print(var("name"));
+      println("!");
+
+      
+      return_;
+    };
+    
+  }
+  endProgram();
   
   
-  std::cout << generateBrainfuck("globals");
+  std::cout << generateBrainfuck("io");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';
