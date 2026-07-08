@@ -25,6 +25,8 @@
 #define API_HEADER
 #include "acus/api/api.h"
 
+// TODO: Slot const & -> Slot
+
 namespace acus {
 
   // ============================================================
@@ -167,6 +169,7 @@ namespace acus {
     struct {
       bool begun = false;
       bool allowGlobalDeclarations = true;
+      bool allowTempAssign = false;
     } _state;
 
     struct MetaBlock {
@@ -245,7 +248,7 @@ namespace acus {
       Slot materialize(SlotProxy proxy);
       void write(SlotProxy dest, SlotProxy src);
       void write(SlotProxy dest, literal::Literal src);
-      void write(SlotProxy dest, std::function<void(Slot const &)> const &writeInto);
+      void write(SlotProxy dest, std::function<void(Slot )> const &writeInto);
       
       void internalBoundary();
       void callBoundary();
@@ -267,14 +270,14 @@ namespace acus {
     int currentScopeDepth() const;
   
     // Normalize to RValue or LValue (assembler_rlvalue.cc)
-    Expression rValue(Expression const &val, API_CTX) const;
+    Expression rValue(Expression val, API_CTX) const;
     Expression rValue(std::string const &var, API_CTX) const;
-    Expression rValue(SlotProxy const &slot, API_CTX) const;
-    Expression rValue(literal::Literal const &val, API_CTX) const;
+    Expression rValue(SlotProxy slot, API_CTX) const;
+    Expression rValue(literal::Literal val, API_CTX) const;
 
-    Expression lValue(Expression const &val, API_CTX) const;
+    Expression lValue(Expression val, API_CTX) const;
     Expression lValue(std::string const &var, API_CTX) const;  
-    Expression lValue(SlotProxy const &slot, API_CTX) const;
+    Expression lValue(SlotProxy slot, API_CTX) const;
 
     // Block management (assembler_blocks.cc)
     std::string generateUniqueBlockName();
@@ -282,7 +285,7 @@ namespace acus {
     void endBlock();    
     void constructMetaBlocks();
     void setNextBlock(std::string const &f, std::string const &b);
-    void setNextBlock(Expression const &obj);
+    void setNextBlock(Expression obj);
     
     // Implementation functions for public interface
     void beginProgramImpl(std::string const &name, std::string const &entry, API_CTX);
@@ -293,150 +296,151 @@ namespace acus {
 
     void callFunctionImpl(std::string const &functionName, std::optional<Expression> const &returnSlot,
 			  std::vector<Expression> const &args, API_CTX);
-    void callFunctionImpl(Expression const &functionPointer, std::optional<Expression> const &returnSlot,
+    void callFunctionImpl(Expression functionPointer, std::optional<Expression> const &returnSlot,
 			  std::vector<Expression> const &args, API_CTX);
     void returnFromFunctionImpl(std::optional<Expression> const &ret, API_CTX);
-    Expression structFieldImpl(Expression const &obj, std::string const &field, API_CTX);
-    Expression structFieldImpl(Expression const &obj, int fieldIndex, API_CTX);
-    Expression arrayElementImpl(Expression const &arr, int index, API_CTX);
-    Expression arrayElementImpl(Expression const &arr, Expression const &index, API_CTX);
-    Expression dereferencePointerImpl(Expression const &ptr, API_CTX);
+    Expression structFieldImpl(Expression obj, std::string const &field, API_CTX);
+    Expression structFieldImpl(Expression obj, int fieldIndex, API_CTX);
+    Expression arrayElementImpl(Expression arr, int index, API_CTX);
+    Expression arrayElementImpl(Expression arr, Expression index, API_CTX);
+    Expression dereferencePointerImpl(Expression ptr, API_CTX);
 
-    Expression addressOfImpl(Expression const &obj, API_CTX);
-    Expression assignImpl(Expression const &lhs, Expression const &rhs, API_CTX);
-    Expression castImpl(Expression const &obj, types::TypeHandle toType, API_CTX);
+    Expression addressOfImpl(Expression obj, API_CTX);
+    Expression assignImpl(Expression lhs, Expression rhs, bool allowTempAssign, API_CTX);
+    Expression castImpl(Expression obj, types::TypeHandle toType, API_CTX);
     
-    void jumpIfImpl(Expression const &condition, std::string const &trueLabel, std::string const &falseLabel, API_CTX);
-    void writeImpl(Expression const &rhs, API_CTX); 
-    void readImpl(Expression const &rhs, API_CTX); 
-    void printImpl(Expression const &rhs, API_CTX);
-    void writeSlot(Slot const &slot);
-    void readSlot(Slot const &target);
+    void jumpIfImpl(Expression condition, std::string const &trueLabel, std::string const &falseLabel, API_CTX);
+    void writeImpl(Expression rhs, API_CTX); 
+    void readImpl(Expression rhs, API_CTX); 
+    void printImpl(Expression rhs, API_CTX);
+    void writeSlot(Slot slot);
+    void readSlot(Slot target);
 
-    void printString(Expression const &rhs);
+    void printString(Expression rhs);
     void printStringConst(std::string const &str);
-    void printStringSlot(Slot const &slot);
+    void printStringSlot(Slot slot);
 
-    void printDecimal(Expression const &rhs);
+    void printDecimal(Expression rhs);
     void printDecimalConst(int value);
-    void printDecimalSlot(Slot const &slot);
-    void printDecimalSlotUnsigned(Slot const &slot, bool const destroySlot = false);
-    void printDecimalSlotSigned(Slot const &slot);
+    void printDecimalSlot(Slot slot);
+    void printDecimalSlotUnsigned(Slot slot, bool const destroySlot = false);
+    void printDecimalSlotSigned(Slot slot);
 
   
     // Slot operations
     template <typename TrueBranch, typename FalseBranch>
-    void branchOnSignBit(Slot const &slot, Cell const &flagCell, TrueBranch&& trueBranch, FalseBranch&& falseBranch);
-    void setSlotToBool(Slot const &slot, bool val);
+    void branchOnSignBit(Slot slot, Cell const &flagCell, TrueBranch&& trueBranch, FalseBranch&& falseBranch);
+    void setSlotToBool(Slot slot, bool val);
 
     std::optional<Slot> localSlot(std::string const &varName) const;
     std::optional<Slot> globalSlot(std::string const &varName) const;
     SlotProxy proxyFromVariableName(std::string const& name, API_CTX) const;
     
-    void assignSlot(Slot const &dest, Slot const &src);
-    void assignSlot(Slot const &slot, literal::Literal const &val);
-    void assignSlotBytewise(Slot const &dest, Slot const &src);
-    void assignIntegerSlot(Slot const &dest, Slot const &src);
+    void assignSlot(Slot dest, Slot src);
+    void assignSlot(Slot slot, literal::Literal val);
+    void assignSlotBytewise(Slot dest, Slot src);
+    void assignIntegerSlot(Slot dest, Slot src);
+    void moveSlotBytewise(Slot dest, Slot src);
 
-    void notSlot(Slot const &rhs);
-    void boolSlot(Slot const &rhs);
-    void negateSlot(Slot const &rhs);
-    void absSlot(Slot const &rhs);
-    void signBitSlot(Slot const &rhs);
-    void printIntegerSlotDestructive(Slot const &valSlot);
+    void notSlot(Slot rhs);
+    void boolSlot(Slot rhs);
+    void negateSlot(Slot rhs);
+    void absSlot(Slot rhs);
+    void signBitSlot(Slot rhs);
+    void printIntegerSlotDestructive(Slot valSlot);
     
-    void addSlotToSlot(Slot const &lhs, Slot const &rhs);
-    void addConstToSlot(Slot const &lhs, int delta);
-    void subSlotFromSlot(Slot const &lhs, Slot const &rhs);
-    void subConstFromSlot(Slot const &lhs, int delta);
+    void addSlotToSlot(Slot lhs, Slot rhs);
+    void addConstToSlot(Slot lhs, int delta);
+    void subSlotFromSlot(Slot lhs, Slot rhs);
+    void subConstFromSlot(Slot lhs, int delta);
 
-    void mulSlotByConst(Slot const &lhs, int factor);
-    void mulSlotByConstUnsigned(Slot const &lhs, int factor);
-    void mulSlotByConstSigned(Slot const &lhs, int factor);
+    void mulSlotByConst(Slot lhs, int factor);
+    void mulSlotByConstUnsigned(Slot lhs, int factor);
+    void mulSlotByConstSigned(Slot lhs, int factor);
 
-    void mulSlotBySlot(Slot const &lhs, Slot const &rhs);
-    void mulSlotBySlotUnsigned(Slot const &lhs, Slot const &rhs, bool const destroyRhs = false);
-    void mulSlotBySlotSigned(Slot const &lhs, Slot const &rhs);
+    void mulSlotBySlot(Slot lhs, Slot rhs);
+    void mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
+    void mulSlotBySlotSigned(Slot lhs, Slot rhs);
 
-    void divSlotByConst(Slot const &lhs, int denom);
-    void divSlotByConst(Slot const &lhs, int denom, Slot const &modSlot);
-    void divSlotByConstUnsigned(Slot const &lhs, int denom, std::optional<Slot> const &modSlot = {});
-    void divSlotByConstSigned(Slot const &lhs, int denom, std::optional<Slot> const &modSlot = {});
+    void divSlotByConst(Slot lhs, int denom);
+    void divSlotByConst(Slot lhs, int denom, Slot modSlot);
+    void divSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> const &modSlot = {});
+    void divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> const &modSlot = {});
 
-    void modSlotByConst(Slot const &lhs, int denom);
-    void modSlotByConst(Slot const &lhs, int denom, Slot const &divSlot);
-    void modSlotByConstUnsigned(Slot const &lhs, int denom, std::optional<Slot> const &divSlot = {});
-    void modSlotByConstSigned(Slot const &lhs, int denom, std::optional<Slot> const &divSlot = {});
+    void modSlotByConst(Slot lhs, int denom);
+    void modSlotByConst(Slot lhs, int denom, Slot divSlot);
+    void modSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> const &divSlot = {});
+    void modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> const &divSlot = {});
 
-    void divSlotBySlot(Slot const &lhs, Slot const &rhs);
-    void divSlotBySlot(Slot const &lhs, Slot const &rhs, Slot const &modSlot);
-    void divSlotBySlotUnsigned(Slot const &lhs, Slot const &rhs, std::optional<Slot> const &modSlot = {}, bool const destroyRhs = false);
-    void divSlotBySlotSigned(Slot const &lhs, Slot const &rhs, std::optional<Slot> const &modSlot = {});
+    void divSlotBySlot(Slot lhs, Slot rhs);
+    void divSlotBySlot(Slot lhs, Slot rhs, Slot modSlot);
+    void divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot = {}, bool const destroyRhs = false);
+    void divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot = {});
 
-    void modSlotBySlot(Slot const &lhs, Slot const &rhs);
-    void modSlotBySlot(Slot const &lhs, Slot const &rhs, Slot const &divSlot);
-    void modSlotBySlotUnsigned(Slot const &lhs, Slot const &rhs, std::optional<Slot> const &divSlot = {}, bool const destroyRhs = false);
-    void modSlotBySlotSigned(Slot const &lhs, Slot const &rhs, std::optional<Slot> const &divSlot = {});
+    void modSlotBySlot(Slot lhs, Slot rhs);
+    void modSlotBySlot(Slot lhs, Slot rhs, Slot divSlot);
+    void modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot = {}, bool const destroyRhs = false);
+    void modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot = {});
 
-    void andSlotWithConst(Slot const &lhs, int val);
-    void andSlotWithSlot(Slot const &lhs, Slot const &rhs);
-    void nandSlotWithConst(Slot const &lhs, int val);
-    void nandSlotWithSlot(Slot const &lhs, Slot const &rhs);
-    void orSlotWithConst(Slot const &lhs, int val);
-    void orSlotWithSlot(Slot const &lhs, Slot const &rhs);
-    void norSlotWithConst(Slot const &lhs, int val);
-    void norSlotWithSlot(Slot const &lhs, Slot const &rhs);
-    void xorSlotWithConst(Slot const &lhs, int val);
-    void xorSlotWithSlot(Slot const &lhs, Slot const &rhs);
-    void xnorSlotWithConst(Slot const &lhs, int val);
-    void xnorSlotWithSlot(Slot const &lhs, Slot const &rhs);
+    void andSlotWithConst(Slot lhs, int val);
+    void andSlotWithSlot(Slot lhs, Slot rhs);
+    void nandSlotWithConst(Slot lhs, int val);
+    void nandSlotWithSlot(Slot lhs, Slot rhs);
+    void orSlotWithConst(Slot lhs, int val);
+    void orSlotWithSlot(Slot lhs, Slot rhs);
+    void norSlotWithConst(Slot lhs, int val);
+    void norSlotWithSlot(Slot lhs, Slot rhs);
+    void xorSlotWithConst(Slot lhs, int val);
+    void xorSlotWithSlot(Slot lhs, Slot rhs);
+    void xnorSlotWithConst(Slot lhs, int val);
+    void xnorSlotWithSlot(Slot lhs, Slot rhs);
 
-    void slotEqualConst(Slot const &lhs, int val);
-    void slotEqualSlot(Slot const &lhs, Slot const &rhs);
-    void slotNotEqualConst(Slot const &lhs, int val);
-    void slotNotEqualSlot(Slot const &lhs, Slot const &rhs);
+    void slotEqualConst(Slot lhs, int val);
+    void slotEqualSlot(Slot lhs, Slot rhs);
+    void slotNotEqualConst(Slot lhs, int val);
+    void slotNotEqualSlot(Slot lhs, Slot rhs);
 
-    void slotLessConst(Slot const &lhs, int val);
-    void slotLessConstSigned(Slot const &lhs, int val);
-    void slotLessConstUnsigned(Slot const &lhs, int val);
+    void slotLessConst(Slot lhs, int val);
+    void slotLessConstSigned(Slot lhs, int val);
+    void slotLessConstUnsigned(Slot lhs, int val);
 
-    void slotLessEqualConst(Slot const &lhs, int val);
-    void slotLessEqualConstUnsigned(Slot const &lhs, int val);
-    void slotLessEqualConstSigned(Slot const &lhs, int val);
+    void slotLessEqualConst(Slot lhs, int val);
+    void slotLessEqualConstUnsigned(Slot lhs, int val);
+    void slotLessEqualConstSigned(Slot lhs, int val);
 
-    void slotGreaterConst(Slot const &lhs, int val);
-    void slotGreaterConstUnsigned(Slot const &lhs, int val);
-    void slotGreaterConstSigned(Slot const &lhs, int val);
+    void slotGreaterConst(Slot lhs, int val);
+    void slotGreaterConstUnsigned(Slot lhs, int val);
+    void slotGreaterConstSigned(Slot lhs, int val);
 
-    void slotGreaterEqualConst(Slot const &lhs, int val);
-    void slotGreaterEqualConstSigned(Slot const &lhs, int val);
-    void slotGreaterEqualConstUnsigned(Slot const &lhs, int val);
+    void slotGreaterEqualConst(Slot lhs, int val);
+    void slotGreaterEqualConstSigned(Slot lhs, int val);
+    void slotGreaterEqualConstUnsigned(Slot lhs, int val);
 
-    void slotLessSlot(Slot const &lhs, Slot const &rhs);
-    void slotLessSlotUnsigned(Slot const &lhs, Slot const &rhs, bool const destroyRhs = false);
-    void slotLessSlotSigned(Slot const &lhs, Slot const &rhs);
+    void slotLessSlot(Slot lhs, Slot rhs);
+    void slotLessSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
+    void slotLessSlotSigned(Slot lhs, Slot rhs);
 
-    void slotLessEqualSlot(Slot const &lhs, Slot const &rhs);
-    void slotLessEqualSlotUnsigned(Slot const &lhs, Slot const &rhs, bool const destroyRhs = false);
-    void slotLessEqualSlotSigned(Slot const &lhs, Slot const &rhs);
+    void slotLessEqualSlot(Slot lhs, Slot rhs);
+    void slotLessEqualSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
+    void slotLessEqualSlotSigned(Slot lhs, Slot rhs);
 
-    void slotGreaterSlot(Slot const &lhs, Slot const &rhs);
-    void slotGreaterSlotUnsigned(Slot const &lhs, Slot const &rhs, bool const destroyRhs = false);
-    void slotGreaterSlotSigned(Slot const &lhs, Slot const &rhs);
+    void slotGreaterSlot(Slot lhs, Slot rhs);
+    void slotGreaterSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
+    void slotGreaterSlotSigned(Slot lhs, Slot rhs);
 
-    void slotGreaterEqualSlot(Slot const &lhs, Slot const &rhs);
-    void slotGreaterEqualSlotUnsigned(Slot const &lhs, Slot const &rhs, bool const destroyRhs = false);
-    void slotGreaterEqualSlotSigned(Slot const &lhs, Slot const &rhs);
+    void slotGreaterEqualSlot(Slot lhs, Slot rhs);
+    void slotGreaterEqualSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
+    void slotGreaterEqualSlotSigned(Slot lhs, Slot rhs);
   
-    void branchIfSlot(Slot const &slot, std::string const &trueLabel, std::string const &falseLabel);
-    void copySlotIntoElement(Slot const &srcSlot, Slot const &arrSlot, Slot const &indexSlot);
-    void copyConstIntoElement(literal::Literal const srcSlot, Slot const &arrSlot, Slot const &indexSlot);
-    void copyElementIntoSlot(Slot const &elementSlot, Slot const &arrSlot, Slot const &indexSlot);
-    void dereferencePointerIntoSlot(Slot const &ptrSlot, Slot const &derefSlot);
-    void writeSlotThroughDereferencedPointer(Slot const &ptrSlot, Slot const &srcSlot);
-    void writeConstThroughDereferencedPointer(Slot const &ptrSlot, literal::Literal const value);
+    void branchIfSlot(Slot slot, std::string const &trueLabel, std::string const &falseLabel);
+    void copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot);
+    void copyConstIntoElement(literal::Literal const srcSlot, Slot arrSlot, Slot indexSlot);
+    void copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot);
+    void dereferencePointerIntoSlot(Slot ptrSlot, Slot derefSlot);
+    void writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot);
+    void writeConstThroughDereferencedPointer(Slot ptrSlot, literal::Literal const value);
     
-    Slot addressOfSlot(Slot const &slot);
+    Slot addressOfSlot(Slot slot);
   
     // Algorithms: all applied to the current DP (assembler_algorithms.cc)
     void moveTo(Cell cell);
@@ -591,36 +595,38 @@ namespace acus {
     void moveToPreviousFrame(Payload const &payload = {});  
     void initializeArguments(primitive::DInt const currentFrameSize, primitive::DInt const paramOffset, std::vector<Expression> const &args, API_CTX);
     void prepareNextFrame(std::string const &functionName, std::vector<Expression> const &args, API_CTX);
-    void prepareNextFrame(Expression const &fptr, std::vector<Expression> const &args, API_CTX);
+    void prepareNextFrame(Expression fptr, std::vector<Expression> const &args, API_CTX);
     void fetchReturnData();
-    void fetchReturnData(Slot const &returnSlot);
-    void moveToPointee(Slot const &ptrSlot);
+    void fetchReturnData(Slot returnSlot);
+    void moveToPointee(Slot ptrSlot);
 
     // Temporaries and memory management (assembler_memory.cc)
     std::string makeFullName(std::string const &name);
     std::string makeFullGlobalName(std::string const &name);
 
-    bool freeFirstSlot(auto&& condition);
     bool freeAllSlots(auto&& condition);
     
-    void markSlotAvailable(Slot &slot);
+    void markSlotAvailable(Slot slot);
+    void markSlotsAvailable(auto&& condition);
+    void markSlotTemp(Slot slot);
     void freeTempSlots();
-    void freeTempSlot(Slot const &slot);
+    void freeTempSlot(Slot slot);
     void freeCacheSlots();
-    void freeCacheSlot(Slot const &slot);
+    void freeCacheSlot(Slot slot);
     
     void freeScope(Function::Scope const *scope);
-    Slot allocSlot(std::string const &name, types::TypeHandle type, Slot::Kind kind);
+    Slot allocSlot(std::string const &name, types::TypeHandle type, SlotData::Kind kind);
     void mergeAvailableSlots();
     Slot getTemp(types::TypeHandle type);
-    Slot getTemp(literal::Literal const &val);
+    Slot getTemp(literal::Literal val);
     Slot getCache(types::TypeHandle type);
-    Slot getCache(literal::Literal const &val);
-  
+    Slot getCache(literal::Literal val);
+    void tempAssign(Slot lhs, Slot rhs);
+    
     // Global Data Synchronization (assembler_globals.cc)
-    void fetchGlobal(Slot const &globalSlot, Slot const &localSlot);
-    void putGlobal(Slot const &globalSlot, Slot const &localSlot);
-    void putGlobal(Slot const &globalSlot, literal::Literal const value);
+    void fetchGlobal(Slot globalSlot, Slot localSlot);
+    void putGlobal(Slot globalSlot, Slot localSlot);
+    void putGlobal(Slot globalSlot, literal::Literal const value);
 
     // Code generation (assembler_codegen.cc)
     std::string builtinFunctionName(BuiltinFunction func);
@@ -643,10 +649,10 @@ namespace acus {
     void deferredLabelChecks();
 
     // Unary and Binary Operators
-    template <typename Operator> Expression unOpAssignImpl(Expression const &obj, API_CTX);
-    template <typename Operator> Expression unOpImpl(Expression const &obj, API_CTX);
-    template <typename Operator> Expression binOpAssignImpl(Expression const &lhs, Expression const &rhs, API_CTX);
-    template <typename Operator> Expression binOpImpl(Expression const &lhs, Expression const &rhs, API_CTX);
+    template <typename Operator> Expression unOpAssignImpl(Expression obj, API_CTX);
+    template <typename Operator> Expression unOpImpl(Expression obj, API_CTX);
+    template <typename Operator> Expression binOpAssignImpl(Expression lhs, Expression rhs, API_CTX);
+    template <typename Operator> Expression binOpImpl(Expression lhs, Expression rhs, API_CTX);
     template <typename Operator> void binOpAssignSlot(Slot const lhs, Slot const rhs);
     template <typename Operator> void binOpAssignConst(Slot const lhs, literal::Literal const rhs);
 
@@ -656,7 +662,7 @@ namespace acus {
 #define DEFINE_UNARY_OPERATOR(name, type, ret, foldExpr, slotOp)	\
     struct name: BinaryOperator<ret> {					\
       static ret fold(int x) { return foldExpr; }			\
-      static void applyToSlot(Assembler &self, Slot const &slot) {	\
+      static void applyToSlot(Assembler &self, Slot slot) {		\
 	return self.slotOp(slot);					\
       }									\
       static UnOp opType() { return type; }				\
@@ -674,10 +680,10 @@ namespace acus {
 #define DEFINE_BINARY_OPERATOR(name, type, ret, foldExpr, slotOp, constOp) \
     struct name: BinaryOperator<ret> {					\
       static ret fold(int x, int y) { return foldExpr; }		\
-      static void applyWithSlot(Assembler &self, Slot const &lhs, Slot const &rhs) { \
+      static void applyWithSlot(Assembler &self, Slot lhs, Slot rhs) { \
 	return self.slotOp(lhs, rhs);					\
       }									\
-      static void applyWithConst(Assembler &self, Slot const &lhs, int rhs) { \
+      static void applyWithConst(Assembler &self, Slot lhs, int rhs) { \
 	return self.constOp(lhs, rhs);					\
       }									\
       static BinOp opType() { return type; }				\

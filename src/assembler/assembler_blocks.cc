@@ -102,14 +102,17 @@ void Assembler::setNextBlock(std::string const &f, std::string const &b) {
   popPtr();
 }
 
-void Assembler::setNextBlock(Expression const &obj) {
+void Assembler::setNextBlock(Expression obj) {
   assert(types::isFunctionPointer(obj.type()));
   
-  Slot const targetSlot {
-    .name = "target_block",
-    .type = obj.type(),
-    .kind = Slot::Dummy,
-    .offset = FrameLayout::TargetBlock
+  auto const targetSlot  = Slot {
+    SlotData{
+      .name = "target_block",
+      .type = obj.type(),
+      .kind = Slot::Dummy,
+      .offset = FrameLayout::TargetBlock
+    },
+    false
   };
   
   if (obj.hasSlot()) {
@@ -138,7 +141,7 @@ void Assembler::jump(std::string const &jumpLabel, API_FUNC) {
   API_EXPECT_NEXT("label");
 }
 
-void Assembler::jumpIfImpl(Expression const &obj, std::string const &trueLabel,
+void Assembler::jumpIfImpl(Expression obj, std::string const &trueLabel,
 		       std::string const &falseLabel, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
@@ -179,7 +182,7 @@ void Assembler::constructMetaBlocks() {
       else {
 	assert(m.returnSlot.has_value());
 	SlotProxy returnSlot = *m.returnSlot;
-	assert(returnType == returnSlot->type());
+	assert(returnType == returnSlot.type());
 
 	_cache.write(returnSlot, [&](Slot const &slot){
 	  fetchReturnData(slot);

@@ -36,7 +36,7 @@ Expression Assembler::expr(auto const &val, API_FUNC_SOURCE) {
 
 Expression Assembler::assign(auto const &lhs, auto const &rhs, API_FUNC_SOURCE) {
   API_FUNC_BEGIN();
-  return assignImpl(lValue(lhs, API_FWD), rValue(rhs, API_FWD), API_FWD);
+  return assignImpl(lValue(lhs, API_FWD), rValue(rhs, API_FWD), true, API_FWD);
 }
 
 Expression Assembler::structField(auto const &obj, std::string const &field, API_FUNC_SOURCE) {

@@ -9,10 +9,10 @@
 namespace acus::proxy {
 
   impl::StructField::StructField(SlotProxy obj, std::string fieldName):
-    Base(types::cast<types::StructType>(obj->type())->fieldType(fieldName)),
+    Base(types::cast<types::StructType>(obj.type())->fieldType(fieldName)),
     _obj(obj),
-    _fieldIndex(types::cast<types::StructType>(obj->type())->fieldIndex(fieldName)),
-    _fieldOffset(types::cast<types::StructType>(obj->type())->fieldOffset(fieldName)),
+    _fieldIndex(types::cast<types::StructType>(obj.type())->fieldIndex(fieldName)),
+    _fieldOffset(types::cast<types::StructType>(obj.type())->fieldOffset(fieldName)),
     _fieldName(fieldName)
   {}
   
@@ -25,19 +25,19 @@ namespace acus::proxy {
   }
       
   bool impl::StructField::directAbsolute() const {
-    return _obj->directAbsolute();
+    return _obj.directAbsolute();
   }
 
   bool impl::StructField::dependsOnDereferencedPointer() const {
-    return _obj->dependsOnDereferencedPointer();
+    return _obj.dependsOnDereferencedPointer();
   }
       
   std::string impl::StructField::name() const {
-    return _obj->name() + "." + _fieldName;
+    return _obj.name() + "." + _fieldName;
   }
   
   std::string impl::StructField::uniqueName() const {
-    return _obj->uniqueName() + "." + _fieldName;
+    return _obj.uniqueName() + "." + _fieldName;
   }
   
   std::optional<SlotProxy> impl::StructField::enclosingProxy() const {
@@ -49,21 +49,24 @@ namespace acus::proxy {
   }
   
   Slot impl::StructField::getFieldSlot(Slot const obj) const {
-    auto structType = static_cast<types::StructType const *>(_obj->type());
+    auto structType = static_cast<types::StructType const *>(_obj.type());
     return Slot {
-      .name = std::string("__field_") + name(),
-      .uniqueName = std::string("__field_") + uniqueName(),
-      .type = structType->_fields[_fieldIndex].type,
-      .kind = obj.kind == Slot::Temp ? Slot::Temp : Slot::Dummy,
-      .offset = obj.offset + _fieldOffset
-    };  
+      SlotData {
+	.name = std::string("__field_") + name(),
+	.uniqueName = std::string("__field_") + uniqueName(),
+	.type = structType->_fields[_fieldIndex].type,
+	.kind = obj.kind() == Slot::Temp ? Slot::Temp : Slot::Dummy,
+	.offset = obj.offset() + _fieldOffset
+      },
+      false
+    };
   }
     
   Slot impl::StructField::materialize(Assembler &a) const {
     return getFieldSlot(a.materialize(_obj));
   }
 
-  void impl::StructField::materialize(Assembler &, Slot const &) const {
+  void impl::StructField::materialize(Assembler &, Slot) const {
     assert(false && "struct field materialization never requires a target slot");
     std::unreachable();
   }
@@ -90,8 +93,8 @@ namespace acus::proxy {
   }
   
   Slot impl::StructField::addressOf(Assembler &a) const {
-    Slot ptr = _obj->addressOf(a);
-    ptr.type = ts::pointer(this->type());
+    Slot ptr = _obj.addressOf(a);
+    ptr.get().type = ts::pointer(this->type());
     a.addAssign(ptr, literal::u16(_fieldOffset));
     return ptr;
   }

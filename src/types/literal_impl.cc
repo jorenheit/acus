@@ -68,7 +68,7 @@ namespace acus::literal::impl {
     Integer(ts::u8(), wrapUnsigned(v, 8))
   {}
 
-  Literal u8::clone() const {
+  BasePtr u8::clone() const {
     return std::make_shared<u8>(*this);
   }
 
@@ -77,7 +77,7 @@ namespace acus::literal::impl {
     Integer(ts::s8(), wrapSigned(v, 8))
   {}
 
-  Literal s8::clone() const {
+  BasePtr s8::clone() const {
     return std::make_shared<s8>(*this);
   }
   
@@ -86,7 +86,7 @@ namespace acus::literal::impl {
     Integer(ts::u16(), wrapUnsigned(v, 16))
   {}
 
-  Literal u16::clone() const  {
+  BasePtr u16::clone() const  {
     return std::make_shared<u16>(*this);
   }      
 
@@ -95,7 +95,7 @@ namespace acus::literal::impl {
     Integer(ts::s16(), wrapSigned(v, 16))
   {}
 
-  Literal s16::clone() const  {
+  BasePtr s16::clone() const  {
     return std::make_shared<s16>(*this);
   }      
   
@@ -123,7 +123,7 @@ namespace acus::literal::impl {
     _str(other._str)
   {
     for (auto const &element: other.arr) {
-      arr.push_back(element->clone());
+      arr.push_back(element.clone());
     }
   }
 
@@ -135,7 +135,7 @@ namespace acus::literal::impl {
     return std::string("\"") + _str + "\"";
   }
       
-  Literal string::clone() const {
+  BasePtr string::clone() const {
     return std::make_shared<string>(*this);
   }
 
@@ -163,7 +163,7 @@ namespace acus::literal::impl {
       API_REQUIRE(fields.contains(name),
 		  error::ErrorCode::MissingField,
 		  "missing field '", name, "' in instantiation of struct literal.");
-      API_EXPECT_TYPE(fields.at(name)->type(), type);
+      API_EXPECT_TYPE(fields.at(name).type(), type);
 
       _fields.emplace_back(name, fields.at(name));
     }
@@ -173,7 +173,7 @@ namespace acus::literal::impl {
     Base(other.type())
   {
     for (auto const &[name, value]: other._fields) {
-      _fields.emplace_back(name, value->clone());
+      _fields.emplace_back(name, value.clone());
     }
   }
       
@@ -188,7 +188,7 @@ namespace acus::literal::impl {
     return _fields[idx].second;
   }      
       
-  Literal structT::clone() const {
+  BasePtr structT::clone() const {
     return std::make_shared<structT>(*this);
   }
 
@@ -196,7 +196,7 @@ namespace acus::literal::impl {
     std::ostringstream oss;
     oss << "{";
     for (auto const &[name, value]: _fields) {
-      oss << name << ": " << value->str() << ",";
+      oss << name << ": " << value.str() << ",";
     }
     oss << "}";
     return oss.str();
@@ -208,7 +208,7 @@ namespace acus::literal::impl {
     elementType(elementType)
   {
     for (auto const &value: elements) {
-      API_EXPECT_TYPE(value->type(), elementType);
+      API_EXPECT_TYPE(value.type(), elementType);
     }
     ArrayLike::arr = elements;
   }
@@ -217,11 +217,11 @@ namespace acus::literal::impl {
   array::array(array const &other): ArrayLike(other.type()), elementType(other.elementType) {
     ArrayLike::arr.reserve(other.arr.size());
     for (auto const& elem: other.arr) {
-      ArrayLike::arr.emplace_back(elem->clone());
+      ArrayLike::arr.emplace_back(elem.clone());
     }
   }
 
-  Literal array::clone() const {
+  BasePtr array::clone() const {
     return std::make_shared<array>(*this);
   }      
 
@@ -229,7 +229,7 @@ namespace acus::literal::impl {
     std::ostringstream oss;
     oss << "{";
     for (size_t i = 0; i != arr.size(); ++i) {
-      oss << arr[i]->str();
+      oss << arr[i].str();
       if (i < arr.size() - 1) oss << ", ";
     }
     oss << "}";

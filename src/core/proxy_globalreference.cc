@@ -8,8 +8,8 @@
 
 namespace acus::proxy {
 
-  impl::GlobalReference::GlobalReference(Slot const &slot):
-    Base(slot.type),
+  impl::GlobalReference::GlobalReference(Slot slot):
+    Base(slot.type()),
     _slot(slot)
   {}
 
@@ -42,18 +42,18 @@ namespace acus::proxy {
   }
   
   std::string impl::GlobalReference::name() const  {
-    return "global<" + _slot.name + ">";
+    return "global<" + _slot.name() + ">";
   }
 
   std::string impl::GlobalReference::uniqueName() const {
-    return "global<" + _slot.uniqueName + ">";
+    return "global<" + _slot.uniqueName() + ">";
   }
   
   Slot impl::GlobalReference::materialize(Assembler &a) const {
     assert(false && "global reference materialization always requires a target slot");
   }
   
-  void impl::GlobalReference::materialize(Assembler &a, Slot const &dest) const {
+  void impl::GlobalReference::materialize(Assembler &a, Slot dest) const {
     a.fetchGlobal(_slot, dest);
   }
       
@@ -67,7 +67,7 @@ namespace acus::proxy {
   }
 
   void impl::GlobalReference::write(Assembler &a, SlotWriteCallback const &writeInto) const {
-    Slot const tmp = a.getTemp(this->type());
+    Slot tmp = a.getTemp(this->type());
     writeInto(tmp);
     write(a, tmp);
     a.freeTempSlot(tmp);

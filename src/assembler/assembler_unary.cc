@@ -7,7 +7,7 @@
 
 
 template <typename Operator>
-Expression Assembler::unOpAssignImpl(Expression const &obj, API_CTX) {
+Expression Assembler::unOpAssignImpl(Expression obj, API_CTX) {
   using Ret = Operator::ReturnType;
   static_assert(std::is_same_v<Ret, bool> || std::is_same_v<Ret, int>);
 
@@ -22,7 +22,7 @@ Expression Assembler::unOpAssignImpl(Expression const &obj, API_CTX) {
 }
 
 template <typename Operator>
-Expression Assembler::unOpImpl(Expression const &obj, API_CTX) {
+Expression Assembler::unOpImpl(Expression obj, API_CTX) {
   using Ret = Operator::ReturnType;
   static_assert(std::is_same_v<Ret, bool> || std::is_same_v<Ret, int>);
 
@@ -52,14 +52,14 @@ Expression Assembler::unOpImpl(Expression const &obj, API_CTX) {
   unOpAssignImpl<Operator>(Expression{result}, API_FWD);
 
   if constexpr (std::is_same_v<Ret, bool>) {
-    result.type = ts::u8();
+    result.get().type = ts::u8();
   }
   return Expression { result };  
 }
 
 #define INSTANTIATE_FOR(op)						\
-  template Expression Assembler::unOpImpl<op>(Expression const&, API_CTX); \
-  template Expression Assembler::unOpAssignImpl<op>(Expression const&, API_CTX);
+  template Expression Assembler::unOpImpl<op>(Expression, API_CTX); \
+  template Expression Assembler::unOpAssignImpl<op>(Expression, API_CTX);
 
 INSTANTIATE_FOR(Assembler::LogicalNot);
 INSTANTIATE_FOR(Assembler::LogicalBool);
@@ -68,7 +68,7 @@ INSTANTIATE_FOR(Assembler::Negate);
 INSTANTIATE_FOR(Assembler::Abs);
 #undef INSTANTIATE_FOR
 
-Expression Assembler::castImpl(Expression const &obj, types::TypeHandle toType, API_CTX) {
+Expression Assembler::castImpl(Expression obj, types::TypeHandle toType, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   auto opResult = types::rules::castResult(obj.type(), toType);
@@ -81,7 +81,7 @@ Expression Assembler::castImpl(Expression const &obj, types::TypeHandle toType, 
 
   Slot const slot = materialize(obj.slot());
   Slot const result = getTemp(toType);
-  if (slot.type == toType) {
+  if (slot.type() == toType) {
     // same type but direct slot, so we copy it directly into our temp
     assignSlot(result, slot);
     return Expression{result};
@@ -94,12 +94,12 @@ Expression Assembler::castImpl(Expression const &obj, types::TypeHandle toType, 
   copyField(Cell{result, MacroCell::Value0}, Temps<1>::select(result, MacroCell::Scratch0));
 
   // If both types (from and to) are 16-bits, we need to copy the high byte as well:
-  if (slot.type->usesValue1() && toType->usesValue1()) {
+  if (slot.type()->usesValue1() && toType->usesValue1()) {
     moveTo(slot, MacroCell::Value1);
     copyField(Cell{result, MacroCell::Value1}, Temps<1>::select(result, MacroCell::Scratch0));    
   }
   // If we're widening S8, we need to sign-extend
-  else if (slot.type->tag() == types::S8 && toType->usesValue1()) {
+  else if (slot.type()->tag() == types::S8 && toType->usesValue1()) {
     moveTo(slot, MacroCell::Value0);    
     signBitConstructive(Cell{slot, MacroCell::Flag},
 			Temps<4>::select(slot, MacroCell::Scratch0,
@@ -126,13 +126,13 @@ Expression Assembler::castImpl(Expression const &obj, types::TypeHandle toType, 
 
 // Unary algorithm implementations
 
-void Assembler::notSlot(Slot const &rhs) {
+void Assembler::notSlot(Slot rhs) {
   assert(rhs.size() == 1);
 
   pushPtr();
   moveTo(rhs);
 
-  if (rhs.type->usesValue1()) {
+  if (rhs.type()->usesValue1()) {
     not16Destructive(Cell{rhs, MacroCell::Value1},
 		     Temps<1>::select(rhs, MacroCell::Scratch0));
   } else {
@@ -143,13 +143,13 @@ void Assembler::notSlot(Slot const &rhs) {
 }
 
 
-void Assembler::boolSlot(Slot const &rhs) {
+void Assembler::boolSlot(Slot rhs) {
   assert(rhs.size() == 1);
   
   pushPtr();
   moveTo(rhs);
 
-  if (rhs.type->usesValue1()) {
+  if (rhs.type()->usesValue1()) {
     bool16Destructive(Cell{rhs, MacroCell::Value1},
 		     Temps<1>::select(rhs, MacroCell::Scratch0));
   } else {
@@ -159,14 +159,14 @@ void Assembler::boolSlot(Slot const &rhs) {
   popPtr();
 }
 
-void Assembler::negateSlot(Slot const &rhs) {
+void Assembler::negateSlot(Slot rhs) {
   assert(rhs.size() == 1);
 
   pushPtr();
 
   moveTo(rhs, MacroCell::Value0);
-  if (rhs.type->usesValue1()) {
-    Slot const tmp = getTemp(ts::raw(1));
+  if (rhs.type()->usesValue1()) {
+    Slot tmp = getTemp(ts::raw(1));
     negate16Destructive(Cell{rhs, MacroCell::Value1},
 			Temps<6>::select(rhs, MacroCell::Scratch0,
 					 rhs, MacroCell::Scratch1,
@@ -183,14 +183,14 @@ void Assembler::negateSlot(Slot const &rhs) {
   popPtr();
 }
 
-void Assembler::absSlot(Slot const &rhs) {
-  assert(types::isInteger(rhs.type));
+void Assembler::absSlot(Slot rhs) {
+  assert(types::isInteger(rhs.type()));
 
-  if (types::isUnsignedInteger(rhs.type)) return;
+  if (types::isUnsignedInteger(rhs.type())) return;
 
   pushPtr();
   // Construct the signbit in rhs.Flag
-  moveTo(rhs, rhs.type->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
+  moveTo(rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{rhs, MacroCell::Flag},
 		      Temps<4>::select(rhs, MacroCell::Scratch0, rhs, MacroCell::Scratch1,
 				       rhs, MacroCell::Payload0, rhs, MacroCell::Payload1));
@@ -205,16 +205,16 @@ void Assembler::absSlot(Slot const &rhs) {
   popPtr();
 }
 
-void Assembler::signBitSlot(Slot const &rhs) {
-  assert(types::isSignedInteger(rhs.type));
+void Assembler::signBitSlot(Slot rhs) {
+  assert(types::isSignedInteger(rhs.type()));
   
   pushPtr();
-  moveTo(rhs, rhs.type->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
+  moveTo(rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitDestructive(Temps<3>::select(rhs, MacroCell::Scratch0,
 				      rhs, MacroCell::Scratch1,
 				      rhs, MacroCell::Payload0));
 
-  if (rhs.type->usesValue1()) {
+  if (rhs.type()->usesValue1()) {
     moveField(Cell{rhs, MacroCell::Value0});
   }
   popPtr();

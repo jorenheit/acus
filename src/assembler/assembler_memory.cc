@@ -10,7 +10,7 @@ std::optional<Slot> Assembler::localSlot(std::string const &varName) const {
   Function::Scope *targetScope = _currentScope;
   while (true) {
     for (Slot const &slot: _currentFunction->frame.locals) {
-      if (slot.name == varName && slot.scope == targetScope) {
+      if (slot.name() == varName && slot.scope() == targetScope) {
 	return slot;
       }
     }
@@ -23,7 +23,7 @@ std::optional<Slot> Assembler::localSlot(std::string const &varName) const {
 
 std::optional<Slot> Assembler::globalSlot(std::string const &varName) const {
  for (Slot const &slot: _program.globals) {
-    if (slot.name == varName) {
+   if (slot.name() == varName) {
       return slot;
     }
   }
@@ -62,58 +62,58 @@ std::string Assembler::makeFullGlobalName(std::string const &name) {
 }
 
 
-Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, Slot::Kind kind) {
+Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotData::Kind kind) {
 
   assert(_currentFunction != nullptr);
   
   auto const tryFindAvailableSlot = [&](std::string const &name,
 				        types::TypeHandle type,
-				        Slot::Kind kind) -> std::optional<Slot> {
+				        SlotData::Kind kind) -> std::optional<Slot> {
     
     // Now check if there is an existing slot that fits this type
     auto &frame = _currentFunction->frame;  
-    for (auto &slot: frame.locals) {
-      if (slot.kind == Slot::Available && slot.type->size() >= type->size()) {
-	int const diff = slot.type->size() - type->size();
-
-	// Reuse this slot
-	slot.name = name;
-	slot.uniqueName = makeFullName(name);
-	slot.type = type;
-	slot.kind = kind;
-	slot.scope = _currentScope;
-	
-	// Store the slot in case the reference is invalidated below
-	Slot const result = slot;
-
-	// Split the slot if there is still room
+    for (auto slot: frame.locals) {
+      if (slot.kind() != Slot::Available || slot.type()->size() < type->size())
+	continue;
+      
+      // Reuse this slot
+      SlotData &data = slot.get();
+      data.name = name;
+      data.uniqueName = makeFullName(name);
+      data.type = type;
+      data.kind = kind;
+      data.scope = _currentScope;
+      
+      // Split the slot if there is still room
+      int const diff = slot.type()->size() - type->size();      
+      if (diff > 0) {
 	std::string const dummyName = [] {
 	  static int counter = 0; return "__dummy_" + std::to_string(counter++);
 	}();
-
-	if (diff > 0) {
-	  // Might invalidate the reference -> use result below
-	  frame.locals.push_back(Slot{
+	
+	frame.locals.push_back( Slot {
+	    SlotData {
 	      .name = dummyName,
 	      .uniqueName = makeFullName(dummyName),
 	      .type = ts::raw(diff),
 	      .kind = Slot::Available,
-	      .offset = slot.offset + slot.type->size(),
+	      .offset = slot.offset() + slot.type()->size(),
 	      .scope = nullptr
-	    });
-	}
-	return result;
+	    },
+	    true
+	  });
       }
+      return slot;
     }
     return {};
   };
 
   auto const newSlot = [&](std::string const &name,
 			   types::TypeHandle type,
-			   Slot::Kind kind) -> Slot {
+			   SlotData::Kind kind) -> Slot {
 
     auto &frame = _currentFunction->frame;
-    Slot newSlot {
+    SlotData newSlot {
       .name = name,
       .uniqueName = makeFullName(name),
       .type = type,
@@ -121,11 +121,11 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, Slot:
       .offset = frame.localBase() + frame.localAreaSize(),
       .scope = _currentScope
     };
-    
-    frame.locals.emplace_back(std::move(newSlot));
+
+    frame.locals.emplace_back(newSlot, true);
     return frame.locals.back();
   };
-  
+
   auto opt = tryFindAvailableSlot(name, type, kind);
   if (opt) return *opt;
   return newSlot(name, type, kind);
@@ -140,24 +140,24 @@ void Assembler::mergeAvailableSlots() {
     
     for (size_t i = 0; i < locals.size() && !changed; ++i) {
       Slot &a = locals[i];
-      if (a.kind != Slot::Available) continue;
+      if (a.kind() != Slot::Available) continue;
 
       for (size_t j = 0; j < locals.size(); ++j) {
         if (i == j) continue;
 	Slot &b = locals[j];
-        if (b.kind != Slot::Available) continue;
+        if (b.kind() != Slot::Available) continue;
 
 	// a just before b
-        if (a.offset + a.size() == b.offset) {
-          a.type = ts::raw(a.size() + b.size());
+        if (a.offset() + a.size() == b.offset()) {
+          a.get().type = ts::raw(a.size() + b.size());
           locals.erase(locals.begin() + static_cast<std::ptrdiff_t>(j));
           changed = true;
           break;
         }
 
 	// b just before a
-        if (b.offset + b.size() == a.offset) {
-          b.type = ts::raw(b.size() + a.size());
+        if (b.offset() + b.size() == a.offset()) {
+          b.get().type = ts::raw(b.size() + a.size());
           locals.erase(locals.begin() + static_cast<std::ptrdiff_t>(i));
           changed = true;
           break;
@@ -167,25 +167,34 @@ void Assembler::mergeAvailableSlots() {
   }
 }
 
-void Assembler::markSlotAvailable(Slot &slot) {
-  size_t const size = slot.size();
+void Assembler::markSlotAvailable(Slot slot) {
+  assert(slot.managed());
   
-  slot.name = "";
-  slot.uniqueName = "";
-  slot.type = ts::raw(size);
-  slot.kind = Slot::Available;
-  slot.scope = nullptr;
+  size_t const size = slot.size();
+
+  SlotData &data = slot.get();
+  data.name = "";
+  data.uniqueName = "";
+  data.type = ts::raw(size);
+  data.kind = Slot::Available;
+  data.scope = nullptr;
 }
 
-bool Assembler::freeFirstSlot(auto&& condition) {
-  for (auto &slot: _currentFunction->frame.locals) {
+void Assembler::markSlotsAvailable(auto&& condition) {
+  for (auto slot: _currentFunction->frame.locals) {
     if (condition(slot)) {
       markSlotAvailable(slot);
-      mergeAvailableSlots();
-      return true;
     }
   }
-  return false;
+}
+
+void Assembler::markSlotTemp(Slot slot) {
+  assert(slot.managed());
+
+  SlotData &data = slot.get();
+  data.name = "";
+  data.uniqueName = "";
+  data.kind = Slot::Temp;
 }
 
 bool Assembler::freeAllSlots(auto&& condition) {
@@ -201,41 +210,39 @@ bool Assembler::freeAllSlots(auto&& condition) {
   return success;
 }
 
-void Assembler::freeTempSlot(Slot const &target) {
-  assert(target.kind == Slot::Temp);
-  
-  // Find this slot in the current frame and free it.
-  freeFirstSlot([&](Slot &slot) {
-    return slot == target;
-  });
+
+void Assembler::freeTempSlot(Slot target) {
+  assert(target.kind() == Slot::Temp);
+  assert(target.managed());
+
+  markSlotAvailable(target);
+  mergeAvailableSlots();
 }
 
 
 void Assembler::freeTempSlots() {
-  freeAllSlots([&](Slot &slot){
-    return slot.kind == Slot::Temp;
+  freeAllSlots([&](Slot slot){
+    return slot.kind() == Slot::Temp;
   });
 }
 
-void Assembler::freeCacheSlot(Slot const &target) {
-  assert(target.kind == Slot::Cache);
-  
-  // Find this slot in the current frame and free it.
-  bool const success = freeFirstSlot([&](Slot &slot) {
-    return slot == target;
-  });
-  assert(success && "trying to free a cache slot that does not exist");
+void Assembler::freeCacheSlot(Slot target) {
+  assert(target.kind() == Slot::Cache);
+  assert(target.managed() == true);
+
+  markSlotAvailable(target);
+  mergeAvailableSlots();
 }
 
 void Assembler::freeCacheSlots() {
-  freeAllSlots([&](Slot &slot) {
-    return slot.kind == Slot::Cache;
+  freeAllSlots([&](Slot slot) {
+    return slot.kind() == Slot::Cache;
   });
 }
 
 void Assembler::freeScope(Function::Scope const *scope) {
-  freeAllSlots([&](Slot &slot) {
-    return slot.scope == scope;
+  freeAllSlots([&](Slot slot) {
+    return slot.scope() == scope;
   });
 }
 
@@ -245,8 +252,8 @@ Slot Assembler::getTemp(types::TypeHandle type) {
   return allocSlot("__tmp_" + std::to_string(tmpID++), type, Slot::Temp);
 }
 
-Slot Assembler::getTemp(literal::Literal const &value) {
-  Slot tmp = getTemp(value->type());
+Slot Assembler::getTemp(literal::Literal value) {
+  Slot tmp = getTemp(value.type());
   assignSlot(tmp, value);
   return tmp;
 }
@@ -257,12 +264,11 @@ Slot Assembler::getCache(types::TypeHandle type) {
   return allocSlot("__cache_" + std::to_string(cacheID++), type, Slot::Cache);
 }
 
-Slot Assembler::getCache(literal::Literal const &value) {
-  Slot const slot = getCache(value->type());
+Slot Assembler::getCache(literal::Literal value) {
+  Slot const slot = getCache(value.type());
   assignSlot(slot, value);
   return slot;
 }
-
 
 void Assembler::declareGlobal(std::string const &name, types::TypeHandle type, API_FUNC) {
   API_FUNC_BEGIN();
@@ -273,13 +279,16 @@ void Assembler::declareGlobal(std::string const &name, types::TypeHandle type, A
   API_REQUIRE_GLOBAL_NAME_AVAILABLE(name);
 
   int const offset = _program.globalVariableFrameSize();
-  Slot slot {
-    .name = name,
-    .uniqueName = makeFullGlobalName(name),
-    .type = type,
-    .kind = Slot::Global,
-    .offset = offset,
-    .scope = nullptr
+  auto slot  = Slot {
+    SlotData {
+      .name = name,
+      .uniqueName = makeFullGlobalName(name),
+      .type = type,
+      .kind = Slot::Global,
+      .offset = offset,
+      .scope = nullptr
+    },
+    true
   };
 
   _program.globals.emplace_back(slot);

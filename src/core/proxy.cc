@@ -8,12 +8,79 @@
 
 namespace acus::proxy {
 
-  impl::SlotProxy::SlotProxy(Slot const &slot):
-    BasePtr(proxy::direct(slot))
+
+  impl::SlotProxy::SlotProxy(BasePtr ptr):
+    _ptr(std::move(ptr))
   {}
   
-  bool impl::SlotProxy::operator==(SlotProxy const &other) const {
-    return (*this)->uniqueName() == other->uniqueName();
+  impl::SlotProxy::SlotProxy(Slot slot):
+    SlotProxy(direct(slot))
+  {}
+
+
+  types::TypeHandle impl::SlotProxy::type() const {
+      return _ptr->type();
+  }
+
+  Slot impl::SlotProxy::addressOf(Assembler &a) const {
+    return _ptr->addressOf(a);
+  }
+
+  bool impl::SlotProxy::dependsOn(impl::SlotProxy other) const {
+    return _ptr->dependsOn(other);
+  }
+  
+  bool impl::SlotProxy::dependsOnDereferencedPointer() const {
+    return _ptr->dependsOnDereferencedPointer();
+  }
+  
+  bool impl::SlotProxy::directAbsolute() const {
+    return _ptr->directAbsolute();
+  }
+  
+  bool impl::SlotProxy::directRelative() const {
+    return _ptr->directRelative();
+  }
+  
+  std::optional<impl::SlotProxy> impl::SlotProxy::enclosingProxy() {
+    return _ptr->enclosingProxy();
+  }
+  
+  Kind impl::SlotProxy::kind() const {
+    return _ptr->kind();
+  }
+  
+  Slot impl::SlotProxy::materialize(Assembler &a) const {
+    return _ptr->materialize(a);
+  }
+  
+  void impl::SlotProxy::materialize(Assembler &a, Slot dest) const {
+    return _ptr->materialize(a, dest);
+  }
+  
+  std::string impl::SlotProxy::name() const {
+    return _ptr->name();
+  }
+  
+  std::string impl::SlotProxy::uniqueName() const {
+    return _ptr->uniqueName();
+  }
+  
+  void impl::SlotProxy::write(Assembler &a, impl::SlotProxy src) const {
+    return _ptr->write(a, src);
+  }
+  
+  void impl::SlotProxy::write(Assembler &a, acus::literal::Literal src) const {
+    return _ptr->write(a, src);
+  }
+  
+  void impl::SlotProxy::write(Assembler &a, SlotWriteCallback const &writeInto) const {
+    return _ptr->write(a, writeInto);
+  }
+  
+  
+  bool impl::SlotProxy::operator==(impl::SlotProxy const &other) const {
+    return (*this).uniqueName() == other.uniqueName();
   }
 
 } // namespace proxy

@@ -31,11 +31,33 @@ namespace acus::proxy {
   namespace impl {
     class Base;
     using BasePtr = std::shared_ptr<Base>;
-    using SlotWriteCallback = std::function<void(Slot const&)>;
+    using BasePtrConst = std::shared_ptr<Base const>;
+    using SlotWriteCallback = std::function<void(Slot)>;
+    
+    class SlotProxy {
+      BasePtr _ptr;
 
-    struct SlotProxy: public BasePtr {
-      SlotProxy(BasePtr ptr): BasePtr(std::move(ptr)) {}
-      SlotProxy(Slot const &slot);
+    public:
+      SlotProxy() = default;
+      SlotProxy(BasePtr ptr);
+      SlotProxy(Slot slot);
+
+      types::TypeHandle type() const;
+      Slot addressOf(Assembler &a) const;
+      bool dependsOn(SlotProxy other) const;
+      bool dependsOnDereferencedPointer() const;
+      bool directAbsolute() const;
+      bool directRelative() const;
+      std::optional<SlotProxy> enclosingProxy();
+      Kind kind() const;
+      Slot materialize(Assembler &a) const;
+      void materialize(Assembler &a, Slot dest) const;
+      std::string name() const;
+      std::string uniqueName() const;
+      void write(Assembler &a, SlotProxy src) const;
+      void write(Assembler &a, acus::literal::Literal src) const;
+      void write(Assembler &a, SlotWriteCallback const &writeInto) const;
+
       bool operator==(SlotProxy const &other) const;
     };
     
@@ -54,7 +76,7 @@ namespace acus::proxy {
       virtual std::optional<SlotProxy> enclosingProxy() const = 0;
       virtual Kind kind() const = 0;
       virtual Slot materialize(Assembler &a) const = 0;
-      virtual void materialize(Assembler &a, Slot const &dest) const = 0;      
+      virtual void materialize(Assembler &a, Slot dest) const = 0;      
       virtual std::string name() const = 0;
       virtual std::string uniqueName() const = 0;
       virtual void write(Assembler &a, SlotProxy src) const = 0;
@@ -67,7 +89,7 @@ namespace acus::proxy {
       Slot _slot;
     
     public:
-      Direct(Slot const &slot);
+      Direct(Slot slot);
 
       virtual Slot addressOf(Assembler &a) const override;
       virtual bool dependsOn(SlotProxy) const override;
@@ -77,7 +99,7 @@ namespace acus::proxy {
       virtual std::optional<SlotProxy> enclosingProxy() const;
       virtual Kind kind() const override;
       virtual Slot materialize(Assembler &a) const override;
-      virtual void materialize(Assembler &a, Slot const &dest) const override;
+      virtual void materialize(Assembler &a, Slot dest) const override;
       virtual std::string name() const override;
       virtual std::string uniqueName() const override;
       virtual void write(Assembler &a, SlotProxy src) const override;
@@ -89,7 +111,7 @@ namespace acus::proxy {
       Slot _slot;
       
     public:
-      GlobalReference(Slot const &slot);
+      GlobalReference(Slot slot);
 
       virtual Slot addressOf(Assembler &a) const override;
       virtual Kind kind() const override;
@@ -99,7 +121,7 @@ namespace acus::proxy {
       virtual bool dependsOn(SlotProxy) const override;
       virtual bool dependsOnDereferencedPointer() const override;
       virtual Slot materialize(Assembler &a) const override;      
-      virtual void materialize(Assembler &a, Slot const &dest) const override;      
+      virtual void materialize(Assembler &a, Slot dest) const override;      
       virtual std::string name() const override;
       virtual std::string uniqueName() const override;
       virtual void write(Assembler &a, SlotProxy src) const override;      
@@ -124,7 +146,7 @@ namespace acus::proxy {
       virtual bool dependsOnDereferencedPointer() const override;
       virtual std::optional<SlotProxy> enclosingProxy() const override;
       virtual Slot materialize(Assembler &a) const override;
-      virtual void materialize(Assembler &a, Slot const &target) const override;      
+      virtual void materialize(Assembler &a, Slot target) const override;      
       virtual std::string name() const override;
       virtual std::string uniqueName() const override;            
       virtual void write(Assembler &a, SlotProxy src) const override;
@@ -133,7 +155,7 @@ namespace acus::proxy {
 
     private:
       Slot materializeImpl(Assembler &a, int index) const;
-      void materializeImpl(Assembler &a, SlotProxy index, Slot const &target) const;
+      void materializeImpl(Assembler &a, SlotProxy index, Slot target) const;
 
       void writeImpl(Assembler &a, int index, SlotProxy src) const;
       void writeImpl(Assembler &a, int index, acus::literal::Literal) const;
@@ -142,7 +164,7 @@ namespace acus::proxy {
       void writeImpl(Assembler &a, SlotProxy index, acus::literal::Literal) const;
       void writeImpl(Assembler &a, SlotProxy index, SlotWriteCallback const &writeInto) const;
 
-      Slot getElementSlot(Slot const &arrSlot, int index) const;
+      Slot getElementSlot(Slot arrSlot, int index) const;
       std::string constructName(auto&& getName) const;
     }; // ArrayElement
 
@@ -163,7 +185,7 @@ namespace acus::proxy {
       virtual bool directRelative() const override;      
       virtual std::optional<SlotProxy> enclosingProxy() const;
       virtual Slot materialize(Assembler &a) const override;
-      virtual void materialize(Assembler &a, Slot const &target) const override;
+      virtual void materialize(Assembler &a, Slot target) const override;
       virtual std::string name() const override;
       virtual std::string uniqueName() const override;      
       virtual void write(Assembler &a, SlotProxy src) const override;
@@ -188,7 +210,7 @@ namespace acus::proxy {
       virtual std::optional<SlotProxy> enclosingProxy() const override;      
       virtual Kind kind() const override;
       virtual Slot materialize(Assembler &a) const override;
-      virtual void materialize(Assembler &a, Slot const &target) const override;
+      virtual void materialize(Assembler &a, Slot target) const override;
       virtual std::string name() const override;
       virtual std::string uniqueName() const override;      
       virtual void write(Assembler &a, SlotProxy src) const override;
@@ -202,11 +224,11 @@ namespace acus::proxy {
       
   using SlotProxy = impl::SlotProxy;
   
-  inline SlotProxy direct(Slot const &slot) {
+  inline SlotProxy direct(Slot slot) {
     return SlotProxy(std::make_shared<impl::Direct>(slot));
   }
 
-  inline SlotProxy globalReference(Slot const &slot) {
+  inline SlotProxy globalReference(Slot slot) {
     return SlotProxy(std::make_shared<impl::GlobalReference>(slot));
   }
   
@@ -229,6 +251,6 @@ namespace acus::proxy {
 } // namespace acus::proxy
   
 namespace acus {
-  using SlotProxy = proxy::impl::SlotProxy;
+  using SlotProxy = proxy::SlotProxy;
 }
   

@@ -10,7 +10,7 @@
 namespace acus::proxy {
 
   impl::DereferencedPointer::DereferencedPointer(SlotProxy ptr):
-    Base(types::cast<types::PointerType>(ptr->type())->pointeeType()),
+    Base(types::cast<types::PointerType>(ptr.type())->pointeeType()),
     _ptr(std::move(ptr))
   {}
 
@@ -31,11 +31,11 @@ namespace acus::proxy {
   }
 
   std::string impl::DereferencedPointer::name() const {
-    return std::string("deref<") + _ptr->name() + ">";
+    return std::string("deref<") + _ptr.name() + ">";
   }
 
   std::string impl::DereferencedPointer::uniqueName() const {
-    return std::string("deref<") + _ptr->uniqueName() + ">";
+    return std::string("deref<") + _ptr.uniqueName() + ">";
   }
       
   std::optional<SlotProxy> impl::DereferencedPointer::enclosingProxy() const {
@@ -51,7 +51,7 @@ namespace acus::proxy {
     std::unreachable();
   }
 
-  void impl::DereferencedPointer::materialize(Assembler &a, Slot const &target) const {
+  void impl::DereferencedPointer::materialize(Assembler &a, Slot target) const {
     Slot const ptrSlot = a.materialize(_ptr);
     a.dereferencePointerIntoSlot(ptrSlot, target);
   }
@@ -68,7 +68,7 @@ namespace acus::proxy {
   }
 
   void impl::DereferencedPointer::write(Assembler &a, SlotWriteCallback const &writeInto) const {
-    Slot const tmp = a.getTemp(this->type());
+    Slot tmp = a.getTemp(this->type());
     writeInto(tmp);
     write(a, tmp);
     a.freeTempSlot(tmp);

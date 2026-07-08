@@ -5,19 +5,19 @@
 
 #include "assembler.ih"
 
-void Assembler::setSlotToBool(Slot const &slot, bool value) {
+void Assembler::setSlotToBool(Slot slot, bool value) {
   moveTo(slot, MacroCell::Value0); setToValue(value);
   moveTo(slot, MacroCell::Value1); setToValue(0);
 }
 
-void Assembler::slotEqualConst(Slot const &lhs, int val) {
+void Assembler::slotEqualConst(Slot lhs, int val) {
 
   pushPtr();
 
   moveTo(lhs);  
   subConstFromSlot(lhs, val);
   
-  if (lhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1()) {
     not16Destructive(Cell{lhs, MacroCell::Value1},
 		     Temps<1>::select(lhs, MacroCell::Scratch0));
   } else {
@@ -27,13 +27,13 @@ void Assembler::slotEqualConst(Slot const &lhs, int val) {
   popPtr();
 }
 
-void Assembler::slotEqualSlot(Slot const &lhs, Slot const &rhs) {
+void Assembler::slotEqualSlot(Slot lhs, Slot rhs) {
   pushPtr();
-  Slot const rhsCopy = getTemp(rhs.type);
+  Slot rhsCopy = getTemp(rhs.type());
   assignSlot(rhsCopy, rhs);
   moveTo(lhs);
 
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     eq16Destructive(Cell{lhs, MacroCell::Value1},
 		    Cell{rhsCopy, MacroCell::Value0},
 		    Cell{rhsCopy, MacroCell::Value1},
@@ -47,7 +47,7 @@ void Assembler::slotEqualSlot(Slot const &lhs, Slot const &rhs) {
   freeTempSlot(rhsCopy);
 }
 
-void Assembler::slotNotEqualConst(Slot const &lhs, int val) {
+void Assembler::slotNotEqualConst(Slot lhs, int val) {
   pushPtr();
   slotEqualConst(lhs, val);
   moveTo(lhs);
@@ -55,7 +55,7 @@ void Assembler::slotNotEqualConst(Slot const &lhs, int val) {
   popPtr();
 }
 
-void Assembler::slotNotEqualSlot(Slot const &lhs, Slot const &rhs) {
+void Assembler::slotNotEqualSlot(Slot lhs, Slot rhs) {
   pushPtr();
   slotEqualSlot(lhs, rhs);
   moveTo(lhs);
@@ -63,15 +63,15 @@ void Assembler::slotNotEqualSlot(Slot const &lhs, Slot const &rhs) {
   popPtr();
 }
 
-void Assembler::slotLessConst(Slot const &lhs, int val) {
-  assert(types::isInteger(lhs.type));
-  if (types::isUnsignedInteger(lhs.type)) return slotLessConstUnsigned(lhs, val);
-  if (types::isSignedInteger(lhs.type))   return slotLessConstSigned(lhs, val);
+void Assembler::slotLessConst(Slot lhs, int val) {
+  assert(types::isInteger(lhs.type()));
+  if (types::isUnsignedInteger(lhs.type())) return slotLessConstUnsigned(lhs, val);
+  if (types::isSignedInteger(lhs.type()))   return slotLessConstSigned(lhs, val);
   std::unreachable();
 }
 
-void Assembler::slotLessConstUnsigned(Slot const &lhs, int val) {
-  assert(types::isUnsignedInteger(lhs.type));
+void Assembler::slotLessConstUnsigned(Slot lhs, int val) {
+  assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
   
   if (val == 0) {
@@ -84,15 +84,15 @@ void Assembler::slotLessConstUnsigned(Slot const &lhs, int val) {
 
   pushPtr();
 
-  Slot const valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
+  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotLessSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
 
   popPtr();
 }
 
-void Assembler::slotLessConstSigned(Slot const &lhs, int val) {
-  assert(types::isSignedInteger(lhs.type));
+void Assembler::slotLessConstSigned(Slot lhs, int val) {
+  assert(types::isSignedInteger(lhs.type()));
 
   if (val == 0) {
     signBitSlot(lhs);
@@ -120,34 +120,34 @@ void Assembler::slotLessConstSigned(Slot const &lhs, int val) {
   }
 }
 
-void Assembler::slotLessSlot(Slot const &lhs, Slot const &rhs) {
-  assert(types::isInteger(lhs.type));
-  assert(types::isInteger(rhs.type));
-  assert(types::cast<types::IntegerType>(lhs.type)->signedness() ==
-	 types::cast<types::IntegerType>(rhs.type)->signedness());
+void Assembler::slotLessSlot(Slot lhs, Slot rhs) {
+  assert(types::isInteger(lhs.type()));
+  assert(types::isInteger(rhs.type()));
+  assert(types::cast<types::IntegerType>(lhs.type())->signedness() ==
+	 types::cast<types::IntegerType>(rhs.type())->signedness());
     
-  if (types::isUnsignedInteger(lhs.type)) return slotLessSlotUnsigned(lhs, rhs);
-  if (types::isSignedInteger(lhs.type))   return slotLessSlotSigned(lhs, rhs);
+  if (types::isUnsignedInteger(lhs.type())) return slotLessSlotUnsigned(lhs, rhs);
+  if (types::isSignedInteger(lhs.type()))   return slotLessSlotSigned(lhs, rhs);
   std::unreachable();
 }
 
-void Assembler::slotLessSlotUnsigned(Slot const &lhs, Slot const &rhs, bool const destroyRhs) {
-  assert(types::isUnsignedInteger(lhs.type));
-  assert(types::isUnsignedInteger(rhs.type));
+void Assembler::slotLessSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {
+  assert(types::isUnsignedInteger(lhs.type()));
+  assert(types::isUnsignedInteger(rhs.type()));
   
   pushPtr();
 
   bool freeRhsCopy = false;
-  Slot const rhsCopy = [&] {
+  Slot rhsCopy = [&] {
     if (destroyRhs) return rhs;
-    Slot const tmp = getTemp(rhs.type);
+    Slot const tmp = getTemp(rhs.type());
     assignSlot(tmp, rhs);
     freeRhsCopy = true;
     return tmp;
   }();
 
   moveTo(lhs);  
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     less16Destructive(Cell{lhs, MacroCell::Value1},
 		      Cell{rhsCopy, MacroCell::Value0},
 		      Cell{rhsCopy, MacroCell::Value1},
@@ -165,9 +165,9 @@ void Assembler::slotLessSlotUnsigned(Slot const &lhs, Slot const &rhs, bool cons
   if (freeRhsCopy) freeTempSlot(rhsCopy);
 }
 
-void Assembler::slotLessSlotSigned(Slot const &lhs, Slot const &rhs) {
-  assert(types::isSignedInteger(lhs.type));
-  assert(types::isSignedInteger(rhs.type));
+void Assembler::slotLessSlotSigned(Slot lhs, Slot rhs) {
+  assert(types::isSignedInteger(lhs.type()));
+  assert(types::isSignedInteger(rhs.type()));
 
   // Both positive -> use unsigned algorithm
   // lhs negative, rhs positive -> return 1
@@ -180,7 +180,7 @@ void Assembler::slotLessSlotSigned(Slot const &lhs, Slot const &rhs) {
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned greater-than
 				      negateSlot(lhs);
-				      Slot const rhsCopy = getTemp(rhs.type);
+				      Slot rhsCopy = getTemp(rhs.type());
 				      assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotGreaterSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
@@ -206,23 +206,23 @@ void Assembler::slotLessSlotSigned(Slot const &lhs, Slot const &rhs) {
   
   
 
-void Assembler::slotLessEqualConst(Slot const &lhs, int val) {
-  assert(types::isInteger(lhs.type));
+void Assembler::slotLessEqualConst(Slot lhs, int val) {
+  assert(types::isInteger(lhs.type()));
   
-  if (types::isUnsignedInteger(lhs.type)) return slotLessEqualConstUnsigned(lhs, val);
-  if (types::isSignedInteger(lhs.type))   return slotLessEqualConstSigned(lhs, val);
+  if (types::isUnsignedInteger(lhs.type())) return slotLessEqualConstUnsigned(lhs, val);
+  if (types::isSignedInteger(lhs.type()))   return slotLessEqualConstSigned(lhs, val);
   std::unreachable();
 }
 
 
-void Assembler::slotLessEqualConstUnsigned(Slot const &lhs, int val) {
-  assert(types::isUnsignedInteger(lhs.type));
+void Assembler::slotLessEqualConstUnsigned(Slot lhs, int val) {
+  assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
   
   pushPtr();
 
   // If val is maximal, the result must be true
-  if (lhs.type->usesValue1() && ((val & 0xffff) == 0xffff)) {
+  if (lhs.type()->usesValue1() && ((val & 0xffff) == 0xffff)) {
     moveTo(lhs); 
     setToValue16(1, Cell{lhs, MacroCell::Value1});
     popPtr();
@@ -233,15 +233,15 @@ void Assembler::slotLessEqualConstUnsigned(Slot const &lhs, int val) {
     popPtr();
   }
   
-  Slot const valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
+  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotLessEqualSlotUnsigned(lhs, valSlot);
   freeTempSlot(valSlot);
 
   popPtr();
 }
 
-void Assembler::slotLessEqualConstSigned(Slot const &lhs, int val) {
-  assert(types::isSignedInteger(lhs.type));
+void Assembler::slotLessEqualConstSigned(Slot lhs, int val) {
+  assert(types::isSignedInteger(lhs.type()));
 
   if (val >= 0) {
     // if sign bit is set -> return 1
@@ -266,34 +266,34 @@ void Assembler::slotLessEqualConstSigned(Slot const &lhs, int val) {
   }
 }
 
-void Assembler::slotLessEqualSlot(Slot const &lhs, Slot const &rhs) {
-  assert(types::isInteger(lhs.type));
-  assert(types::isInteger(rhs.type));
-  assert(types::cast<types::IntegerType>(lhs.type)->signedness() ==
-	 types::cast<types::IntegerType>(rhs.type)->signedness());
+void Assembler::slotLessEqualSlot(Slot lhs, Slot rhs) {
+  assert(types::isInteger(lhs.type()));
+  assert(types::isInteger(rhs.type()));
+  assert(types::cast<types::IntegerType>(lhs.type())->signedness() ==
+	 types::cast<types::IntegerType>(rhs.type())->signedness());
     
-  if (types::isUnsignedInteger(lhs.type)) return slotLessEqualSlotUnsigned(lhs, rhs);
-  if (types::isSignedInteger(lhs.type))   return slotLessEqualSlotSigned(lhs, rhs);
+  if (types::isUnsignedInteger(lhs.type())) return slotLessEqualSlotUnsigned(lhs, rhs);
+  if (types::isSignedInteger(lhs.type()))   return slotLessEqualSlotSigned(lhs, rhs);
   std::unreachable();
 }
 
-void Assembler::slotLessEqualSlotUnsigned(Slot const &lhs, Slot const &rhs, bool const destroyRhs) {
-  assert(types::isUnsignedInteger(lhs.type));
-  assert(types::isUnsignedInteger(rhs.type));
+void Assembler::slotLessEqualSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {
+  assert(types::isUnsignedInteger(lhs.type()));
+  assert(types::isUnsignedInteger(rhs.type()));
 
   pushPtr();
 
   bool freeRhsCopy = false;
-  Slot const rhsCopy = [&] {
+  Slot rhsCopy = [&] {
     if (destroyRhs) return rhs;
-    Slot const tmp = getTemp(rhs.type);
+    Slot const tmp = getTemp(rhs.type());
     assignSlot(tmp, rhs);
     freeRhsCopy = true;
     return tmp;
   }();
 
   moveTo(lhs);  
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     lessOrEqual16Destructive(Cell{lhs, MacroCell::Value1},
 			     Cell{rhsCopy, MacroCell::Value0},
 			     Cell{rhsCopy, MacroCell::Value1},
@@ -311,9 +311,9 @@ void Assembler::slotLessEqualSlotUnsigned(Slot const &lhs, Slot const &rhs, bool
   if (freeRhsCopy) freeTempSlot(rhsCopy);
 }
 
-void Assembler::slotLessEqualSlotSigned(Slot const &lhs, Slot const &rhs) {
-  assert(types::isSignedInteger(lhs.type));
-  assert(types::isSignedInteger(rhs.type));
+void Assembler::slotLessEqualSlotSigned(Slot lhs, Slot rhs) {
+  assert(types::isSignedInteger(lhs.type()));
+  assert(types::isSignedInteger(rhs.type()));
 
   // if both are positive, use unsigned version
   // if lhs < 0 and rhs >= 0, return true
@@ -326,7 +326,7 @@ void Assembler::slotLessEqualSlotSigned(Slot const &lhs, Slot const &rhs) {
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned greater-equal
 				      negateSlot(lhs);
-				      Slot const rhsCopy = getTemp(rhs.type);
+				      Slot rhsCopy = getTemp(rhs.type());
 				      assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotGreaterEqualSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
@@ -349,22 +349,22 @@ void Assembler::slotLessEqualSlotSigned(Slot const &lhs, Slot const &rhs) {
 }
 
 
-void Assembler::slotGreaterConst(Slot const &lhs, int val) {
-  assert(types::isInteger(lhs.type));
+void Assembler::slotGreaterConst(Slot lhs, int val) {
+  assert(types::isInteger(lhs.type()));
   
-  if (types::isUnsignedInteger(lhs.type)) return slotGreaterConstUnsigned(lhs, val);
-  if (types::isSignedInteger(lhs.type))   return slotGreaterConstSigned(lhs, val);
+  if (types::isUnsignedInteger(lhs.type())) return slotGreaterConstUnsigned(lhs, val);
+  if (types::isSignedInteger(lhs.type()))   return slotGreaterConstSigned(lhs, val);
   std::unreachable();
 }
 
-void Assembler::slotGreaterConstUnsigned(Slot const &lhs, int val) {
-  assert(types::isUnsignedInteger(lhs.type));
+void Assembler::slotGreaterConstUnsigned(Slot lhs, int val) {
+  assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
   
   pushPtr();
 
   // If val is maximal, the result must be false
-  if (lhs.type->usesValue1() && ((val & 0xffff) == 0xffff)) {
+  if (lhs.type()->usesValue1() && ((val & 0xffff) == 0xffff)) {
     moveTo(lhs); 
     setToValue16(0, Cell{lhs, MacroCell::Value1});
     popPtr();
@@ -377,48 +377,48 @@ void Assembler::slotGreaterConstUnsigned(Slot const &lhs, int val) {
     return;
   }
 
-  Slot const valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
+  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotGreaterSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
   
   popPtr();
 }
 
-void Assembler::slotGreaterConstSigned(Slot const &lhs, int val) {
-  assert(types::isSignedInteger(lhs.type));
+void Assembler::slotGreaterConstSigned(Slot lhs, int val) {
+  assert(types::isSignedInteger(lhs.type()));
   
   slotLessEqualConstSigned(lhs, val);
   notSlot(lhs);
 }
 
-void Assembler::slotGreaterSlot(Slot const &lhs, Slot const &rhs) {
-  assert(types::isInteger(lhs.type));
-  assert(types::isInteger(rhs.type));
-  assert(types::cast<types::IntegerType>(lhs.type)->signedness() ==
-	 types::cast<types::IntegerType>(rhs.type)->signedness());
+void Assembler::slotGreaterSlot(Slot lhs, Slot rhs) {
+  assert(types::isInteger(lhs.type()));
+  assert(types::isInteger(rhs.type()));
+  assert(types::cast<types::IntegerType>(lhs.type())->signedness() ==
+	 types::cast<types::IntegerType>(rhs.type())->signedness());
     
-  if (types::isUnsignedInteger(lhs.type)) return slotGreaterSlotUnsigned(lhs, rhs);
-  if (types::isSignedInteger(lhs.type))   return slotGreaterSlotSigned(lhs, rhs);
+  if (types::isUnsignedInteger(lhs.type())) return slotGreaterSlotUnsigned(lhs, rhs);
+  if (types::isSignedInteger(lhs.type()))   return slotGreaterSlotSigned(lhs, rhs);
   std::unreachable();
 }
 
-void Assembler::slotGreaterSlotUnsigned(Slot const &lhs, Slot const &rhs, bool const destroyRhs) {
-  assert(types::isUnsignedInteger(lhs.type));
-  assert(types::isUnsignedInteger(rhs.type));
+void Assembler::slotGreaterSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {
+  assert(types::isUnsignedInteger(lhs.type()));
+  assert(types::isUnsignedInteger(rhs.type()));
   
   pushPtr();
 
   bool freeRhsCopy = false;
-  Slot const rhsCopy = [&] {
+  Slot rhsCopy = [&] {
     if (destroyRhs) return rhs;
-    Slot const tmp = getTemp(rhs.type);
+    Slot const tmp = getTemp(rhs.type());
     assignSlot(tmp, rhs);
     freeRhsCopy = true;
     return tmp;
   }();
     
   moveTo(lhs);  
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     greater16Destructive(Cell{lhs, MacroCell::Value1},
 			 Cell{rhsCopy, MacroCell::Value0},
 			 Cell{rhsCopy, MacroCell::Value1},
@@ -437,9 +437,9 @@ void Assembler::slotGreaterSlotUnsigned(Slot const &lhs, Slot const &rhs, bool c
   if (freeRhsCopy) freeTempSlot(rhsCopy);
 }
 
-void Assembler::slotGreaterSlotSigned(Slot const &lhs, Slot const &rhs) {
-  assert(types::isSignedInteger(lhs.type));
-  assert(types::isSignedInteger(rhs.type));
+void Assembler::slotGreaterSlotSigned(Slot lhs, Slot rhs) {
+  assert(types::isSignedInteger(lhs.type()));
+  assert(types::isSignedInteger(rhs.type()));
 
   // if both are positive, use unsigned version
   // if lhs < 0 and rhs >= 0, return false
@@ -452,7 +452,7 @@ void Assembler::slotGreaterSlotSigned(Slot const &lhs, Slot const &rhs) {
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned greater-equal
 				      negateSlot(lhs);
-				      Slot const rhsCopy = getTemp(rhs.type);
+				      Slot rhsCopy = getTemp(rhs.type());
 				      assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotLessSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
@@ -474,22 +474,22 @@ void Assembler::slotGreaterSlotSigned(Slot const &lhs, Slot const &rhs) {
 		  }); 
 }
   
-void Assembler::slotGreaterEqualConst(Slot const &lhs, int val) {
-  assert(types::isInteger(lhs.type));
+void Assembler::slotGreaterEqualConst(Slot lhs, int val) {
+  assert(types::isInteger(lhs.type()));
   
-  if (types::isUnsignedInteger(lhs.type)) return slotGreaterEqualConstUnsigned(lhs, val);
-  if (types::isSignedInteger(lhs.type))   return slotGreaterEqualConstSigned(lhs, val);
+  if (types::isUnsignedInteger(lhs.type())) return slotGreaterEqualConstUnsigned(lhs, val);
+  if (types::isSignedInteger(lhs.type()))   return slotGreaterEqualConstSigned(lhs, val);
   std::unreachable();
 }
 
-void Assembler::slotGreaterEqualConstUnsigned(Slot const &lhs, int val) {
-  assert(types::isUnsignedInteger(lhs.type));
+void Assembler::slotGreaterEqualConstUnsigned(Slot lhs, int val) {
+  assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
   
   pushPtr();
 
   // If val is 0, the result must be true
-  if (lhs.type->usesValue1() && (val == 0)) {
+  if (lhs.type()->usesValue1() && (val == 0)) {
     moveTo(lhs); 
     setToValue16(1, Cell{lhs, MacroCell::Value1});
     popPtr();
@@ -502,49 +502,49 @@ void Assembler::slotGreaterEqualConstUnsigned(Slot const &lhs, int val) {
     return;
   }
 
-  Slot const valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
+  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotGreaterEqualSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
 
   popPtr();
 }
 
-void Assembler::slotGreaterEqualConstSigned(Slot const &lhs, int val) {
-  assert(types::isSignedInteger(lhs.type));
+void Assembler::slotGreaterEqualConstSigned(Slot lhs, int val) {
+  assert(types::isSignedInteger(lhs.type()));
 
   slotLessConstSigned(lhs, val);
   notSlot(lhs);
 }
 
-void Assembler::slotGreaterEqualSlot(Slot const &lhs, Slot const &rhs) {
-  assert(types::isInteger(lhs.type));
-  assert(types::isInteger(rhs.type));
-  assert(types::cast<types::IntegerType>(lhs.type)->signedness() ==
-	 types::cast<types::IntegerType>(rhs.type)->signedness());
+void Assembler::slotGreaterEqualSlot(Slot lhs, Slot rhs) {
+  assert(types::isInteger(lhs.type()));
+  assert(types::isInteger(rhs.type()));
+  assert(types::cast<types::IntegerType>(lhs.type())->signedness() ==
+	 types::cast<types::IntegerType>(rhs.type())->signedness());
     
-  if (types::isUnsignedInteger(lhs.type)) return slotGreaterEqualSlotUnsigned(lhs, rhs);
-  if (types::isSignedInteger(lhs.type))   return slotGreaterEqualSlotSigned(lhs, rhs);
+  if (types::isUnsignedInteger(lhs.type())) return slotGreaterEqualSlotUnsigned(lhs, rhs);
+  if (types::isSignedInteger(lhs.type()))   return slotGreaterEqualSlotSigned(lhs, rhs);
   std::unreachable();
 }
 
 
-void Assembler::slotGreaterEqualSlotUnsigned(Slot const &lhs, Slot const &rhs, bool const destroyRhs) {
-  assert(types::isUnsignedInteger(lhs.type));
-  assert(types::isUnsignedInteger(rhs.type));
+void Assembler::slotGreaterEqualSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {
+  assert(types::isUnsignedInteger(lhs.type()));
+  assert(types::isUnsignedInteger(rhs.type()));
   
   pushPtr();
 
   bool freeRhsCopy = false;
-  Slot const rhsCopy = [&] {
+  Slot rhsCopy = [&] {
     if (destroyRhs) return rhs;
-    Slot const tmp = getTemp(rhs.type);
+    Slot const tmp = getTemp(rhs.type());
     assignSlot(tmp, rhs);
     freeRhsCopy = true;
     return tmp;
   }();
 
   moveTo(lhs);  
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     greaterOrEqual16Destructive(Cell{lhs, MacroCell::Value1},
 				Cell{rhsCopy, MacroCell::Value0},
 				Cell{rhsCopy, MacroCell::Value1},
@@ -563,9 +563,9 @@ void Assembler::slotGreaterEqualSlotUnsigned(Slot const &lhs, Slot const &rhs, b
   if (freeRhsCopy) freeTempSlot(rhsCopy);
 }
 
-void Assembler::slotGreaterEqualSlotSigned(Slot const &lhs, Slot const &rhs) {
-  assert(types::isSignedInteger(lhs.type));
-  assert(types::isSignedInteger(rhs.type));
+void Assembler::slotGreaterEqualSlotSigned(Slot lhs, Slot rhs) {
+  assert(types::isSignedInteger(lhs.type()));
+  assert(types::isSignedInteger(rhs.type()));
 
   // if both are positive, use unsigned version
   // if lhs < 0 and rhs >= 0, return false
@@ -578,7 +578,7 @@ void Assembler::slotGreaterEqualSlotSigned(Slot const &lhs, Slot const &rhs) {
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned greater-equal
 				      negateSlot(lhs);
-				      Slot const rhsCopy = getTemp(rhs.type);
+				      Slot rhsCopy = getTemp(rhs.type());
 				      assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotLessEqualSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);

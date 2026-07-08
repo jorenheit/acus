@@ -10,13 +10,13 @@ namespace acus::proxy {
 
   
   impl::ArrayElement::ArrayElement(SlotProxy arr, int index):
-    Base(cast<types::ArrayLike>(arr->type())->elementType()),
+    Base(cast<types::ArrayLike>(arr.type())->elementType()),
     _arr(std::move(arr)),
     _index(index)
   {}
       
   impl::ArrayElement::ArrayElement(SlotProxy arr, SlotProxy index):
-    Base(cast<types::ArrayLike>(arr->type())->elementType()),
+    Base(cast<types::ArrayLike>(arr.type())->elementType()),
     _arr(std::move(arr)),
     _index(std::move(index))
   {}
@@ -26,9 +26,9 @@ namespace acus::proxy {
   }     
 
   bool impl::ArrayElement::dependsOnDereferencedPointer() const {
-    if (_arr->dependsOnDereferencedPointer()) return true;
+    if (_arr.dependsOnDereferencedPointer()) return true;
     if (std::holds_alternative<SlotProxy>(_index)) {
-      return std::get<SlotProxy>(_index)->dependsOnDereferencedPointer();
+      return std::get<SlotProxy>(_index).dependsOnDereferencedPointer();
     }
     return false;
   }
@@ -38,7 +38,7 @@ namespace acus::proxy {
   }
       
   bool impl::ArrayElement::directAbsolute() const {
-    return _arr->directAbsolute() && directRelative();
+    return _arr.directAbsolute() && directRelative();
   }
 
   std::string impl::ArrayElement::constructName(auto&& getName) const {
@@ -50,11 +50,11 @@ namespace acus::proxy {
   }
   
   std::string impl::ArrayElement::name() const {
-    return constructName([](SlotProxy proxy){ return proxy->name(); });
+    return constructName([](SlotProxy proxy){ return proxy.name(); });
   }
 
   std::string impl::ArrayElement::uniqueName() const {
-    return constructName([](SlotProxy proxy){ return proxy->uniqueName(); });
+    return constructName([](SlotProxy proxy){ return proxy.uniqueName(); });
   }
       
   Slot impl::ArrayElement::materialize(Assembler &a) const {
@@ -62,7 +62,7 @@ namespace acus::proxy {
     return materializeImpl(a, std::get<int>(_index));
   }
 
-  void impl::ArrayElement::materialize(Assembler &a, Slot const &target) const {
+  void impl::ArrayElement::materialize(Assembler &a, Slot target) const {
     assert(std::holds_alternative<SlotProxy>(_index) && "direct arrayElement does not require a target (cache) slot");
     materializeImpl(a, std::get<SlotProxy>(_index), target);
   }
@@ -96,7 +96,7 @@ namespace acus::proxy {
   }
       
     
-  Slot impl::ArrayElement::getElementSlot(Slot const &arrSlot, int index) const {
+  Slot impl::ArrayElement::getElementSlot(Slot arrSlot, int index) const {
     return arrSlot.sub(this->type(), index * this->type()->size());
   }
 
@@ -106,7 +106,7 @@ namespace acus::proxy {
   }
 
   // Materialize a slot at unknown offset
-  void impl::ArrayElement::materializeImpl(Assembler &a, SlotProxy index, Slot const &target) const {
+  void impl::ArrayElement::materializeImpl(Assembler &a, SlotProxy index, Slot target) const {
     Slot const arrSlot = a.materialize(_arr);
     Slot const indexSlot = a.materialize(index);
     a.copyElementIntoSlot(target, arrSlot, indexSlot);
@@ -151,15 +151,15 @@ namespace acus::proxy {
 
   // Apply a callback to a dynamic offset
   void impl::ArrayElement::writeImpl(Assembler &a, SlotProxy index, SlotWriteCallback const &writeInto) const {
-    Slot const tmp = a.getTemp(this->type());
+    Slot tmp = a.getTemp(this->type());
     writeInto(tmp);
     writeImpl(a, index, tmp);
     a.freeTempSlot(tmp);
   }
 
   Slot impl::ArrayElement::addressOf(Assembler &a) const {
-    Slot ptr = _arr->addressOf(a);
-    ptr.type = ts::pointer(this->type());
+    Slot ptr = _arr.addressOf(a);
+    ptr.get().type = ts::pointer(this->type());
     if (std::holds_alternative<int>(_index)) {
       a.addAssign(ptr, literal::u16(std::get<int>(_index)));
     } else {

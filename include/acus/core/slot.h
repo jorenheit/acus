@@ -6,40 +6,80 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
 #include "acus/types/types_fwd.h"
 
 namespace acus {
 
-struct Slot {
+  struct SlotData {
 
-  enum Kind {
-    Local,
-    Global,
-    Dummy,
-    Available,
-    Temp,
-    Cache
+    enum Kind {
+      Local,
+      Global,
+      Dummy,
+      Available,
+      Temp,
+      Cache
+    };
+
+    std::string name;
+    std::string uniqueName;
+    types::TypeHandle type;
+    Kind kind;
+    int offset;
+    void const *scope = nullptr;
+  
+    int size() const;
+    operator int() const { return offset; }
+
+    SlotData sub(types::TypeHandle subType, int subOffset) const;
+    SlotData unsignedView() const;
   };
 
-  std::string name;
-  std::string uniqueName;
-  types::TypeHandle type;
-  Kind kind;
-  int offset;
-  void const *scope = nullptr;
-  
-	 
-  int size() const;
-  operator int() const { return offset; }
 
-  Slot sub(types::TypeHandle subType, int subOffset) const;
-  Slot unsignedView() const;
-};
 
-  inline bool operator==(Slot const &s1, Slot const &s2) {
+  class Slot {
+    std::shared_ptr<SlotData> _slot;
+    bool _managed;
+    
+  public:
+    using enum SlotData::Kind;
+    
+    Slot(SlotData const &data, bool managed):
+      _slot(std::make_shared<SlotData>(data)),
+      _managed(managed)
+    {}
+
+    Slot(Slot const &other) = default;
+    Slot(Slot&& other) = default;
+    Slot &operator=(Slot const &other) = default;
+    Slot &operator=(Slot&& other) = default;
+    
+    SlotData &get() { return *_slot; }
+    SlotData const &get() const { return *_slot; }
+    
+    std::string name() const { return _slot->name; }
+    std::string uniqueName() const { return _slot->uniqueName; }
+    types::TypeHandle type() const { return _slot->type; }
+    SlotData::Kind kind() const { return _slot->kind; }
+    void const *scope() const { return _slot->scope; }
+    int size() const { return _slot->size(); }
+    int offset() const { return _slot->offset; }
+    operator int() const { return offset(); }
+    bool managed() const { return _managed; }
+    
+    Slot sub(types::TypeHandle subType, int subOffset) const { return Slot{_slot->sub(subType, subOffset), false}; }
+    Slot unsignedView() const { return Slot{_slot->unsignedView(), false}; }
+  };
+
+
+  inline bool operator==(SlotData const &s1, SlotData const &s2) {
     return s1.offset == s2.offset && s1.size() == s2.size();
   }
 
+  inline bool operator==(Slot const &s1, Slot const &s2) {
+    return s1.get() == s2.get();
+  }
   
 } // namespace acus

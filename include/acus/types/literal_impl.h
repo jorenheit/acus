@@ -26,7 +26,9 @@ namespace acus::literal::impl {
     virtual types::TypeHandle type() const;
   };
 
-  using Literal = std::shared_ptr<Base>;
+  using BasePtr = std::shared_ptr<Base>;
+  using BasePtrConst = std::shared_ptr<Base const>;
+  class Literal;
     
   struct Integer: Base {
     int const _semanticValue;
@@ -40,25 +42,25 @@ namespace acus::literal::impl {
   struct u8: Integer {
     u8(u8 const &other) = default;
     u8(int v, API_CTX_IGNORE);
-    virtual Literal clone() const override;
+    virtual BasePtr clone() const override;
   };
 
   struct s8: Integer {
     s8(s8 const &other) = default;
     s8(int v, API_CTX_IGNORE);
-    virtual Literal clone() const override;
+    virtual BasePtr clone() const override;
   };
   
   struct u16: Integer {
     u16(u16 const& other) = default;
     u16(int v, API_CTX_IGNORE);
-    virtual Literal clone() const override;
+    virtual BasePtr clone() const override;
   };      
 
   struct s16: Integer {
     s16(s16 const& other) = default;
     s16(int v, API_CTX_IGNORE);
-    virtual Literal clone() const override;
+    virtual BasePtr clone() const override;
   };      
   
   struct ArrayLike: Base {
@@ -74,7 +76,7 @@ namespace acus::literal::impl {
     string(std::string const &s, API_CTX);      
     string(string const &other);
     virtual std::string str() const override;      
-    virtual Literal clone() const override;
+    virtual BasePtr clone() const override;
     Literal element(size_t idx) const;
     std::string const &stdstr() const;
   }; // string
@@ -87,7 +89,7 @@ namespace acus::literal::impl {
     structT(structT const &other);      
     Literal field(std::string const &name) const;
     Literal field(size_t idx) const;      
-    virtual Literal clone() const override;
+    virtual BasePtr clone() const override;
     virtual std::string str() const override;
   }; // structT
 
@@ -97,25 +99,43 @@ namespace acus::literal::impl {
     array(types::TypeHandle elementType, std::vector<Literal> const &elements, API_CTX);      
     array(array const &other);
 
-    virtual Literal clone() const override;
+    virtual BasePtr clone() const override;
     virtual std::string str() const override;
   }; // array
 
-    
+
+  class Literal {
+    BasePtr _ptr;
+
+  public:
+    Literal() = default;
+    Literal(BasePtr ptr):
+      _ptr(ptr)
+    {}
+
+    BasePtr get() { return _ptr; }
+    BasePtrConst get() const { return _ptr; }
+
+    Literal clone() const { return _ptr->clone(); }
+    std::string str() const { return _ptr->str(); }
+    types::TypeHandle type() const { return _ptr->type(); }
+  };
+
+  
   struct FunctionPointer: Base {
     std::string _functionName;
       
     FunctionPointer(types::FunctionType const *functionType, std::string const &fname, API_CTX_IGNORE);
     FunctionPointer(FunctionPointer const &other) = default;
       
-    virtual std::shared_ptr<Base> clone() const override;      
+    virtual BasePtr clone() const override;      
     virtual std::string str() const override;
     std::string const &functionName() const;
   };
     
   template <typename V> requires std::derived_from<V, Base>
-  auto cast(Literal const &v) {
-    auto ptr = std::dynamic_pointer_cast<V>(v);
+  auto cast(Literal v) {
+    auto ptr = std::dynamic_pointer_cast<std::remove_cvref_t<V>>(v.get());
     assert(ptr != nullptr && "invalid value cast");
     return ptr;
   }

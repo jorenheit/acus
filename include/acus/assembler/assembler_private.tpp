@@ -17,10 +17,10 @@ auto Assembler::getFieldIndices(Args... args) {
 }
 
 template <typename TrueBranch, typename FalseBranch>
-void Assembler::branchOnSignBit(Slot const &slot, Cell const &flagCell, TrueBranch&& trueBranch, FalseBranch&& falseBranch) {
+void Assembler::branchOnSignBit(Slot slot, Cell const &flagCell, TrueBranch&& trueBranch, FalseBranch&& falseBranch) {
 
   pushPtr();
-  moveTo(slot, slot.type->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);    
+  moveTo(slot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);    
   signBitConstructive(flagCell,
 		      Temps<4>::select(slot, MacroCell::Scratch0,
 				       slot, MacroCell::Scratch1,

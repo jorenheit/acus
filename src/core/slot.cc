@@ -8,10 +8,10 @@
 
 using namespace acus;
 
-int Slot::size() const { return type->size(); }
+int SlotData::size() const { return type->size(); }
 
-Slot Slot::sub(types::TypeHandle subType, int subOffset) const {
-  return Slot {
+SlotData SlotData::sub(types::TypeHandle subType, int subOffset) const {
+  return SlotData {
     .name = name + "<" + std::to_string(subOffset) + ">",
     .type = subType,
     .kind = this->kind == Temp ? Temp : Dummy,
@@ -20,9 +20,9 @@ Slot Slot::sub(types::TypeHandle subType, int subOffset) const {
   };
 }
 
-Slot Slot::unsignedView() const {
+SlotData SlotData::unsignedView() const {
   assert(types::isInteger(type));
-  Slot view = *this;
+  SlotData view = *this;
   view.type = type->usesValue1() ? ts::u16() : ts::u8();
   return view;
 }

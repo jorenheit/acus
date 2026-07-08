@@ -14,10 +14,10 @@ Assembler::Cache::Entry* Assembler::Cache::findEntry(SlotProxy proxy) const {
 }
 
 Assembler::Cache::Entry *Assembler::Cache::findCachedOwner(SlotProxy proxy) const {
-  std::optional<SlotProxy> parent = proxy->enclosingProxy();
+  std::optional<SlotProxy> parent = proxy.enclosingProxy();
   while (parent) {
     if (Entry *entry = findEntry(*parent)) return entry;
-    parent = (*parent)->enclosingProxy();
+    parent = (*parent).enclosingProxy();
   }
   return nullptr;
 }
@@ -26,12 +26,12 @@ Assembler::Cache::Entry* Assembler::Cache::ensureParentEntry(SlotProxy proxy) {
   // Make sure that the proxy has a parent cached if it needs to be written
   // back indirectly; no dangling cached children.
   
-  auto parentProxy = proxy->enclosingProxy();
+  auto parentProxy = proxy.enclosingProxy();
 
   // Direct-relative proxies are not cache entries themselves. They are views
   // into their enclosing storage owner, so climb past them.
-  while (parentProxy && (*parentProxy)->directRelative()) {
-    parentProxy = (*parentProxy)->enclosingProxy();
+  while (parentProxy && (*parentProxy).directRelative()) {
+    parentProxy = (*parentProxy).enclosingProxy();
   }
 
   // No cacheable enclosing proxy. The proxy is rooted in canonical storage.
@@ -45,7 +45,7 @@ Assembler::Cache::Entry* Assembler::Cache::ensureParentEntry(SlotProxy proxy) {
 
 Assembler::Cache::Entry& Assembler::Cache::findOrCreateEntry(SlotProxy proxy, bool const skipMaterialization) {
   // Direct proxies should never be cached.
-  assert(proxy->directRelative() == false);
+  assert(proxy.directRelative() == false);
 
   // If this proxy was already cached, return the cached entry.
   if (Entry *entry = findEntry(proxy)) {
@@ -58,9 +58,9 @@ Assembler::Cache::Entry& Assembler::Cache::findOrCreateEntry(SlotProxy proxy, bo
   // is set to true), m[row] must still exist as the parent entry so the cell can later flush into it.
 
   Entry *parentEntry = ensureParentEntry(proxy);
-  Slot const cacheSlot = _self.getCache(proxy->type());
+  Slot const cacheSlot = _self.getCache(proxy.type());
   if (not skipMaterialization) {
-    proxy->materialize(_self, cacheSlot);
+    proxy.materialize(_self, cacheSlot);
   }
 
   auto newEntry = std::make_unique<Entry>(Entry{
@@ -83,13 +83,13 @@ Assembler::Cache::Entry& Assembler::Cache::findOrCreateEntry(SlotProxy proxy, bo
 }
 
 Slot Assembler::Cache::materialize(SlotProxy proxy) {
-  if (proxy->dependsOnDereferencedPointer() && not _flushing && not _aliasWriteMode) {
+  if (proxy.dependsOnDereferencedPointer() && not _flushing && not _aliasWriteMode) {
     flushAndClearEntireCache();
   }
   
-  if (proxy->directRelative()) {
+  if (proxy.directRelative()) {
     if (not _flushing) flushSubtree(proxy);
-    return proxy->materialize(_self);
+    return proxy.materialize(_self);
   }
   
   Entry &entry = findOrCreateEntry(proxy);
@@ -107,10 +107,10 @@ void Assembler::Cache::forEntireSubtree(SlotProxy root, auto&& action) {
   auto const isPartOfSemanticSubtree = [&](SlotProxy proxy) -> bool {
     if (proxy == root) return true;
 
-    auto current = proxy->enclosingProxy();
+    auto current = proxy.enclosingProxy();
     while (current) {
       if (*current == root) return true;
-      current = (*current)->enclosingProxy();
+      current = (*current).enclosingProxy();
     }
     return false;
   };
@@ -151,7 +151,7 @@ void Assembler::Cache::forEntireSubtree(Entry& root, bool const includeRoot, aut
 void Assembler::Cache::flushEntryIfDirty(Entry &entry) {
   if (not entry.dirty || entry.pendingWrite) return;
   entry.dirty = false;
-  entry.proxy->write(_self, entry.slot);
+  entry.proxy.write(_self, entry.slot);
   if (entry.parent != nullptr) entry.parent->dirty = true;
 }
       
@@ -230,7 +230,7 @@ void Assembler::Cache::deleteMarkedEntries() {
 void Assembler::Cache::flushAndClearEntireCacheExceptGlobals() {
 
   for (auto const &entry: _entries) {
-    if (entry->parent == nullptr && entry->proxy->kind() != proxy::Kind::GlobalReference) {
+    if (entry->parent == nullptr && entry->proxy.kind() != proxy::Kind::GlobalReference) {
       flushAndDeleteSubtree(*entry, true);
     }
   }
@@ -275,8 +275,8 @@ void Assembler::Cache::returnBoundary() {
   // Find all cached entries (roots) that (could) refer to data outside this frame
   for (auto const &entry: _entries) {
     if (entry->parent != nullptr) continue;
-    if (entry->proxy->kind() == proxy::Kind::GlobalReference ||
-	entry->proxy->kind() == proxy::Kind::DereferencedPointer) {
+    if (entry->proxy.kind() == proxy::Kind::GlobalReference ||
+	entry->proxy.kind() == proxy::Kind::DereferencedPointer) {
 
       flushSubtree(*entry, true);
     }
@@ -301,7 +301,7 @@ void Assembler::Cache::invalidateDependencies(SlotProxy modifiedProxy) {
   // invalidated (deleted) to prevent them becoming stale. 
 
   // The proxy may not depend on a dereferenced pointer.
-  assert(not modifiedProxy->dependsOnDereferencedPointer());
+  assert(not modifiedProxy.dependsOnDereferencedPointer());
   
   // The cache should not contain any delete-marks at this point
   for (auto const &entryPtr: _entries) assert(not entryPtr->markedForDelete);
@@ -317,7 +317,7 @@ void Assembler::Cache::invalidateDependencies(SlotProxy modifiedProxy) {
       for (auto const &entryPtr: _entries) {
 	Entry& entry = *entryPtr;
 	if (entry.markedForDelete) continue;
-	if (entry.proxy->dependsOn(dependency)) {
+	if (entry.proxy.dependsOn(dependency)) {
 	  markSubtreeForDelete(entry, true);
 	  self(self, entry.proxy);
 	  result.push_back(&entry);
@@ -336,7 +336,7 @@ void Assembler::Cache::invalidateDependencies(SlotProxy modifiedProxy) {
   // dirty alias entries must be committed before the dependency changes, and
   // clean alias entries must be invalidated. Conservatively clear the cache.  
   for (Entry *entry: dependentEntries) {
-    if (entry->proxy->dependsOnDereferencedPointer()) {
+    if (entry->proxy.dependsOnDereferencedPointer()) {
       flushAndClearEntireCache();
       return;
     }
@@ -355,24 +355,24 @@ void Assembler::Cache::invalidateDependencies(SlotProxy modifiedProxy) {
 void Assembler::Cache::writeAliasSensitive(SlotProxy dest, auto&& src) {
   flushAndClearEntireCache();
   _aliasWriteMode = true;
-  dest->write(_self, src);
+  dest.write(_self, src);
   _aliasWriteMode = false;
   flushAndClearEntireCache();
 }
 
 void Assembler::Cache::writeDirect(SlotProxy dest, auto&& src) {
-  assert(dest->directRelative());
+  assert(dest.directRelative());
   
   flushAndDeleteSubtree(dest);
   invalidateDependencies(dest);
-  dest->write(_self, src);
+  dest.write(_self, src);
 
   if (Entry *cachedOwner = findCachedOwner(dest))
     cachedOwner->dirty = true;
 }
 
 void Assembler::Cache::writeIndirect(SlotProxy dest, auto&& assign) {
-  assert(not dest->directRelative());
+  assert(not dest.directRelative());
 
   // When writing to an indirect proxy, there is no need to materialize the old value
   // into the cache, so we skip the materialization when creating a cache entry.
@@ -395,15 +395,15 @@ void Assembler::Cache::write(SlotProxy dest, SlotProxy src) {
   if (dest == src) return;
   
   // If not in the flushing state, we need to check if the proxies are alias-sensitive.
-  if ((dest->dependsOnDereferencedPointer() || src->dependsOnDereferencedPointer())) {
+  if ((dest.dependsOnDereferencedPointer() || src.dependsOnDereferencedPointer())) {
     return writeAliasSensitive(dest, src);
   }
 
-  if (dest->directRelative()) {
+  if (dest.directRelative()) {
     return writeDirect(dest, src);
   }
 
-  writeIndirect(dest, [&](Slot const &destSlot){
+  writeIndirect(dest, [&](Slot destSlot){
     Slot const srcSlot = materialize(src);
     _self.assignSlot(destSlot, srcSlot);
   });
@@ -412,32 +412,32 @@ void Assembler::Cache::write(SlotProxy dest, SlotProxy src) {
 void Assembler::Cache::write(SlotProxy dest, literal::Literal val) {
   assert(not _flushing);
   
-  if (dest->dependsOnDereferencedPointer()) {
+  if (dest.dependsOnDereferencedPointer()) {
     return writeAliasSensitive(dest, val);
   }
   
-  if (dest->directRelative()) {
+  if (dest.directRelative()) {
     return writeDirect(dest, val);
   }
 
-  writeIndirect(dest, [&](Slot const &destSlot){
+  writeIndirect(dest, [&](Slot destSlot){
     _self.assignSlot(destSlot, val);
   });
 }
 
 
-void Assembler::Cache::write(SlotProxy dest, std::function<void(Slot const &)> const &writeInto) {
+void Assembler::Cache::write(SlotProxy dest, std::function<void(Slot)> const &writeInto) {
   assert(not _flushing);
   
-  if (dest->dependsOnDereferencedPointer()) {
+  if (dest.dependsOnDereferencedPointer()) {
     return writeAliasSensitive(dest, writeInto);
   }
   
-  if (dest->directRelative()) {
+  if (dest.directRelative()) {
     return writeDirect(dest, writeInto);
   }
 
-  writeIndirect(dest, [&](Slot const &destSlot){
+  writeIndirect(dest, [&](Slot destSlot){
     writeInto(destSlot);
   });
 }

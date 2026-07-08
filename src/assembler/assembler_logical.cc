@@ -5,7 +5,7 @@
 
 #include "assembler.ih"
 
-void Assembler::andSlotWithConst(Slot const &lhs, int val) {
+void Assembler::andSlotWithConst(Slot lhs, int val) {
   pushPtr();
   moveTo(lhs);
 
@@ -17,7 +17,7 @@ void Assembler::andSlotWithConst(Slot const &lhs, int val) {
     return;
   }
 
-  if (lhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1()) {
     bool16Destructive(Cell{lhs, MacroCell::Value1},
 		      Temps<1>::select(lhs, MacroCell::Scratch0));
   } else {
@@ -27,14 +27,14 @@ void Assembler::andSlotWithConst(Slot const &lhs, int val) {
   popPtr();
 }
 
-void Assembler::andSlotWithSlot(Slot const &lhs, Slot const &rhs) {
+void Assembler::andSlotWithSlot(Slot lhs, Slot rhs) {
   pushPtr();
 
-  Slot const rhsCopy = getTemp(rhs.type);
+  Slot rhsCopy = getTemp(rhs.type());
   assignSlot(rhsCopy, rhs);
   moveTo(lhs);
 
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     and16Destructive(Cell{lhs, MacroCell::Value1},
 		     Cell{rhsCopy, MacroCell::Value0},
 		     Cell{rhsCopy, MacroCell::Value1},
@@ -50,7 +50,7 @@ void Assembler::andSlotWithSlot(Slot const &lhs, Slot const &rhs) {
 }
 
 
-void Assembler::nandSlotWithConst(Slot const &lhs, int val) {
+void Assembler::nandSlotWithConst(Slot lhs, int val) {
   pushPtr();
   moveTo(lhs);
 
@@ -62,7 +62,7 @@ void Assembler::nandSlotWithConst(Slot const &lhs, int val) {
     return;
   }
 
-  if (lhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1()) {
     not16Destructive(Cell{lhs, MacroCell::Value1},
 		     Temps<1>::select(lhs, MacroCell::Scratch0));
   } else {
@@ -72,14 +72,14 @@ void Assembler::nandSlotWithConst(Slot const &lhs, int val) {
   popPtr();
 }
 
-void Assembler::nandSlotWithSlot(Slot const &lhs, Slot const &rhs) {
+void Assembler::nandSlotWithSlot(Slot lhs, Slot rhs) {
   pushPtr();
 
-  Slot const rhsCopy = getTemp(rhs.type);
+  Slot rhsCopy = getTemp(rhs.type());
   assignSlot(rhsCopy, rhs);
   moveTo(lhs);
 
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     nand16Destructive(Cell{lhs, MacroCell::Value1},
 		      Cell{rhsCopy, MacroCell::Value0},
 		      Cell{rhsCopy, MacroCell::Value1},
@@ -95,7 +95,7 @@ void Assembler::nandSlotWithSlot(Slot const &lhs, Slot const &rhs) {
 }
 
 
-void Assembler::orSlotWithConst(Slot const &lhs, int val) {
+void Assembler::orSlotWithConst(Slot lhs, int val) {
   pushPtr();
   moveTo(lhs);
 
@@ -107,7 +107,7 @@ void Assembler::orSlotWithConst(Slot const &lhs, int val) {
     return;
   }
 
-  if (lhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1()) {
     bool16Destructive(Cell{lhs, MacroCell::Value1},
 		      Temps<1>::select(lhs, MacroCell::Scratch0));
   } else {
@@ -117,14 +117,14 @@ void Assembler::orSlotWithConst(Slot const &lhs, int val) {
   popPtr();
 }
 
-void Assembler::orSlotWithSlot(Slot const &lhs, Slot const &rhs) {
+void Assembler::orSlotWithSlot(Slot lhs, Slot rhs) {
   pushPtr();
 
-  Slot const rhsCopy = getTemp(rhs.type);
+  Slot rhsCopy = getTemp(rhs.type());
   assignSlot(rhsCopy, rhs);
   moveTo(lhs);
 
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     or16Destructive(Cell{lhs, MacroCell::Value1},
 		    Cell{rhsCopy, MacroCell::Value0},
 		    Cell{rhsCopy, MacroCell::Value1},
@@ -139,7 +139,7 @@ void Assembler::orSlotWithSlot(Slot const &lhs, Slot const &rhs) {
   freeTempSlot(rhsCopy);
 }
 
-void Assembler::norSlotWithConst(Slot const &lhs, int val) {
+void Assembler::norSlotWithConst(Slot lhs, int val) {
   pushPtr();
   moveTo(lhs);
 
@@ -151,7 +151,7 @@ void Assembler::norSlotWithConst(Slot const &lhs, int val) {
     return;
   }
 
-  if (lhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1()) {
     not16Destructive(Cell{lhs, MacroCell::Value1},
 		      Temps<1>::select(lhs, MacroCell::Scratch0));
   } else {
@@ -161,14 +161,14 @@ void Assembler::norSlotWithConst(Slot const &lhs, int val) {
   popPtr();
 }
 
-void Assembler::norSlotWithSlot(Slot const &lhs, Slot const &rhs) {
+void Assembler::norSlotWithSlot(Slot lhs, Slot rhs) {
   pushPtr();
 
-  Slot const rhsCopy = getTemp(rhs.type);
+  Slot rhsCopy = getTemp(rhs.type());
   assignSlot(rhsCopy, rhs);
   moveTo(lhs);
 
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     nor16Destructive(Cell{lhs, MacroCell::Value1},
 		     Cell{rhsCopy, MacroCell::Value0},
 		     Cell{rhsCopy, MacroCell::Value1},
@@ -183,12 +183,12 @@ void Assembler::norSlotWithSlot(Slot const &lhs, Slot const &rhs) {
   freeTempSlot(rhsCopy);
 }
 
-void Assembler::xorSlotWithConst(Slot const &lhs, int val) {
+void Assembler::xorSlotWithConst(Slot lhs, int val) {
   pushPtr();
   moveTo(lhs);
 
   if (val > 0) {
-    if (lhs.type->usesValue1()) {
+    if (lhs.type()->usesValue1()) {
       not16Destructive(Cell{lhs, MacroCell::Value1},
 		       Temps<1>::select(lhs, MacroCell::Scratch0));
     } else {
@@ -196,7 +196,7 @@ void Assembler::xorSlotWithConst(Slot const &lhs, int val) {
     }
   }
   else {
-    if (lhs.type->usesValue1()) {
+    if (lhs.type()->usesValue1()) {
       bool16Destructive(Cell{lhs, MacroCell::Value1},
 		       Temps<1>::select(lhs, MacroCell::Scratch0));
     } else {
@@ -207,14 +207,14 @@ void Assembler::xorSlotWithConst(Slot const &lhs, int val) {
   popPtr();
 }
 
-void Assembler::xorSlotWithSlot(Slot const &lhs, Slot const &rhs) {
+void Assembler::xorSlotWithSlot(Slot lhs, Slot rhs) {
   pushPtr();
 
-  Slot const rhsCopy = getTemp(rhs.type);
+  Slot rhsCopy = getTemp(rhs.type());
   assignSlot(rhsCopy, rhs);
   moveTo(lhs);
 
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     xor16Destructive(Cell{lhs, MacroCell::Value1},
 		     Cell{rhsCopy, MacroCell::Value0},
 		     Cell{rhsCopy, MacroCell::Value1},
@@ -231,12 +231,12 @@ void Assembler::xorSlotWithSlot(Slot const &lhs, Slot const &rhs) {
   freeTempSlot(rhsCopy);
 }
 
-void Assembler::xnorSlotWithConst(Slot const &lhs, int val) {
+void Assembler::xnorSlotWithConst(Slot lhs, int val) {
   pushPtr();
   moveTo(lhs);
 
   if (val == 0) {
-    if (lhs.type->usesValue1()) {
+    if (lhs.type()->usesValue1()) {
       not16Destructive(Cell{lhs, MacroCell::Value1},
 		       Temps<1>::select(lhs, MacroCell::Scratch0));
     } else {
@@ -244,7 +244,7 @@ void Assembler::xnorSlotWithConst(Slot const &lhs, int val) {
     }
   }
   else {
-    if (lhs.type->usesValue1()) {
+    if (lhs.type()->usesValue1()) {
       bool16Destructive(Cell{lhs, MacroCell::Value1},
 		       Temps<1>::select(lhs, MacroCell::Scratch0));
     } else {
@@ -255,14 +255,14 @@ void Assembler::xnorSlotWithConst(Slot const &lhs, int val) {
   popPtr();
 }
 
-void Assembler::xnorSlotWithSlot(Slot const &lhs, Slot const &rhs) {
+void Assembler::xnorSlotWithSlot(Slot lhs, Slot rhs) {
   pushPtr();
 
-  Slot const rhsCopy = getTemp(rhs.type);
+  Slot rhsCopy = getTemp(rhs.type());
   assignSlot(rhsCopy, rhs);
   moveTo(lhs);
 
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     xnor16Destructive(Cell{lhs, MacroCell::Value1},
 		      Cell{rhsCopy, MacroCell::Value0},
 		      Cell{rhsCopy, MacroCell::Value1},

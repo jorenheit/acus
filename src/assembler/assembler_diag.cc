@@ -27,7 +27,7 @@ bool Assembler::inScope(std::string const &name) const {
 
 bool Assembler::inCurrentScope(std::string const &name) const {
   std::optional<Slot> slot = localSlot(name);
-  return slot.has_value() && slot->scope == _currentScope;
+  return slot.has_value() && slot->scope() == _currentScope;
 }
 
 int Assembler::currentScopeDepth() const {

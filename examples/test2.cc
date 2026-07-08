@@ -2,29 +2,27 @@
 #include "acus/assembler/assembler.h"
 using namespace acus;
 
+#define CAT(c1, c2) (((int)c1) | ((int)(c2 << 8)))
+
+
 int main() try {
   Assembler c;
 
   c.program("test", "main").begin(); {
-    c.declareGlobal("g", ts::u8());
 
     c.function("main").begin(); {
-
-      c.callFunction("foo").into("g").done();
-      c.write("g");
-      c.callFunction("bar").done();
-      c.returnFromFunction();
-    } c.endFunction();
-
-    c.function("foo").ret(ts::u8()).begin(); {
+      c.declareLocal("x", ts::u8());
       c.declareLocal("y", ts::u8());
-      c.assign("y", literal::u8('Y'));
-      c.returnFromFunction("y");
+
+      c.assign("x", literal::u8('A'));
+      c.callFunction("foo").into("y").arg("x").arg(literal::u8('B')).done();
+      c.write("x");
+      c.write("y");
+      c.returnFromFunction();
     } c.endFunction();
 
-    c.function("bar").begin(); {
-      c.write("g");
-      c.returnFromFunction();
+    c.function("foo").param("arg1", ts::u8()).param("arg2", ts::u8()).ret(ts::u8()).begin(); {
+      c.returnFromFunction("arg2");
     } c.endFunction();
     
   } c.endProgram();

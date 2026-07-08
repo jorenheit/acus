@@ -5,7 +5,7 @@
 
 #include "assembler.ih"
 
-Expression Assembler::structFieldImpl(Expression const &obj, int fieldIndex, API_CTX) {
+Expression Assembler::structFieldImpl(Expression obj, int fieldIndex, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_STRUCT(obj.type());
@@ -15,7 +15,7 @@ Expression Assembler::structFieldImpl(Expression const &obj, int fieldIndex, API
   return structFieldImpl(obj, structType->fieldName(fieldIndex), API_FWD);
 }
 
-Expression Assembler::structFieldImpl(Expression const &obj, std::string const &fieldName, API_CTX) {
+Expression Assembler::structFieldImpl(Expression obj, std::string const &fieldName, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_STRUCT(obj.type());
@@ -29,7 +29,7 @@ Expression Assembler::structFieldImpl(Expression const &obj, std::string const &
   return Expression{proxy::structField(obj.slot(), fieldName)};
 }
 
-Expression Assembler::arrayElementImpl(Expression const &arr, int index, API_CTX) {
+Expression Assembler::arrayElementImpl(Expression arr, int index, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_ARRAY_OR_STRING(arr.type());
@@ -43,7 +43,7 @@ Expression Assembler::arrayElementImpl(Expression const &arr, int index, API_CTX
   return Expression{proxy::arrayElement(arr.slot(), index)};  
 }  
 
-Expression Assembler::arrayElementImpl(Expression const &arr, Expression const &index, API_CTX) {
+Expression Assembler::arrayElementImpl(Expression arr, Expression index, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_ARRAY_OR_STRING(arr.type());
@@ -66,7 +66,7 @@ Expression Assembler::arrayElementImpl(Expression const &arr, Expression const &
   return Expression{proxy::arrayElement(arr.slot(), index.slot())};
 }
 
-Expression Assembler::dereferencePointerImpl(Expression const &ptr, API_CTX) {
+Expression Assembler::dereferencePointerImpl(Expression ptr, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_POINTER(ptr.type());

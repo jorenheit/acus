@@ -17,9 +17,9 @@ class Expression {
   types::TypeHandle _type;
     
 public:
-  explicit Expression(Slot const &s): _val(s), _type(s.type) {}
-  explicit Expression(SlotProxy const &s): _val(s), _type(s->type()) {}
-  explicit Expression(literal::Literal const &v): _val(v), _type(v->type()) {}
+  explicit Expression(Slot s): _val(s), _type(s.type()) {}
+  explicit Expression(SlotProxy s): _val(s), _type(s.type()) {}
+  explicit Expression(literal::Literal v): _val(v), _type(v.type()) {}
   Expression(Expression const &) = default;
 
   bool hasSlot() const   { return std::holds_alternative<SlotProxy>(_val); }
@@ -38,8 +38,8 @@ public:
   types::TypeHandle type() const { return _type; }
 
   std::string str() const {
-    if (hasSlot()) return slot()->name();
-    return literal()->str();
+    if (hasSlot()) return slot().name();
+    return literal().str();
   }
 };
 

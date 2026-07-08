@@ -8,8 +8,8 @@
 
 namespace acus::proxy {
 
-  impl::Direct::Direct(Slot const &slot):
-    Base(slot.type),
+  impl::Direct::Direct(Slot slot):
+    Base(slot.type()),
     _slot(slot)
   {} 
 
@@ -29,7 +29,7 @@ namespace acus::proxy {
     return _slot;
   }
 
-  void impl::Direct::materialize(Assembler &, Slot const &) const {
+  void impl::Direct::materialize(Assembler &, Slot ) const {
     assert(false && "trying to materialize a direct proxy into another slot");
   }
   
@@ -54,11 +54,11 @@ namespace acus::proxy {
   }
 
   std::string impl::Direct::name() const {
-    return _slot.name;
+    return _slot.name();
   }
 
   std::string impl::Direct::uniqueName() const {
-    return _slot.uniqueName;
+    return _slot.uniqueName();
   }
 
   std::optional<SlotProxy> impl::Direct::enclosingProxy() const {

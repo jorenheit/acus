@@ -49,7 +49,7 @@ void Assembler::callFunctionImpl(std::string const &functionName, std::optional<
   beginBlock(nextBlockName);
 }
 
-void Assembler::callFunctionImpl(Expression const &fPtr, std::optional<Expression> const &returnSlot,
+void Assembler::callFunctionImpl(Expression fPtr, std::optional<Expression> const &returnSlot,
 				 std::vector<Expression> const &args, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
@@ -171,19 +171,21 @@ void Assembler::returnFromFunctionImpl(std::optional<Expression> const &ret, API
   if (ret) {
     API_REQUIRE_ASSIGNABLE(_currentFunction->type->returnType(), ret->type());
 
-    // Copy the variable into the return-slot. TODO: non-globals can be moved rather than copied
-    Slot returnSlot = {
-      .name = "__return_slot",
-      .type = ret->type(),
-      .kind = Slot::Dummy,
-      .offset = FrameLayout::ReturnValueStart,
-      .scope = nullptr
+    // Copy the variable into the return-slot. 
+    auto returnSlot = Slot {
+      SlotData {
+	.name = "__return_slot",
+	.type = ret->type(),
+	.kind = Slot::Dummy,
+	.offset = FrameLayout::ReturnValueStart,
+	.scope = nullptr
+      },
+      false
     };
-    
-    assignImpl(Expression{returnSlot}, *ret, API_FWD);
+      
+    assignImpl(Expression{returnSlot}, *ret, true, API_FWD);
   }
   
-  //  syncLocalToGlobal();
   _cache.returnBoundary();
   popFrame();
 
@@ -195,8 +197,9 @@ void Assembler::returnFromFunctionImpl(std::optional<Expression> const &ret, API
 void Assembler::initializeArguments(primitive::DInt const currentFrameSize, primitive::DInt const paramStart,
 				  std::vector<Expression> const &args, API_CTX) {
 
-  auto const copySlotToNextFrame = [&](Slot const &slot, int &offset) {
-    for (int i = 0; i != slot.type->size(); ++i) {
+  auto const copySlotToNextFrame = [&](Slot slot, int &offset) {
+    assert(slot.kind() != Slot::Temp);
+    for (int i = 0; i != slot.type()->size(); ++i) {
       int const varIndex0 = getFieldIndex(slot + i, MacroCell::Value0);
       primitive::DInt const paramIndex0 = currentFrameSize + paramStart + offset + MacroCell::Value0;
       primitive::DInt const scratchIndex = paramIndex0 + (MacroCell::Scratch0 - MacroCell::Value0);
@@ -204,7 +207,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
       moveTo(slot + i, MacroCell::Value0);
       emit<primitive::CopyData>(varIndex0, paramIndex0, scratchIndex);
       moveTo(slot + i, MacroCell::Value1);
-      if (slot.type->usesValue1()) {
+      if (slot.type()->usesValue1()) {
 	int const varIndex1 = getFieldIndex(slot + i, MacroCell::Value1);
 	primitive::DInt const paramIndex1 = currentFrameSize + paramStart + offset + MacroCell::Value1;
 	emit<primitive::CopyData>(varIndex1, paramIndex1, scratchIndex);
@@ -216,24 +219,49 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     }
   };
 
+  auto const moveSlotToNextFrame = [&](Slot slot, int &offset) {
+    assert(slot.kind() == Slot::Temp);
+    for (int i = 0; i != slot.type()->size(); ++i) {
+      int const varIndex0 = getFieldIndex(slot + i, MacroCell::Value0);
+      primitive::DInt const paramIndex0 = currentFrameSize + paramStart + offset + MacroCell::Value0;
+
+      moveTo(slot + i, MacroCell::Value0);
+      emit<primitive::MoveData>(varIndex0, paramIndex0);
+      moveTo(slot + i, MacroCell::Value1);
+      if (slot.type()->usesValue1()) {
+	int const varIndex1 = getFieldIndex(slot + i, MacroCell::Value1);
+	primitive::DInt const paramIndex1 = currentFrameSize + paramStart + offset + MacroCell::Value1;
+	emit<primitive::MoveData>(varIndex1, paramIndex1);
+      }
+      else {
+	emit<primitive::ZeroCell>();
+      }
+      offset += MacroCell::FieldCount;
+    }
+  };
+
+  auto const copyOrMoveSlotToNextFrame = [&](Slot slot, int &offset) {
+    if (slot.kind() == Slot::Temp) moveSlotToNextFrame(slot, offset);
+    else copySlotToNextFrame(slot, offset);
+  };
 
   auto const constructInNextFrame = [&](auto&& self, int &offset, Expression const &arg) -> void {
 
     if (arg.hasSlot()) { // Already stored on tape -> copy to next frame
       Slot const argSlot = materialize(arg.slot());
-      switch (argSlot.type->tag()) {
+      switch (argSlot.type()->tag()) {
       case types::U8:
       case types::U16:
       case types::S8:
       case types::S16:
       case types::STRING:
       case types::FUNCTION_POINTER: {
-	copySlotToNextFrame(argSlot, offset);
+	copyOrMoveSlotToNextFrame(argSlot, offset);
 	break;
       }
       case types::POINTER: {
 	int const destOffset = offset;
-	copySlotToNextFrame(argSlot, offset);
+	copyOrMoveSlotToNextFrame(argSlot, offset);
 	primitive::DInt const distance = currentFrameSize + paramStart + destOffset + MacroCell::Value0;
 	moveTo(0, MacroCell::Value0);
 	emit<primitive::MovePointerRelative>(distance);
@@ -242,29 +270,35 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
 	break;
       }	
       case types::ARRAY: {
-	auto arrayType = types::cast<types::ArrayType>(argSlot.type);
+	auto arrayType = types::cast<types::ArrayType>(argSlot.type());
 	auto elementType = arrayType->elementType();
 	
 	for (int i = 0; i != arrayType->length(); ++i) {
-	  Slot const elementSlot {
-	    .name = "dummy",
-	    .type = elementType,
-	    .kind = Slot::Dummy,
-	    .offset = argSlot.offset + i * elementType->size()
+	  auto const elementSlot = Slot {
+	    SlotData {
+	      .name = "dummy",
+	      .type = elementType,
+	      .kind = Slot::Dummy,
+	      .offset = argSlot + i * elementType->size()
+	    },
+	    false
 	  };
 	  self(self, offset, rValue(elementSlot, API_FWD));
 	}
 	break;
       }
       case types::STRUCT: {
-	auto structType = types::cast<types::StructType>(argSlot.type);
+	auto structType = types::cast<types::StructType>(argSlot.type());
 	for (int i = 0; i != structType->fieldCount(); ++i) {
 	  auto fieldType = structType->fieldType(i);
-	  Slot const fieldSlot {
-	    .name = "dummy",
-	    .type = fieldType,
-	    .kind = Slot::Dummy,
-	    .offset = argSlot.offset + structType->fieldOffset(i)
+	  auto const fieldSlot = Slot {
+	    SlotData {
+	      .name = "dummy",
+	      .type = fieldType,
+	      .kind = Slot::Dummy,
+	      .offset = argSlot + structType->fieldOffset(i)
+	    },
+	    false
 	  };
 	  self(self, offset, rValue(fieldSlot, API_FWD));
 	}
@@ -323,7 +357,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
       case types::POINTER: {
 	assert(false && "there should not be anonymous pointers"); 
       }
-      default: assert(false && "passing this type as arg is not supported yet"); 
+      default: assert(false && "passing this type as arg is not supported"); 
       }
     }
   };
@@ -358,7 +392,7 @@ void Assembler::prepareNextFrame(std::string const &functionName, std::vector<Ex
   emit<primitive::MovePointerRelative>(-currentFrameSize);
 }
 
-void Assembler::prepareNextFrame(Expression const &fptr, std::vector<Expression> const &args, API_CTX) {
+void Assembler::prepareNextFrame(Expression fptr, std::vector<Expression> const &args, API_CTX) {
 
   auto functionPointerType = types::cast<types::FunctionPointerType>(fptr.type());
   auto functionType = types::cast<types::FunctionType>(functionPointerType->functionType());
@@ -374,7 +408,7 @@ void Assembler::prepareNextFrame(Expression const &fptr, std::vector<Expression>
   
   
   // Set target block
-  Slot const fptrSlot = [&] {
+  Slot fptrSlot = [&] {
     if (fptr.hasSlot()) return materialize(fptr.slot());
     return getTemp(fptr.literal());
   }();
@@ -392,7 +426,7 @@ void Assembler::prepareNextFrame(Expression const &fptr, std::vector<Expression>
   emit<primitive::CopyData>(sourceCell1, targetCell1, scratchCell);
   popPtr();
 
-  if (fptrSlot.kind == Slot::Temp) freeTempSlot(fptrSlot);
+  if (fptrSlot.kind() == Slot::Temp) freeTempSlot(fptrSlot);
 }
 
 
@@ -419,14 +453,14 @@ void Assembler::fetchReturnData() {
 
 
 
-void Assembler::fetchReturnData(Slot const &returnSlot) {
+void Assembler::fetchReturnData(Slot returnSlot) {
 
   primitive::DInt const stackFrameSize = [caller = _currentFunction->name](primitive::Context const &ctx) -> int {
     return ctx.getStackFrameSize(caller) * MacroCell::FieldCount;
   };
 
   pushPtr();
-  for (int i = 0; i != returnSlot.type->size(); ++i) {
+  for (int i = 0; i != returnSlot.type()->size(); ++i) {
     primitive::DInt const diff = stackFrameSize - (returnSlot - FrameLayout::ReturnValueStart) * MacroCell::FieldCount;
     
     moveTo(returnSlot + i, MacroCell::Value0);
@@ -434,7 +468,7 @@ void Assembler::fetchReturnData(Slot const &returnSlot) {
     emit<primitive::MoveData>(-diff);
     emit<primitive::MovePointerRelative>(-diff);
 
-    if (returnSlot.type->usesValue1()) {
+    if (returnSlot.type()->usesValue1()) {
       moveTo(returnSlot + i, MacroCell::Value1);
       emit<primitive::MovePointerRelative>(diff);
       emit<primitive::MoveData>(-diff);
@@ -446,14 +480,14 @@ void Assembler::fetchReturnData(Slot const &returnSlot) {
 }
 
 
-void Assembler::branchIfSlot(Slot const &slot, std::string const &trueLabel, std::string const &falseLabel) {
+void Assembler::branchIfSlot(Slot slot, std::string const &trueLabel, std::string const &falseLabel) {
 
   pushPtr();
 
-  Slot const tmp = getTemp(ts::u8());
+  Slot tmp = getTemp(ts::u8());
     
   moveTo(slot);
-  if (slot.type->usesValue1()) {
+  if (slot.type()->usesValue1()) {
     orConstructive(Cell{tmp, MacroCell::Value0},
 		   Cell{slot, MacroCell::Value1},
 		   Temps<2>::select(tmp, MacroCell::Scratch0,

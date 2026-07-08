@@ -10,14 +10,14 @@ void Assembler::binOpAssignSlot(Slot const lhs, Slot const rhs) {
 
  pushPtr();
 
- auto const [targetSlot, operandSlot, freeOperandSlot] = [&] -> std::tuple<Slot, Slot, bool> {
-   if (not types::isPointer(lhs.type)) return {lhs, rhs, false};
+ auto [targetSlot, operandSlot, freeOperandSlot] = [&] -> std::tuple<Slot, Slot, bool> {
+   if (not types::isPointer(lhs.type())) return {lhs, rhs, false};
    assert(Operator::opType() == BinOp::Add || Operator::opType() == BinOp::Sub);     
    Slot const targetSlot = lhs.sub(ts::u16(), RuntimePointer::Offset);
-   int const stride = types::cast<types::PointerType>(lhs.type)->pointeeType()->size();
+   int const stride = types::cast<types::PointerType>(lhs.type())->pointeeType()->size();
    if (stride == 1) return {targetSlot, rhs, false};
 
-   Slot const copy = getTemp(rhs.type);
+   Slot const copy = getTemp(rhs.type());
    assignSlot(copy, rhs);
    mulSlotByConst(copy, stride);
    return {targetSlot, copy, true};
@@ -35,13 +35,13 @@ void Assembler::binOpAssignConst(Slot const lhs, literal::Literal const rhs) {
 
   pushPtr();
   auto const [targetSlot, operandVal] = [&] -> std::tuple<Slot, int> {
-    assert(types::isInteger(rhs->type()));
+    assert(types::isInteger(rhs.type()));
     int const rhsVal = literal::cast<types::IntegerType>(rhs)->semanticValue();
-    if (not types::isPointer(lhs.type)) return {lhs, rhsVal};
+    if (not types::isPointer(lhs.type())) return {lhs, rhsVal};
     assert(Operator::opType() == BinOp::Add || Operator::opType() == BinOp::Sub);     
 
     Slot const targetSlot = lhs.sub(ts::u16(), RuntimePointer::Offset);
-    int const stride = types::cast<types::PointerType>(lhs.type)->pointeeType()->size();
+    int const stride = types::cast<types::PointerType>(lhs.type())->pointeeType()->size();
     return {targetSlot, rhsVal * stride};
   }();
 
@@ -51,7 +51,7 @@ void Assembler::binOpAssignConst(Slot const lhs, literal::Literal const rhs) {
 
 
 template <typename Operator>
-Expression Assembler::binOpAssignImpl(Expression const &lhs, Expression const &rhs, API_CTX) {
+Expression Assembler::binOpAssignImpl(Expression lhs, Expression rhs, API_CTX) {
   assert(not lhs.isLiteral());
 
   API_CHECK_EXPECTED();
@@ -70,7 +70,7 @@ Expression Assembler::binOpAssignImpl(Expression const &lhs, Expression const &r
 }
 
 template <typename Operator>
-Expression Assembler::binOpImpl(Expression const &lhs, Expression const &rhs, API_CTX) {
+Expression Assembler::binOpImpl(Expression lhs, Expression rhs, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
@@ -94,18 +94,18 @@ Expression Assembler::binOpImpl(Expression const &lhs, Expression const &rhs, AP
   }
 
   Slot result = getTemp(opResult.workType);
-  assignImpl(Expression{result}, lhs, API_FWD);
+  assignImpl(Expression{result}, lhs, false, API_FWD);
   binOpAssignImpl<Operator>(Expression{result}, rhs, API_FWD);
 
-  result.type = opResult.type;
+  result.get().type = opResult.type;
   return Expression{result};
 }
 
 #define INSTANTIATE_FOR(op)						\
-  template Expression Assembler::binOpImpl<op>(Expression const&, Expression const &, API_CTX); \
-  template Expression Assembler::binOpAssignImpl<op>(Expression const&, Expression const &, API_CTX); \
-  template void Assembler::binOpAssignSlot<op>(Slot const lhs, Slot const rhs); \
-  template void Assembler::binOpAssignConst<op>(Slot const lhs, literal::Literal const rhs);
+  template Expression Assembler::binOpImpl<op>(Expression, Expression, API_CTX); \
+  template Expression Assembler::binOpAssignImpl<op>(Expression, Expression, API_CTX); \
+  template void Assembler::binOpAssignSlot<op>(Slot lhs, Slot rhs); \
+  template void Assembler::binOpAssignConst<op>(Slot lhs, literal::Literal rhs);
 
 INSTANTIATE_FOR(Assembler::Add);
 INSTANTIATE_FOR(Assembler::Sub);

@@ -71,7 +71,7 @@ struct Program {
   }
 
   inline int globalIndex(std::string const &name) const {
-    for (size_t i = 0; i != globals.size(); ++i) if (globals[i].name == name) return i;
+    for (size_t i = 0; i != globals.size(); ++i) if (globals[i].name() == name) return i;
     return -1;
   }
 

@@ -7,7 +7,7 @@
 
 // TODO: rename this file to assembler_io.cc
 
-void Assembler::readImpl(Expression const &rhs, API_CTX) {
+void Assembler::readImpl(Expression rhs, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE(rhs.type()->size() == 1,
@@ -15,37 +15,37 @@ void Assembler::readImpl(Expression const &rhs, API_CTX) {
 	      "input must be read into variable-type of size 1.");
   assert(not rhs.isLiteral());
 
-  _cache.write(rhs.slot(), [&](Slot const &dest){
+  _cache.write(rhs.slot(), [&](Slot dest){
     readSlot(dest);
   });
 }
 
-void Assembler::readSlot(Slot const &target) {
+void Assembler::readSlot(Slot target) {
   pushPtr();
   moveTo(target);
   emit<primitive::In>();
   popPtr();
 }
 
-void Assembler::writeImpl(Expression const &rhs, API_CTX) {
+void Assembler::writeImpl(Expression rhs, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  Slot const slot = [&] {
+  Slot slot = [&] {
     if (rhs.hasSlot()) return materialize(rhs.slot());
     return getTemp(rhs.literal());
   }();
 
   writeSlot(slot);
-  if (slot.kind == Slot::Temp) freeTempSlot(slot);
+  if (slot.kind() == Slot::Temp) freeTempSlot(slot);
 }
 
-void Assembler::writeSlot(Slot const &slot) {
+void Assembler::writeSlot(Slot slot) {
   pushPtr();
-  for (int i = 0; i != slot.type->size(); ++i) {
+  for (int i = 0; i != slot.type()->size(); ++i) {
     moveTo(slot + i, MacroCell::Value0);
     emit<primitive::Out>();
-    if (slot.type->usesValue1()) {
+    if (slot.type()->usesValue1()) {
       moveTo(slot + i, MacroCell::Value1);
       emit<primitive::Out>();
     }
@@ -53,7 +53,7 @@ void Assembler::writeSlot(Slot const &slot) {
   popPtr();
 }
 
-void Assembler::printImpl(Expression const &val, API_CTX) {
+void Assembler::printImpl(Expression val, API_CTX) {
   
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
@@ -86,7 +86,7 @@ void Assembler::printImpl(Expression const &val, API_CTX) {
   }
 }
 
-void Assembler::printDecimal(Expression const &expr) {
+void Assembler::printDecimal(Expression expr) {
   assert(types::isInteger(expr.type()));
   
   if (expr.hasSlot()) {
@@ -103,21 +103,21 @@ void Assembler::printDecimalConst(int value) {
   printStringConst(std::to_string(value));
 }
 
-void Assembler::printDecimalSlot(Slot const &slot) {
-  assert(types::isInteger(slot.type));
+void Assembler::printDecimalSlot(Slot slot) {
+  assert(types::isInteger(slot.type()));
 
-  if (types::isUnsignedInteger(slot.type)) return printDecimalSlotUnsigned(slot);
-  if (types::isSignedInteger(slot.type)) return printDecimalSlotSigned(slot);
+  if (types::isUnsignedInteger(slot.type())) return printDecimalSlotUnsigned(slot);
+  if (types::isSignedInteger(slot.type())) return printDecimalSlotSigned(slot);
   std::unreachable();
 }
 
-void Assembler::printDecimalSlotUnsigned(Slot const &slot, bool const destroySlot) {
-  assert(types::isUnsignedInteger(slot.type));
+void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
+  assert(types::isUnsignedInteger(slot.type()));
 
   bool freeValSlot = false;
-  Slot const valSlot = [&] {
+  Slot valSlot = [&] {
     if (destroySlot) return slot;
-    Slot const copy = getTemp(slot.type);
+    Slot const copy = getTemp(slot.type());
     assignSlot(copy, slot);
     freeValSlot = true;
     return copy;
@@ -126,9 +126,9 @@ void Assembler::printDecimalSlotUnsigned(Slot const &slot, bool const destroySlo
   pushPtr();
   
   // We can destroy the contents of valSlot while working on it.
-  int const maxDigits = valSlot.type->usesValue1() ? 5 : 3;
+  int const maxDigits = valSlot.type()->usesValue1() ? 5 : 3;
 	  
-  Slot const digits = getTemp(ts::raw(maxDigits));
+  Slot digits = getTemp(ts::raw(maxDigits));
   for (int i = 0; i != 5; ++i) {
     Slot const currentDigitSlot = digits.sub(ts::u8(), i);
     divSlotByConst(valSlot, 10, currentDigitSlot);
@@ -177,15 +177,15 @@ void Assembler::printDecimalSlotUnsigned(Slot const &slot, bool const destroySlo
   if (freeValSlot) freeTempSlot(valSlot);
 }
 
-void Assembler::printDecimalSlotSigned(Slot const &slot) {
-  assert(types::isSignedInteger(slot.type));
+void Assembler::printDecimalSlotSigned(Slot slot) {
+  assert(types::isSignedInteger(slot.type()));
 
-  Slot const valSlot = getTemp(slot.type);
+  Slot const valSlot = getTemp(slot.type());
   assignSlot(valSlot, slot);
   
   pushPtr();
   // Construct sign bit in the flag and use that to determine whether to print a - sign.
-  moveTo(valSlot, valSlot.type->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
+  moveTo(valSlot, valSlot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{valSlot, MacroCell::Flag},
 		      Temps<4>::select(valSlot, MacroCell::Scratch0,
 				       valSlot, MacroCell::Scratch1,
@@ -206,7 +206,7 @@ void Assembler::printDecimalSlotSigned(Slot const &slot) {
   // valSlot will already be freed
 }
 
-void Assembler::printString(Expression const &expr) {
+void Assembler::printString(Expression expr) {
   assert(types::isString(expr.type()));
   
   if (expr.hasSlot()) {
@@ -224,7 +224,7 @@ void Assembler::printStringConst(std::string const &str) {
 
   if (str.size() == 0) return;
   
-  Slot const ch = getTemp(ts::u8());
+  Slot ch = getTemp(ts::u8());
 
   pushPtr();
   moveTo(ch);
@@ -241,8 +241,8 @@ void Assembler::printStringConst(std::string const &str) {
   freeTempSlot(ch);
 }
  
-void Assembler::printStringSlot(Slot const &slot) {
-  assert(types::isString(slot.type));
+void Assembler::printStringSlot(Slot slot) {
+  assert(types::isString(slot.type()));
 
   pushPtr();
   moveTo(slot, MacroCell::Value0);

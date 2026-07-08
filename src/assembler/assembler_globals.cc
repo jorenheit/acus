@@ -6,13 +6,13 @@
 #include "assembler.ih"
 
 
-void Assembler::fetchGlobal(Slot const &globalSlot, Slot const &localSlot) {
-  assert(globalSlot.type == localSlot.type);
+void Assembler::fetchGlobal(Slot globalSlot, Slot localSlot) {
+  assert(globalSlot.type() == localSlot.type());
   assert(globalSlot.size() == localSlot.size());
 
   pushPtr();
-  int const size = globalSlot.type->size();
-  bool const useValue1 = globalSlot.type->usesValue1();
+  int const size = globalSlot.type()->size();
+  bool const useValue1 = globalSlot.type()->usesValue1();
 
   
   // Move to global frame 
@@ -55,11 +55,11 @@ void Assembler::fetchGlobal(Slot const &globalSlot, Slot const &localSlot) {
   popPtr();
 }
 
-void Assembler::putGlobal(Slot const &globalSlot, Slot const &localSlot) {
-  assert(globalSlot.type == localSlot.type);
+void Assembler::putGlobal(Slot globalSlot, Slot localSlot) {
+  assert(globalSlot.type() == localSlot.type());
 
-  bool const useValue1 = globalSlot.type->usesValue1();
-  int const size = globalSlot.type->size();
+  bool const useValue1 = globalSlot.type()->usesValue1();
+  int const size = globalSlot.type()->size();
 
   pushPtr();
 
@@ -102,8 +102,8 @@ void Assembler::putGlobal(Slot const &globalSlot, Slot const &localSlot) {
   popPtr();
 }
 
-void Assembler::putGlobal(Slot const &globalSlot, literal::Literal const value) {
-  assert(globalSlot.type == value->type());
+void Assembler::putGlobal(Slot globalSlot, literal::Literal const value) {
+  assert(globalSlot.type() == value.type());
 
   // Move to the global frame (no payload)
   pushPtr();  

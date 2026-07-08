@@ -5,12 +5,12 @@
 
 #include "assembler.ih"
 
-void Assembler::addSlotToSlot(Slot const &lhs, Slot const &rhs) {
+void Assembler::addSlotToSlot(Slot lhs, Slot rhs) {
   pushPtr();
-  Slot const rhsCopy = getTemp(rhs.type);
+  Slot rhsCopy = getTemp(rhs.type());
   assignSlot(rhsCopy, rhs);
   moveTo(lhs, MacroCell::Value0);
-  if (lhs.type->usesValue1() || rhs.type->usesValue1()) {
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     add16Destructive(Cell{lhs, MacroCell::Value1},
 		     Cell{rhsCopy, MacroCell::Value0},
 		     Cell{rhsCopy, MacroCell::Value1},
@@ -25,10 +25,10 @@ void Assembler::addSlotToSlot(Slot const &lhs, Slot const &rhs) {
   freeTempSlot(rhsCopy);
 }
 
-void Assembler::addConstToSlot(Slot const &lhs, int delta) {
+void Assembler::addConstToSlot(Slot lhs, int delta) {
   pushPtr();
   moveTo(lhs, MacroCell::Value0);    
-  (lhs.type->usesValue1())
+  (lhs.type()->usesValue1())
     ? add16Const(delta, Cell{lhs, MacroCell::Value1},
 		 Temps<4>::select(lhs, MacroCell::Scratch0,
 				  lhs, MacroCell::Scratch1,

@@ -5,31 +5,31 @@
 
 #include "assembler.ih"
 
-Expression Assembler::addressOfImpl(Expression const &obj, API_CTX) {
+Expression Assembler::addressOfImpl(Expression obj, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   assert(not obj.isLiteral());
   
-  if (obj.slot()->directAbsolute()) {
+  if (obj.slot().directAbsolute()) {
     Slot const slot = materialize(obj.slot());
-    API_REQUIRE(slot.kind != Slot::Temp,
+    API_REQUIRE(slot.kind() != Slot::Temp,
 		error::ErrorCode::TakingAddressOfTemporary,
 		"Cannot take the address of a temporary value.");
   }
   
-  return Expression(obj.slot()->addressOf(*this));
+  return Expression(obj.slot().addressOf(*this));
 }
 
-Slot Assembler::addressOfSlot(Slot const &pointeeSlot) {
-  assert(pointeeSlot.kind != Slot::Temp && "taking address of temp");
-  assert(pointeeSlot.kind != Slot::Cache && "taking address of cache");
+Slot Assembler::addressOfSlot(Slot pointeeSlot) {
+  assert(pointeeSlot.kind() != Slot::Temp && "taking address of temp");
+  assert(pointeeSlot.kind() != Slot::Cache && "taking address of cache");
 
-  types::TypeHandle const pointeeType = pointeeSlot.type;
+  types::TypeHandle const pointeeType = pointeeSlot.type();
   types::TypeHandle const pointerType = ts::pointer(pointeeType);
 
   // Set frame-depth to 0 for a local pointer, FrameID for a global pointer
   Slot const ptrSlot = getTemp(pointerType);
-  if (pointeeSlot.kind == Slot::Kind::Global) {
+  if (pointeeSlot.kind() == SlotData::Kind::Global) {
     moveTo(0, MacroCell::FrameMarker);
     copyField(Cell{ptrSlot + RuntimePointer::FrameDepth, MacroCell::Value0},
 	      Temps<1>::select(ptrSlot + RuntimePointer::FrameDepth, MacroCell::Scratch0));
@@ -39,7 +39,7 @@ Slot Assembler::addressOfSlot(Slot const &pointeeSlot) {
   }
 
   // Construct offset in second cell
-  int const offset = pointeeSlot.offset;  
+  int const offset = pointeeSlot.offset();  
   moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value0);
   setToValue(offset & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
   moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value1);
@@ -48,11 +48,11 @@ Slot Assembler::addressOfSlot(Slot const &pointeeSlot) {
   return ptrSlot;
 }
 
-void Assembler::copyElementIntoSlot(Slot const &elementSlot, Slot const &arrSlot, Slot const &indexSlot) {
-  assert(types::isArrayLike(arrSlot.type));
-  assert(types::isInteger(indexSlot.type));
-  assert(elementSlot.type == types::cast<types::ArrayLike>(arrSlot.type)->elementType());
-  types::TypeHandle elementType = elementSlot.type;
+void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot) {
+  assert(types::isArrayLike(arrSlot.type()));
+  assert(types::isInteger(indexSlot.type()));
+  assert(elementSlot.type() == types::cast<types::ArrayLike>(arrSlot.type())->elementType());
+  types::TypeHandle elementType = elementSlot.type();
   
   pushPtr();
 
@@ -90,12 +90,12 @@ void Assembler::copyElementIntoSlot(Slot const &elementSlot, Slot const &arrSlot
 
 }
 
-void Assembler::copySlotIntoElement(Slot const &srcSlot, Slot const &arrSlot, Slot const &indexSlot) {
-  assert(types::isArrayLike(arrSlot.type));
-  assert(types::isInteger(indexSlot.type));
+void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot) {
+  assert(types::isArrayLike(arrSlot.type()));
+  assert(types::isInteger(indexSlot.type()));
 
-  types::TypeHandle elementType = types::cast<types::ArrayLike>(arrSlot.type)->elementType();
-  assert(srcSlot.type == elementType);
+  types::TypeHandle elementType = types::cast<types::ArrayLike>(arrSlot.type())->elementType();
+  assert(srcSlot.type() == elementType);
 
   pushPtr();
 
@@ -167,12 +167,12 @@ void Assembler::copySlotIntoElement(Slot const &srcSlot, Slot const &arrSlot, Sl
   popPtr();
 }
 
-void Assembler::copyConstIntoElement(literal::Literal const value, Slot const &arrSlot, Slot const &indexSlot) {
-  assert(types::isArrayLike(arrSlot.type));
-  assert(types::isInteger(indexSlot.type));
+void Assembler::copyConstIntoElement(literal::Literal const value, Slot arrSlot, Slot indexSlot) {
+  assert(types::isArrayLike(arrSlot.type()));
+  assert(types::isInteger(indexSlot.type()));
 
-  types::TypeHandle elementType = types::cast<types::ArrayLike>(arrSlot.type)->elementType();
-  assert(value->type() == elementType);
+  types::TypeHandle elementType = types::cast<types::ArrayLike>(arrSlot.type())->elementType();
+  assert(value.type() == elementType);
 
   pushPtr();
 
@@ -195,10 +195,13 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot const &a
 
   // Rebase the datapointer and use assign the constant value to the slot
   _dp.set(0);
-  Slot const elementSlot {
-    .type = elementType,
-    .kind = Slot::Kind::Dummy,
-    .offset = 0
+  auto const elementSlot = Slot {
+    SlotData { 
+      .type = elementType,
+      .kind = SlotData::Kind::Dummy,
+      .offset = 0
+    },
+    false
   };
   assignSlot(elementSlot, value);
 
@@ -209,13 +212,13 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot const &a
   popPtr();
 }
 
-void Assembler::assignIntegerSlot(Slot const &dest, Slot const &src) {
-  assert(types::isInteger(dest.type));
-  assert(types::isInteger(src.type));
-  if (dest == src) return;
+void Assembler::assignIntegerSlot(Slot dest, Slot src) {
+  assert(types::isInteger(dest.type()));
+  assert(types::isInteger(src.type()));
+  assert(dest != src);
 
-  auto destInt = types::cast<types::IntegerType>(dest.type);
-  auto srcInt  = types::cast<types::IntegerType>(src.type);  
+  auto destInt = types::cast<types::IntegerType>(dest.type());
+  auto srcInt  = types::cast<types::IntegerType>(src.type());  
 
   if (destInt->bits() == srcInt->bits()) return assignSlotBytewise(dest, src);
 
@@ -253,18 +256,23 @@ void Assembler::assignIntegerSlot(Slot const &dest, Slot const &src) {
   popPtr();
 }
 
-void Assembler::assignSlot(Slot const &dest, Slot const &src) {
+void Assembler::assignSlot(Slot dest, Slot src) {
   if (dest == src) return;
-  if (types::isInteger(dest.type) && types::isInteger(src.type))
+  if (_state.allowTempAssign && src.kind() == Slot::Temp && dest.size() >= src.size()) {
+    moveSlotBytewise(dest, src);
+    return;
+  }
+  
+  if (types::isInteger(dest.type()) && types::isInteger(src.type()))
     return assignIntegerSlot(dest, src);
 
   return assignSlotBytewise(dest, src);
 }
 
 
-void Assembler::assignSlotBytewise(Slot const &dest, Slot const &src) {
+void Assembler::assignSlotBytewise(Slot dest, Slot src) {
+  assert(dest != src);
   assert(dest.size() >= src.size());
-  if (dest == src) return;
 
   // Direct copy all of the cells
   pushPtr();  
@@ -273,7 +281,7 @@ void Assembler::assignSlotBytewise(Slot const &dest, Slot const &src) {
     copyField(Cell{dest + i, MacroCell::Value0},
 	      Temps<1>::select(dest + i, MacroCell::Scratch0));
     moveTo(src + i, MacroCell::Value1);
-    if (src.type->usesValue1()) {
+    if (src.type()->usesValue1()) {
       copyField(Cell{dest + i, MacroCell::Value1},
 		Temps<1>::select(dest + i, MacroCell::Scratch0));
     }
@@ -285,47 +293,67 @@ void Assembler::assignSlotBytewise(Slot const &dest, Slot const &src) {
 
 }
 
-void Assembler::assignSlot(Slot const &slot, literal::Literal const &val) {
+void Assembler::moveSlotBytewise(Slot dest, Slot src) {
+  assert(dest != src);
+  assert(dest.size() >= src.size());
+
+  pushPtr();  
+  for (int i = 0; i != dest.size(); ++i) {
+    moveTo(src + i, MacroCell::Value0);
+    moveField(Cell{dest + i, MacroCell::Value0});
+    moveTo(src + i, MacroCell::Value1);
+    if (src.type()->usesValue1()) {
+      moveField(Cell{dest + i, MacroCell::Value1});
+    }
+    else {
+      setToValue(0);
+    }
+  }
+  popPtr();
+}
+
+
+void Assembler::assignSlot(Slot slot, literal::Literal val) {
   pushPtr();
-  if (types::isInteger(slot.type)) {
+  if (types::isInteger(slot.type())) {
     int const x = literal::cast<types::IntegerType>(val)->encodedValue();
     moveTo(slot, MacroCell::Value0);
     setToValue(x & 0xff, Temps<1>::select(slot, MacroCell::Scratch0));
     moveTo(slot, MacroCell::Value1);    
-    if (slot.type->usesValue1()) {
+    if (slot.type()->usesValue1()) {
       setToValue((x >> 8) & 0xff, Temps<1>::select(slot, MacroCell::Scratch0));
     }
     else {
       zeroCell();
     }
   }
-  else if (types::isArray(slot.type) || types::isString(slot.type)) {
+  else if (types::isArray(slot.type()) || types::isString(slot.type())) {
     // recursive call for each element
-    auto const arrayType = types::cast<types::ArrayLike>(val->type());
+    auto const arrayType = types::cast<types::ArrayLike>(val.type());
     types::TypeHandle const elementType = arrayType->elementType();
     for (int i = 0; i != arrayType->length(); ++i) {
       size_t  const elementOffset = i * elementType->size();
       Slot    const elementSlot   = slot.sub(elementType, elementOffset);
       literal::Literal const elementVal    = literal::cast<types::ArrayLike>(val)->element(i);
 
-      assert(elementSlot.type == elementVal->type());
+      assert(elementSlot.type() == elementVal.type());
       assignSlot(elementSlot, elementVal);
     }
   }
-  else if (types::isStruct(slot.type)) {
+  else if (types::isStruct(slot.type())) {
     // recursive call for each field	
-    auto const structType = types::cast<types::StructType>(val->type());
+    auto const structType = types::cast<types::StructType>(val.type());
     for (int i = 0; i != structType->fieldCount(); ++i) {
       types::TypeHandle const fieldType   = structType->fieldType(i);
       size_t            const fieldOffset = structType->fieldOffset(i);
       Slot              const fieldSlot   = slot.sub(fieldType, fieldOffset);
       literal::Literal  const fieldVal    = literal::cast<types::StructType>(val)->field(i);
 
-      assert(fieldType == fieldVal->type());
+      assert(fieldType == fieldVal.type());
       assignSlot(fieldSlot, fieldVal);
     }
   }
-  else if (types::isFunctionPointer(slot.type)) {
+  else if (types::isFunctionPointer(slot.type())) {
     std::string const &functionName = literal::cast<types::FunctionPointerType>(val)->functionName();
 
     moveTo(slot, MacroCell::Value0); zeroCell();
@@ -345,21 +373,23 @@ void Assembler::assignSlot(Slot const &slot, literal::Literal const &val) {
 }
 
 
-Expression Assembler::assignImpl(Expression const &lhs, Expression const &rhs, API_CTX) {
+Expression Assembler::assignImpl(Expression lhs, Expression rhs, bool allowTempAssign, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_ASSIGNABLE(lhs.type(), rhs.type());
   assert(not lhs.isLiteral());
 
+  _state.allowTempAssign = true;
   SlotProxy const dest = lhs.slot();
   if (rhs.hasSlot()) _cache.write(dest, rhs.slot());
   else _cache.write(dest, rhs.literal());
+  _state.allowTempAssign = false;
   return lhs;
 }
 
 
-void Assembler::moveToPointee(Slot const &ptrSlot) {
-  assert(types::isPointer(ptrSlot.type));
+void Assembler::moveToPointee(Slot ptrSlot) {
+  assert(types::isPointer(ptrSlot.type()));
   // NOTE: this leaves the pointer in an unknown position. Leave a seekmarker before calling this
   
   // Decompose the pointer into its frameDepth and offset
@@ -403,9 +433,9 @@ void Assembler::moveToPointee(Slot const &ptrSlot) {
 }
 
 
-void Assembler::writeSlotThroughDereferencedPointer(Slot const &ptrSlot, Slot const &srcSlot) {
-  assert(types::isPointer(ptrSlot.type));
-  assert(srcSlot.type == types::cast<types::PointerType>(ptrSlot.type)->pointeeType());
+void Assembler::writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot) {
+  assert(types::isPointer(ptrSlot.type()));
+  assert(srcSlot.type() == types::cast<types::PointerType>(ptrSlot.type())->pointeeType());
 
   pushPtr();
   // Leave a marker at the end of the current frame to guarantee that the
@@ -426,7 +456,7 @@ void Assembler::writeSlotThroughDereferencedPointer(Slot const &ptrSlot, Slot co
     moveTo(srcSlot + i, MacroCell::Value0);
     copyField(Cell{endOfFrame + i, MacroCell::Payload0},
 	      Temps<1>::select(endOfFrame + i, MacroCell::Scratch0));
-    if (srcSlot.type->usesValue1()) {
+    if (srcSlot.type()->usesValue1()) {
       moveTo(srcSlot + i, MacroCell::Value1);
       copyField(Cell{endOfFrame + i, MacroCell::Payload1},
 		Temps<1>::select(endOfFrame + i, MacroCell::Scratch0));
@@ -437,7 +467,7 @@ void Assembler::writeSlotThroughDereferencedPointer(Slot const &ptrSlot, Slot co
   moveTo(endOfFrame);
   Payload payload{
     srcSlot.size(),
-    srcSlot.type->usesValue1() ? Payload::Width::Double : Payload::Width::Single
+    srcSlot.type()->usesValue1() ? Payload::Width::Double : Payload::Width::Single
   };
   
   seek(MacroCell::SeekMarker, primitive::Left, payload, false);
@@ -448,7 +478,7 @@ void Assembler::writeSlotThroughDereferencedPointer(Slot const &ptrSlot, Slot co
   for (int i = 0; i != srcSlot.size(); ++i) {
     moveTo(i, MacroCell::Payload0);
     moveField(Cell{i, MacroCell::Value0});
-    if (srcSlot.type->usesValue1()) {
+    if (srcSlot.type()->usesValue1()) {
       moveTo(i, MacroCell::Payload1);
       moveField(Cell{i, MacroCell::Value1});
     }
@@ -462,9 +492,9 @@ void Assembler::writeSlotThroughDereferencedPointer(Slot const &ptrSlot, Slot co
 }
 
 
-void Assembler::writeConstThroughDereferencedPointer(Slot const &ptrSlot, literal::Literal const value) {
-  assert(types::isPointer(ptrSlot.type));
-  assert(value->type() == types::cast<types::PointerType>(ptrSlot.type)->pointeeType());
+void Assembler::writeConstThroughDereferencedPointer(Slot ptrSlot, literal::Literal const value) {
+  assert(types::isPointer(ptrSlot.type()));
+  assert(value.type() == types::cast<types::PointerType>(ptrSlot.type())->pointeeType());
 
   pushPtr();
   
@@ -474,10 +504,13 @@ void Assembler::writeConstThroughDereferencedPointer(Slot const &ptrSlot, litera
   moveToPointee(ptrSlot);
 
   _dp.set(0);
-  Slot const pointeeSlot {
-    .type = value->type(),
-    .kind = Slot::Kind::Dummy,
-    .offset = 0
+  auto const pointeeSlot = Slot {
+    SlotData {
+      .type = value.type(),
+      .kind = SlotData::Kind::Dummy,
+      .offset = 0
+    },
+    false
   };
   assignSlot(pointeeSlot, value);
   
@@ -489,9 +522,9 @@ void Assembler::writeConstThroughDereferencedPointer(Slot const &ptrSlot, litera
 }
 
 
-void Assembler::dereferencePointerIntoSlot(Slot const &ptrSlot, Slot const &derefSlot) {
-  assert(types::isPointer(ptrSlot.type));
-  assert(derefSlot.type == types::cast<types::PointerType>(ptrSlot.type)->pointeeType());
+void Assembler::dereferencePointerIntoSlot(Slot ptrSlot, Slot derefSlot) {
+  assert(types::isPointer(ptrSlot.type()));
+  assert(derefSlot.type() == types::cast<types::PointerType>(ptrSlot.type())->pointeeType());
 
   pushPtr();
 
@@ -506,7 +539,7 @@ void Assembler::dereferencePointerIntoSlot(Slot const &ptrSlot, Slot const &dere
   for (int i = 0; i != derefSlot.size(); ++i) {
     moveTo(i, MacroCell::Value0);
     copyField(Cell{i, MacroCell::Payload0}, Temps<1>::select(i, MacroCell::Scratch0));
-    if (derefSlot.type->usesValue1()) {
+    if (derefSlot.type()->usesValue1()) {
       moveTo(i, MacroCell::Value1);    
       copyField(Cell{i, MacroCell::Payload1}, Temps<1>::select(i, MacroCell::Scratch0));
     }
@@ -519,7 +552,7 @@ void Assembler::dereferencePointerIntoSlot(Slot const &ptrSlot, Slot const &dere
 
   Payload payload {
     derefSlot.size(),
-    derefSlot.type->usesValue1() ? Payload::Width::Double : Payload::Width::Single
+    derefSlot.type()->usesValue1() ? Payload::Width::Double : Payload::Width::Single
   };
 
   seek(MacroCell::FrameMarker, primitive::Left, payload, false);
@@ -533,7 +566,7 @@ void Assembler::dereferencePointerIntoSlot(Slot const &ptrSlot, Slot const &dere
   for (int i = 0; i != derefSlot.size(); ++i) {
     moveTo(derefSlot + i, MacroCell::Payload0);
     moveField(Cell{derefSlot + i, MacroCell::Value0});
-    if (derefSlot.type->usesValue1()) {
+    if (derefSlot.type()->usesValue1()) {
       moveTo(derefSlot + i, MacroCell::Payload1);    
       moveField(Cell{derefSlot + i, MacroCell::Value1});
     } else {

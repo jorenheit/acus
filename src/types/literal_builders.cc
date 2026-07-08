@@ -24,7 +24,9 @@ namespace acus::literal {
   Literal StructLiteralBuilder::done() {
     BuilderBase::check();
     _finalized.done();
-    return std::make_shared<impl::structT>(_structType, _fields, API_FWD);
+    return Literal {
+      std::make_shared<impl::structT>(_structType, _fields, API_FWD)
+    };
   }
 
   StructLiteralBuilder::StructLiteralBuilder(types::TypeHandle structType, api::impl::Context const &ctx):
@@ -37,7 +39,7 @@ namespace acus::literal {
     API_REQUIRE(_elements.size() < _length,
 		error::ErrorCode::TooManyElementsInArrayInitialization,
 		"too many elements for this array-type.");
-    API_EXPECT_TYPE(value->type(), _elementType);
+    API_EXPECT_TYPE(value.type(), _elementType);
     _elements.push_back(value);
     return *this;
   }
@@ -53,7 +55,9 @@ namespace acus::literal {
 		error::ErrorCode::TooFewElementsInArrayInitialization,
 		"too few elements for this array-type.");
     _finalized.done();
-    return std::make_shared<impl::array>(_elementType, _elements, API_FWD);
+    return Literal{
+       std::make_shared<impl::array>(_elementType, _elements, API_FWD)
+    };
   }
 
   ArrayLiteralBuilder::ArrayLiteralBuilder(types::TypeHandle arrayType, api::impl::Context const &ctx):
