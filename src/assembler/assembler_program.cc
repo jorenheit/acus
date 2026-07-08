@@ -157,7 +157,9 @@ void Assembler::endScope(API_FUNC) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  _cache.controlBoundary();
+  // TODO: should this actually be a cache boundary?
+  // Rather, cache entries should not be scoped?
+  _cache.internalBoundary();
   freeScope(_currentScope);
   _currentScope = _currentScope->parent;
 }

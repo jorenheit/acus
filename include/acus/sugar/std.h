@@ -17,44 +17,68 @@ namespace acus::sugar::io {
   
   void read(Expr const &expr, SUGAR_FUNC);
 
-
+  
   template <size_t MaxSize>
-  Expr readLine(Expr const &result) {
-
-    __assembler.scope().begin();
-    {
-      auto i = (let<u8>("i") = 0);
-      while_(i < MaxSize) {
-	auto elem = result[i];
-	read(elem);
-	if_(elem == '\n') { break_; };
-	++i;
-      };
-      result[i] = 0;
+  struct ReadLine {
+    static Expr operator()(Expr const &result) {
+      __assembler.scope().begin();
+      {
+	auto i = (let<u8>("i") = 0);
+	while_(i < MaxSize) {
+	  read(result[i]);
+	  if_(result[i++] == '\n') { break_; };
+	};
+	result[i - 1] = 0;
+      }
+      __assembler.endScope();
+      return result;
     }
-    __assembler.endScope();
-    return result;
+    
+    static Expr operator()() {
+      auto result = let<string<MaxSize>>(impl::nextVarName());
+      return ReadLine<MaxSize>::operator()(result);
+    }
+
+    static auto outline(std::string const &name = "readLine", SUGAR_FUNC) {
+      return function_<string<MaxSize>()>(name) | define {
+	return__(ReadLine<MaxSize>::operator()(), LOC_FWD);
+      };
+    }
   };
 
   template <size_t MaxSize>
-  Expr readLine() {
+  ReadLine<MaxSize> readLine{};
 
-    auto result = let<string<MaxSize>>(impl::nextVarName());
-    __assembler.scope().begin();
-    {
-      auto i = (let<u8>("i") = 0);
-      while_(i < MaxSize) {
-	auto elem = result[i];
-	read(elem);
-	if_(elem == '\n') { break_; };
-	++i;
-      };
-      result[i] = 0;
+
+  template <typename IntType, size_t MaxSize> requires impl::IsSugarType<IntType>
+  struct StrLen {
+    
+    static Expr operator()(Expr const &str) {
+      assert(types::isString(str.get().type()));
+
+      std::string result = impl::nextVarName();
+      let<IntType>(result) = 0;
+      while_(str[var(result)++] != 0) { };
+      return var(result) - 1;
     }
-    __assembler.endScope();
-    return result;
+
+    static auto outline(std::string const &name = "strlen", SUGAR_FUNC) {
+      return function_<IntType(string<MaxSize>)>(name, "str") | define {
+	return__(StrLen<IntType, MaxSize>::operator()(var("str")));
+      };
+    }
+
   };
+
+
+  template <typename IntType = u8, size_t MaxSize = 64>
+  StrLen<IntType, MaxSize> strlen;
   
-  
-  
+  // Expr stringToInt(Expr const &str) {
+  //   assert(types::isString(str.get().type()));
+
+  //   let<u16>("base") = 1;
+  //   for_(let<u8>("i") = 0, var<"i"> != str.get().type()->size(), 
+    
+  // }
 }

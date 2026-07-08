@@ -17,6 +17,7 @@ namespace acus {
 // MacroCell
 // ============================================================
 
+  // TODO: restructure; scratch cells should be close to value cells
 struct MacroCell {
   enum Field {
     Value0,

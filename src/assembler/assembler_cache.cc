@@ -83,7 +83,7 @@ Assembler::Cache::Entry& Assembler::Cache::findOrCreateEntry(SlotProxy proxy, bo
 }
 
 Slot Assembler::Cache::materialize(SlotProxy proxy) {
-  if (not _flushing && not _aliasWriteMode && proxy->dependsOnDereferencedPointer()) {
+  if (proxy->dependsOnDereferencedPointer() && not _flushing && not _aliasWriteMode) {
     flushAndClearEntireCache();
   }
   
@@ -227,8 +227,19 @@ void Assembler::Cache::deleteMarkedEntries() {
   std::erase_if(_entries, [](EntryPtr const &entry){ return entry->markedForDelete; });
 }      
 
+void Assembler::Cache::flushAndClearEntireCacheExceptGlobals() {
+
+  for (auto const &entry: _entries) {
+    if (entry->parent == nullptr && entry->proxy->kind() != proxy::Kind::GlobalReference) {
+      flushAndDeleteSubtree(*entry, true);
+    }
+  }
+}
+
+
 void Assembler::Cache::flushAndClearEntireCache() {
 
+  // TODO: can this just call flushAndDeleteSubtree on all roots? Then assert entries are empty
   for (auto const &entry: _entries) {
     if (entry->parent == nullptr) {
       flushSubtree(*entry, true);
@@ -244,15 +255,22 @@ void Assembler::Cache::flushAndClearEntireCache() {
 }
 
 
-void Assembler::Cache::controlBoundary() {
-  // At control-flow boundaries, we flush the cache to make sure every path sees an up-to-date version of the slots.
+void Assembler::Cache::internalBoundary() {
+  // At internal control-flow boundaries, we don't need to synchronize globals
+  flushAndClearEntireCacheExceptGlobals();
+  //  flushAndClearEntireCache();
+}
+
+void Assembler::Cache::callBoundary() {
+  // At call boundaries, we flush the entire cache to make sure all aliased slots are in sync
   flushAndClearEntireCache();
 }
 
+
 void Assembler::Cache::returnBoundary() {
-  // When returning from a function, we only need to flush dirty global data. All local data
-  // (except for the return value) will be invalid anyway after the return. We only need
-  // to flush entries that might outlive this frame, i.e. global references and dereferenced pointers.
+  // When returning from a function, we only need to flush dirty global data. Invalidation is
+  // not necessary, since all local data (except for the return value) will be invalid anyway after the return.
+  // We only need to flush entries that might outlive this frame, i.e. global references and dereferenced pointers.
 
   // Find all cached entries (roots) that (could) refer to data outside this frame
   for (auto const &entry: _entries) {

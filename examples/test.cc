@@ -260,8 +260,7 @@ int main() try {
     function_<void()>("main") | define {
       print("Enter your name: ");
 
-      let<string<10>>("name") = io::readLine<10>();
-      auto name = var("name");
+      auto name = let<string<20>>("name") = io::readLine<10>();
 		      
       print("Hello, ");
       print(name);
@@ -272,9 +271,29 @@ int main() try {
     
   }
   endProgram();
+
+  program("echo");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto strlen = io::strlen<u8>.outline();
+    
+    function_<void()>("main") | define {
+      for (int i = 0; i != 10; ++i) {
+	//auto line = readLine();
+		auto line = io::readLine<20>();
+	println(line);
+	//println(strlen(line));
+	println(io::strlen<>(line));
+      }
+      
+      return_;
+    };
+    
+  }
+  endProgram();
   
   
-  std::cout << generateBrainfuck("io");
+  std::cout << generateBrainfuck("echo");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

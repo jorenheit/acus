@@ -231,7 +231,8 @@ namespace acus {
       void flushAndDeleteSubtree(Entry &root, bool const includeRoot);
       void flushEntryIfDirty(Entry &entry);
       void deleteMarkedEntries();
-      void invalidateDependencies(SlotProxy modifiedProxy);      
+      void invalidateDependencies(SlotProxy modifiedProxy);
+      void flushAndClearEntireCacheExceptGlobals();
       void flushAndClearEntireCache();
       void forEntireSubtree(SlotProxy root, auto&& action);
       void forEntireSubtree(Entry& root, bool const sortBeforeAction, auto&& action);      
@@ -246,7 +247,8 @@ namespace acus {
       void write(SlotProxy dest, literal::Literal src);
       void write(SlotProxy dest, std::function<void(Slot const &)> const &writeInto);
       
-      void controlBoundary();
+      void internalBoundary();
+      void callBoundary();
       void returnBoundary();
       void reset(); 
       bool empty() const; 

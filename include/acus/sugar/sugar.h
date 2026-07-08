@@ -37,7 +37,7 @@ namespace acus::sugar {
     Expr operator[](Expr const &index) const;    
     Expr &operator=(Expr const &other);
     Expr &operator++();
-    // TODO: post increment
+    Expr operator++(int);
     Expr &operator--();
     Expr operator-();
     Expr operator+();

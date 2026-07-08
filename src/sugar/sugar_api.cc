@@ -1,8 +1,14 @@
 #include "acus/sugar/sugar.h"
+#include "acus/sugar/std.h"
 
 namespace acus::sugar {
 
   Assembler __assembler;
+
+  namespace io {
+    
+  }
+  
 
   std::string generateBrainfuck(std::string const &programName, SUGAR_LOC) {
     return __assembler.brainfuck(programName);

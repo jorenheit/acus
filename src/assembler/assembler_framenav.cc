@@ -30,6 +30,7 @@ void Assembler::pushFrame() {
     return ctx.getStackFrameSize(caller) * MacroCell::FieldCount;
   };
 
+  // TODO: just set the frame-marker to 1. Don't need the frames to count up... right?
   moveTo(0, MacroCell::FrameMarker);
   emit<primitive::CopyData>(0, //getFieldIndex(0, MacroCell::FrameMarker),
 			    currentFrameSize,

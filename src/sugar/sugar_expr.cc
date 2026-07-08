@@ -55,6 +55,13 @@ namespace acus::sugar {
     return *this;
   }
 
+  Expr Expr::operator++(int) {
+    auto copy = Expr{__assembler.declareLocal(impl::nextVarName(), get().type())};
+    copy = *this;
+    __assembler.addAssign(get(), impl::toLiteral(1, get().type()), _loc);
+    return copy;
+  }
+  
   Expr &Expr::operator--() {
     __assembler.subAssign(get(), impl::toLiteral(1, get().type()), _loc);
     return *this;
