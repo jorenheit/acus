@@ -38,7 +38,6 @@ namespace acus {
   };
 
 
-
   class Slot {
     std::shared_ptr<SlotData> _slot;
     bool _managed;

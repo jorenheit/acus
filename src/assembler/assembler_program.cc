@@ -64,14 +64,14 @@ void Assembler::endProgram(API_FUNC) {
 
   setTargetSequence(&_program.bootstrap);
 
-  resetOrigin();
+  _dp.set(0, static_cast<MacroCell::Field>(0));
   switchField(MacroCell::SeekMarker);
   setToValue(1);
   switchField(MacroCell::FrameMarker);
   setToValue(1);
 
   moveTo(1 + _program.globalVariableFrameSize()); 
-  resetOrigin();
+  _dp.set(0);
   switchField(MacroCell::FrameMarker);
   setToValue(1);
 

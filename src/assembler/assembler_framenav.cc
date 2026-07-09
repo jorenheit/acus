@@ -5,10 +5,6 @@
 
 #include "assembler.ih"
 
-void Assembler::resetOrigin() {
-  _dp.set(0, static_cast<MacroCell::Field>(0));
-}
-
 void Assembler::pushPtr() {
   _ptrStack.push(_dp.current());
 }
@@ -30,14 +26,9 @@ void Assembler::pushFrame() {
     return ctx.getStackFrameSize(caller) * MacroCell::FieldCount;
   };
 
-  // TODO: just set the frame-marker to 1. Don't need the frames to count up... right?
   moveTo(0, MacroCell::FrameMarker);
-  emit<primitive::CopyData>(0, //getFieldIndex(0, MacroCell::FrameMarker),
-			    currentFrameSize,
-			    getFieldIndex(0, MacroCell::Scratch0));
-  
   emit<primitive::MovePointerRelative>(currentFrameSize);
-  inc();
+  setToValue(1);
   moveTo(FrameLayout::RunState, MacroCell::Value0);
   setToValue(1);
   moveToOrigin();
@@ -110,7 +101,6 @@ void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Pay
 		    Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
     switchField(MacroCell::Flag);
   } loopClose();
-  switchField(static_cast<MacroCell::Field>(0));
 }
 
 

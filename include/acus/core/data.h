@@ -17,21 +17,23 @@ namespace acus {
 // MacroCell
 // ============================================================
 
-  // TODO: restructure; scratch cells should be close to value cells
 struct MacroCell {
   enum Field {
+    FrameMarker,
+    SeekMarker,
     Value0,
     Value1,
-    FrameMarker,
-    Flag,
-    SeekMarker,
     Scratch0,
     Scratch1,
+    Flag,
     Payload0,
     Payload1,
     
     FieldCount
   };
+
+  static constexpr MacroCell::Field FirstField =
+    static_cast<MacroCell::Field>(0);
 };
 
 // ============================================================
@@ -69,8 +71,9 @@ public:
   int offset() const { return _current.offset; }
   
   void moveRelative(int logicalCells) { _current.offset += logicalCells; }
+  void set(int offset) { _current.offset = offset; }
   void set(MacroCell::Field field) { _current.field = field; }
-  void set(int offset, MacroCell::Field field = MacroCell::Value0) {
+  void set(int offset, MacroCell::Field field) { // = MacroCell::Value0) {
     _current.offset = offset;
     _current.field = field;
   }

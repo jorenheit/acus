@@ -25,7 +25,6 @@ void Assembler::beginBlock(std::string const &name) {
   // used as the conditional cell upon which it is decided whether or not to enter
   // the block.
   
-  resetOrigin();
   moveTo(FrameLayout::TargetBlock, MacroCell::Value0);
   compare16ToConstConstructive(/* value =    */ _currentBlock->globalBlockIndex,
 			       /* highByte = */ Cell{FrameLayout::TargetBlock, MacroCell::Value1},

@@ -56,7 +56,7 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   
   pushPtr();
 
-  Slot const scaledIndexSlot = getTemp(ts::u8());
+  Slot scaledIndexSlot = getTemp(ts::u8());
   assignSlot(scaledIndexSlot, indexSlot);
   moveTo(scaledIndexSlot, MacroCell::Value0);
   mulConst(elementType->size(),
@@ -86,6 +86,7 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   
   moveTo(arrSlot);
   resetSeekMarker();
+  freeTempSlot(scaledIndexSlot);
   popPtr();
 
 }
@@ -99,7 +100,7 @@ void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot) 
 
   pushPtr();
 
-  Slot const scaledIndexSlot = getTemp(ts::u8());
+  Slot scaledIndexSlot = getTemp(ts::u8());
   assignSlot(scaledIndexSlot, indexSlot);
   moveTo(scaledIndexSlot, MacroCell::Value0);
   mulConst(elementType->size(),
@@ -113,12 +114,13 @@ void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot) 
   setSeekMarker();
 
   // Plant another marker one (full element) beyond the start of the element we need
-  goToDynamicOffset(Cell{scaledIndexSlot, MacroCell::Value0},
-		    Cell{scaledIndexSlot, MacroCell::Value1});
+  moveToDynamicOffset(Cell{scaledIndexSlot, MacroCell::Value0},
+		      Cell{scaledIndexSlot, MacroCell::Value1});
 
   _dp.set(0);
   moveTo(elementType->size()); 
   setSeekMarker();
+  freeTempSlot(scaledIndexSlot);
   moveTo(0);
 
   // Move back to the start of the array
@@ -176,7 +178,7 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot arrSlot,
 
   pushPtr();
 
-  Slot const scaledIndexSlot = getTemp(ts::u8());
+  Slot scaledIndexSlot = getTemp(ts::u8());
   assignSlot(scaledIndexSlot, indexSlot);
   moveTo(scaledIndexSlot, MacroCell::Value0);
   mulConst(elementType->size(),
@@ -188,10 +190,11 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot arrSlot,
   // Plant a seek marker at the start of the array
   moveTo(arrSlot, MacroCell::Value0);
   setSeekMarker();
+  freeTempSlot(scaledIndexSlot);
 
   // Move to the element-slot
-  goToDynamicOffset(Cell{scaledIndexSlot, MacroCell::Value0},
-		    Cell{scaledIndexSlot, MacroCell::Value1});
+  moveToDynamicOffset(Cell{scaledIndexSlot, MacroCell::Value0},
+		      Cell{scaledIndexSlot, MacroCell::Value1});
 
   // Rebase the datapointer and use assign the constant value to the slot
   _dp.set(0);
@@ -258,7 +261,7 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src) {
 
 void Assembler::assignSlot(Slot dest, Slot src) {
   if (dest == src) return;
-  if (_state.allowTempAssign && src.kind() == Slot::Temp && dest.size() >= src.size()) {
+  if (_state.allowTempAssign && src.kind() == Slot::Temp && dest.type() == src.type()) {
     moveSlotBytewise(dest, src);
     return;
   }
@@ -379,11 +382,12 @@ Expression Assembler::assignImpl(Expression lhs, Expression rhs, bool allowTempA
   API_REQUIRE_ASSIGNABLE(lhs.type(), rhs.type());
   assert(not lhs.isLiteral());
 
-  _state.allowTempAssign = true;
+  bool const oldAllowTempAssign = _state.allowTempAssign;
+  _state.allowTempAssign = allowTempAssign;
   SlotProxy const dest = lhs.slot();
   if (rhs.hasSlot()) _cache.write(dest, rhs.slot());
   else _cache.write(dest, rhs.literal());
-  _state.allowTempAssign = false;
+  _state.allowTempAssign = oldAllowTempAssign;
   return lhs;
 }
 
@@ -429,7 +433,7 @@ void Assembler::moveToPointee(Slot ptrSlot) {
   } loopClose();
 
   // At the target frame -> move to offset indicated by pointer value in payload
-  goToDynamicOffset(offsetLowPayload, offsetHighPayload);
+  moveToDynamicOffset(offsetLowPayload, offsetHighPayload);
 }
 
 

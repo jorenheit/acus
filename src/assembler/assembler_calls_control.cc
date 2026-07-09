@@ -262,7 +262,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
       case types::POINTER: {
 	int const destOffset = offset;
 	copyOrMoveSlotToNextFrame(argSlot, offset);
-	primitive::DInt const distance = currentFrameSize + paramStart + destOffset + MacroCell::Value0;
+	primitive::DInt const distance = currentFrameSize + paramStart + destOffset;;
 	moveTo(0, MacroCell::Value0);
 	emit<primitive::MovePointerRelative>(distance);
 	inc();
@@ -346,6 +346,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
 	switchField(MacroCell::Value0);
 	emit<primitive::MovePointerRelative>(-diff);
 	offset += MacroCell::FieldCount;
+	break;
       }
       case types::ARRAY:
       case types::STRING: {

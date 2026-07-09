@@ -794,7 +794,7 @@ void Assembler::divMod16Destructive(Cell high, Cell denomLow, Cell denomHigh, Ce
   not16Constructive(numCopyHigh, zeroFlag, tmp.select<6, 7>());
   moveTo(zeroFlag);
   loopOpen(); {
-    moveTo(divResultLow);  zeroCell(); // TODO: should this be [+]? The only reason this isnt 0 is when div by zero was hit
+    moveTo(divResultLow);  zeroCellPlus();
     moveTo(divResultHigh); zeroCell();
     moveTo(loopFlag);      setToValue(0);
     moveTo(zeroFlag);      zeroCell();

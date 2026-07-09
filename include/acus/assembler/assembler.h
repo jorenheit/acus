@@ -235,8 +235,8 @@ namespace acus {
       void flushEntryIfDirty(Entry &entry);
       void deleteMarkedEntries();
       void invalidateDependencies(SlotProxy modifiedProxy);
-      void flushAndClearEntireCacheExceptGlobals();
-      void flushAndClearEntireCache();
+      void flushAndClearRoots();
+      void flushAndClearRoots(auto&& condition);
       void forEntireSubtree(SlotProxy root, auto&& action);
       void forEntireSubtree(Entry& root, bool const sortBeforeAction, auto&& action);      
       void writeAliasSensitive(SlotProxy dest, auto&& src);
@@ -453,7 +453,7 @@ namespace acus {
     void loopOpen(std::string const &tag = defaultOpenTag());
     void loopClose(std::string const &tag = defaultCloseTag());
 
-    void goToDynamicOffset(Cell offsetLow, Cell offsetHigh);// TODO: rename moveTo..
+    void moveToDynamicOffset(Cell offsetLow, Cell offsetHigh);
     void fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir);
   
     void moveField(Cell dest);
@@ -621,7 +621,6 @@ namespace acus {
     Slot getTemp(literal::Literal val);
     Slot getCache(types::TypeHandle type);
     Slot getCache(literal::Literal val);
-    void tempAssign(Slot lhs, Slot rhs);
     
     // Global Data Synchronization (assembler_globals.cc)
     void fetchGlobal(Slot globalSlot, Slot localSlot);

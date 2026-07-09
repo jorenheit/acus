@@ -25,7 +25,6 @@ namespace acus::api::impl {
 
     bool programStarted() const;
     std::string currentFunction() const;
-    std::string currentBlock() const;
     int currentScopeDepth() const;
     bool declaredAsGlobal(std::string const &name) const;
     bool inScope(std::string const &name) const;

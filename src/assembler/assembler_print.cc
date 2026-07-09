@@ -129,7 +129,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
   int const maxDigits = valSlot.type()->usesValue1() ? 5 : 3;
 	  
   Slot digits = getTemp(ts::raw(maxDigits));
-  for (int i = 0; i != 5; ++i) {
+  for (int i = 0; i != maxDigits; ++i) {
     Slot const currentDigitSlot = digits.sub(ts::u8(), i);
     divSlotByConst(valSlot, 10, currentDigitSlot);
   }
@@ -170,7 +170,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
   resetSeekMarker();
 
   // Rebase datapointer to the start of the digits-array
-  _dp.set(Cell{digits, MacroCell::Value0});
+  _dp.set(digits, MacroCell::Value0);
 
   popPtr();
   freeTempSlot(digits);

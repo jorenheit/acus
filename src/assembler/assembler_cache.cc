@@ -84,7 +84,7 @@ Assembler::Cache::Entry& Assembler::Cache::findOrCreateEntry(SlotProxy proxy, bo
 
 Slot Assembler::Cache::materialize(SlotProxy proxy) {
   if (proxy.dependsOnDereferencedPointer() && not _flushing && not _aliasWriteMode) {
-    flushAndClearEntireCache();
+    flushAndClearRoots();
   }
   
   if (proxy.directRelative()) {
@@ -227,43 +227,33 @@ void Assembler::Cache::deleteMarkedEntries() {
   std::erase_if(_entries, [](EntryPtr const &entry){ return entry->markedForDelete; });
 }      
 
-void Assembler::Cache::flushAndClearEntireCacheExceptGlobals() {
-
-  for (auto const &entry: _entries) {
-    if (entry->parent == nullptr && entry->proxy.kind() != proxy::Kind::GlobalReference) {
-      flushAndDeleteSubtree(*entry, true);
-    }
+void Assembler::Cache::flushAndClearRoots(auto&& condition) {
+  std::vector<Entry*> roots;
+  for (auto const& entry : _entries) {
+    if (entry->parent == nullptr && condition(entry))
+      roots.push_back(entry.get());
+  }
+  
+  for (Entry* root: roots) {
+    flushAndDeleteSubtree(*root, true);
   }
 }
 
-
-void Assembler::Cache::flushAndClearEntireCache() {
-
-  // TODO: can this just call flushAndDeleteSubtree on all roots? Then assert entries are empty
-  for (auto const &entry: _entries) {
-    if (entry->parent == nullptr) {
-      flushSubtree(*entry, true);
-    }
-  }
-
-  for (auto const &entry: _entries) {
-    assert(not entry->dirty);
-    _self.freeCacheSlot(entry->slot);
-  }
-
-  _entries.clear();
+void Assembler::Cache::flushAndClearRoots() {
+  flushAndClearRoots([](EntryPtr const &entry) { return true; });
 }
-
 
 void Assembler::Cache::internalBoundary() {
   // At internal control-flow boundaries, we don't need to synchronize globals
-  flushAndClearEntireCacheExceptGlobals();
-  //  flushAndClearEntireCache();
+  flushAndClearRoots([&](EntryPtr const &entry) {
+    return entry->proxy.kind() != proxy::Kind::GlobalReference;
+  });
 }
 
 void Assembler::Cache::callBoundary() {
   // At call boundaries, we flush the entire cache to make sure all aliased slots are in sync
-  flushAndClearEntireCache();
+  flushAndClearRoots();;
+  assert(_entries.empty());
 }
 
 
@@ -337,7 +327,7 @@ void Assembler::Cache::invalidateDependencies(SlotProxy modifiedProxy) {
   // clean alias entries must be invalidated. Conservatively clear the cache.  
   for (Entry *entry: dependentEntries) {
     if (entry->proxy.dependsOnDereferencedPointer()) {
-      flushAndClearEntireCache();
+      flushAndClearRoots();
       return;
     }
   }
@@ -353,11 +343,11 @@ void Assembler::Cache::invalidateDependencies(SlotProxy modifiedProxy) {
 
 
 void Assembler::Cache::writeAliasSensitive(SlotProxy dest, auto&& src) {
-  flushAndClearEntireCache();
+  flushAndClearRoots();
   _aliasWriteMode = true;
   dest.write(_self, src);
   _aliasWriteMode = false;
-  flushAndClearEntireCache();
+  flushAndClearRoots();
 }
 
 void Assembler::Cache::writeDirect(SlotProxy dest, auto&& src) {

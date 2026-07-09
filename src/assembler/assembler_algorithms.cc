@@ -40,6 +40,9 @@ void Assembler::zeroCell() {
   emit<primitive::ZeroCell>();
 }
 
+void Assembler::zeroCellPlus() { 
+  emit<primitive::ZeroCellPlus>();
+}
 
 void Assembler::setToValue(int value) {
   zeroCell();
@@ -143,7 +146,7 @@ void Assembler::compare16ToConstConstructive(int value, Cell high, Cell result, 
   popPtr();
 }
 
-void Assembler::goToDynamicOffset(Cell offsetLow, Cell offsetHigh) {
+void Assembler::moveToDynamicOffset(Cell offsetLow, Cell offsetHigh) {
   // WARNING: this leaves pointer in unknown position.
   // Make sure to leave a marker in order to be able to seek back
   
@@ -195,7 +198,7 @@ void Assembler::fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload 
 
   int const base = _dp.current().offset;
   pushPtr();
-  goToDynamicOffset(offsetLow, offsetHigh);
+  moveToDynamicOffset(offsetLow, offsetHigh);
   
   // Base is now the cell we arrived at (at offset).
   // Load values into payload

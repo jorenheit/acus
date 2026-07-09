@@ -75,6 +75,8 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
     for (auto slot: frame.locals) {
       if (slot.kind() != Slot::Available || slot.type()->size() < type->size())
 	continue;
+
+      int const diff = slot.type()->size() - type->size();      
       
       // Reuse this slot
       SlotData &data = slot.get();
@@ -85,7 +87,6 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
       data.scope = _currentScope;
       
       // Split the slot if there is still room
-      int const diff = slot.type()->size() - type->size();      
       if (diff > 0) {
 	std::string const dummyName = [] {
 	  static int counter = 0; return "__dummy_" + std::to_string(counter++);

@@ -52,7 +52,7 @@ namespace acus::builder {
       API_CTX_NAME(ctx)
     {}
     
-    ~BuilderBase() {
+    ~BuilderBase() noexcept(false) {
       if (std::uncaught_exceptions() == 0)
 	API_REQUIRE(_finalized, error::ErrorCode::BuilderNotFinalized,
 		    "'", _finalizeMethod, "' was never called the ", _builderName , ".");

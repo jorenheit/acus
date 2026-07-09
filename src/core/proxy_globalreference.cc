@@ -51,6 +51,7 @@ namespace acus::proxy {
   
   Slot impl::GlobalReference::materialize(Assembler &a) const {
     assert(false && "global reference materialization always requires a target slot");
+    std::unreachable();
   }
   
   void impl::GlobalReference::materialize(Assembler &a, Slot dest) const {

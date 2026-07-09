@@ -39,8 +39,7 @@ void Assembler::fetchGlobal(Slot globalSlot, Slot localSlot) {
   moveTo(globalSlot);
   seek(MacroCell::SeekMarker, primitive::Right, payload, false);
   resetSeekMarker();
-  switchField(static_cast<MacroCell::Field>(0));
-  resetOrigin();
+  _dp.set(0);
     
   // Move the payload into the local slot
   for (int i = 0; i != size; ++i) {
