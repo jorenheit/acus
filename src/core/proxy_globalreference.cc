@@ -17,8 +17,8 @@ namespace acus::proxy {
     return Kind::GlobalReference;
   }     
 
-  Slot impl::GlobalReference::addressOf(Assembler &a) const {
-    return a.addressOfSlot(_slot);
+  Slot impl::GlobalReference::addressOf(Assembler &a, API_CTX) const {
+    return a.addressOfSlot(_slot, API_FWD);
   }
 
   bool impl::GlobalReference::directAbsolute() const {

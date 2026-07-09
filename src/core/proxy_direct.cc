@@ -45,8 +45,8 @@ namespace acus::proxy {
     writeInto(_slot);
   }
 
-  Slot impl::Direct::addressOf(Assembler &a) const {
-    return a.addressOfSlot(_slot);
+  Slot impl::Direct::addressOf(Assembler &a, API_CTX) const {
+    return a.addressOfSlot(_slot, API_FWD);
   }
 
   bool impl::Direct::dependsOnDereferencedPointer() const {

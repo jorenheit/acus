@@ -440,7 +440,7 @@ namespace acus {
     void writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot);
     void writeConstThroughDereferencedPointer(Slot ptrSlot, literal::Literal const value);
     
-    Slot addressOfSlot(Slot slot);
+    Slot addressOfSlot(Slot slot, API_CTX);
   
     // Algorithms: all applied to the current DP (assembler_algorithms.cc)
     void moveTo(Cell cell);

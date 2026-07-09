@@ -92,8 +92,8 @@ namespace acus::proxy {
     writeInto(fieldSlot);
   }
   
-  Slot impl::StructField::addressOf(Assembler &a) const {
-    Slot ptr = _obj.addressOf(a);
+  Slot impl::StructField::addressOf(Assembler &a, API_CTX) const {
+    Slot ptr = _obj.addressOf(a, API_FWD);
     ptr.get().type = ts::pointer(this->type());
     a.addAssign(ptr, literal::u16(_fieldOffset));
     return ptr;

@@ -11,20 +11,24 @@ int main() try {
   c.program("test", "main").begin(); {
 
     c.function("main").begin(); {
-      c.declareLocal("x", ts::u8());
-      c.declareLocal("y", ts::u8());
 
-      c.assign("x", literal::u8('A'));
-      c.callFunction("foo").into("y").arg("x").arg(literal::u8('B')).done();
-      c.write("x");
-      c.write("y");
+      c.declareLocal("idx", ts::u8());
+      c.assign("idx", literal::u8(1));
+
+      auto tmpArray =
+	literal::array(ts::array(ts::u8(), 3))
+	.push(literal::u8('A'))
+	.push(literal::u8('B'))
+	.push(literal::u8('C'))
+	.done();
+
+      auto elem = c.arrayElement(tmpArray, "idx");
+
+      c.addressOf(elem);
+
       c.returnFromFunction();
     } c.endFunction();
 
-    c.function("foo").param("arg1", ts::u8()).param("arg2", ts::u8()).ret(ts::u8()).begin(); {
-      c.returnFromFunction("arg2");
-    } c.endFunction();
-    
   } c.endProgram();
 
   std::cout << c.brainfuck("test") << '\n';

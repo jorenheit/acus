@@ -157,8 +157,8 @@ namespace acus::proxy {
     a.freeTempSlot(tmp);
   }
 
-  Slot impl::ArrayElement::addressOf(Assembler &a) const {
-    Slot ptr = _arr.addressOf(a);
+  Slot impl::ArrayElement::addressOf(Assembler &a, API_CTX) const {
+    Slot ptr = _arr.addressOf(a, API_FWD);
     ptr.get().type = ts::pointer(this->type());
     if (std::holds_alternative<int>(_index)) {
       a.addAssign(ptr, literal::u16(std::get<int>(_index)));

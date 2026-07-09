@@ -17,11 +17,13 @@ Expression Assembler::addressOfImpl(Expression obj, API_CTX) {
 		"Cannot take the address of a temporary value.");
   }
   
-  return Expression(obj.slot().addressOf(*this));
+  return Expression(obj.slot().addressOf(*this, API_FWD));
 }
 
-Slot Assembler::addressOfSlot(Slot pointeeSlot) {
-  assert(pointeeSlot.kind() != Slot::Temp && "taking address of temp");
+Slot Assembler::addressOfSlot(Slot pointeeSlot, API_CTX) {
+  API_REQUIRE(pointeeSlot.kind() != Slot::Temp,
+	      error::ErrorCode::TakingAddressOfTemporary,
+	      "Tried to take the address of a temporary or literal value.");
   assert(pointeeSlot.kind() != Slot::Cache && "taking address of cache");
 
   types::TypeHandle const pointeeType = pointeeSlot.type();
@@ -190,7 +192,6 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot arrSlot,
   // Plant a seek marker at the start of the array
   moveTo(arrSlot, MacroCell::Value0);
   setSeekMarker();
-  freeTempSlot(scaledIndexSlot);
 
   // Move to the element-slot
   moveToDynamicOffset(Cell{scaledIndexSlot, MacroCell::Value0},
@@ -212,6 +213,8 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot arrSlot,
   seek(MacroCell::SeekMarker, primitive::Left, {}, true);
   _dp.set(arrSlot);
   resetSeekMarker();
+  freeTempSlot(scaledIndexSlot);
+
   popPtr();
 }
 
@@ -279,7 +282,7 @@ void Assembler::assignSlotBytewise(Slot dest, Slot src) {
 
   // Direct copy all of the cells
   pushPtr();  
-  for (int i = 0; i != dest.size(); ++i) {
+  for (int i = 0; i != src.size(); ++i) {
     moveTo(src + i, MacroCell::Value0);
     copyField(Cell{dest + i, MacroCell::Value0},
 	      Temps<1>::select(dest + i, MacroCell::Scratch0));
@@ -301,7 +304,7 @@ void Assembler::moveSlotBytewise(Slot dest, Slot src) {
   assert(dest.size() >= src.size());
 
   pushPtr();  
-  for (int i = 0; i != dest.size(); ++i) {
+  for (int i = 0; i != src.size(); ++i) {
     moveTo(src + i, MacroCell::Value0);
     moveField(Cell{dest + i, MacroCell::Value0});
     moveTo(src + i, MacroCell::Value1);
@@ -382,12 +385,21 @@ Expression Assembler::assignImpl(Expression lhs, Expression rhs, bool allowTempA
   API_REQUIRE_ASSIGNABLE(lhs.type(), rhs.type());
   assert(not lhs.isLiteral());
 
-  bool const oldAllowTempAssign = _state.allowTempAssign;
-  _state.allowTempAssign = allowTempAssign;
+  struct TempAssignGuard {
+    bool &_state;
+    bool _old;
+    TempAssignGuard(bool &state, bool allow):
+      _state(state),
+      _old(state)
+    {
+      _state = allow;
+    }
+    ~TempAssignGuard() { _state = _old; }
+  } guard(_state.allowTempAssign, allowTempAssign);
+  
   SlotProxy const dest = lhs.slot();
   if (rhs.hasSlot()) _cache.write(dest, rhs.slot());
   else _cache.write(dest, rhs.literal());
-  _state.allowTempAssign = oldAllowTempAssign;
   return lhs;
 }
 

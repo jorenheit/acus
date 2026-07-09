@@ -74,7 +74,7 @@ namespace acus::proxy {
     a.freeTempSlot(tmp);
   }
   
-  Slot impl::DereferencedPointer::addressOf(Assembler &a) const {
+  Slot impl::DereferencedPointer::addressOf(Assembler &a, API_CTX) const {
     return a.materialize(_ptr);
   }
 

@@ -11,6 +11,7 @@
 #include <optional>
 #include <variant>
 #include <functional>
+#include "acus/api/api.h"
 #include "acus/core/slot.h"
 #include "acus/types/literal.h"
 
@@ -43,7 +44,7 @@ namespace acus::proxy {
       SlotProxy(Slot slot);
 
       types::TypeHandle type() const;
-      Slot addressOf(Assembler &a) const;
+      Slot addressOf(Assembler &a, API_CTX) const;
       bool dependsOn(SlotProxy other) const;
       bool dependsOnDereferencedPointer() const;
       bool directAbsolute() const;
@@ -68,7 +69,7 @@ namespace acus::proxy {
       types::TypeHandle type() const { return _type; }
       virtual ~Base() = default;
 
-      virtual Slot addressOf(Assembler &a) const = 0;
+      virtual Slot addressOf(Assembler &a, API_CTX) const = 0;
       virtual bool dependsOn(SlotProxy other) const = 0;
       virtual bool dependsOnDereferencedPointer() const = 0;
       virtual bool directAbsolute() const = 0;
@@ -91,7 +92,7 @@ namespace acus::proxy {
     public:
       Direct(Slot slot);
 
-      virtual Slot addressOf(Assembler &a) const override;
+      virtual Slot addressOf(Assembler &a, API_CTX) const override;
       virtual bool dependsOn(SlotProxy) const override;
       virtual bool dependsOnDereferencedPointer() const override;
       virtual bool directAbsolute() const override;
@@ -113,7 +114,7 @@ namespace acus::proxy {
     public:
       GlobalReference(Slot slot);
 
-      virtual Slot addressOf(Assembler &a) const override;
+      virtual Slot addressOf(Assembler &a, API_CTX) const override;
       virtual Kind kind() const override;
       virtual bool directAbsolute() const override;
       virtual bool directRelative() const override;
@@ -138,7 +139,7 @@ namespace acus::proxy {
       ArrayElement(SlotProxy arr, int index);      
       ArrayElement(SlotProxy arr, SlotProxy index);
 
-      virtual Slot addressOf(Assembler &a) const override;
+      virtual Slot addressOf(Assembler &a, API_CTX) const override;
       virtual Kind kind() const override;  
       virtual bool directAbsolute() const override;
       virtual bool directRelative() const override;      
@@ -177,7 +178,7 @@ namespace acus::proxy {
     public:
       StructField(SlotProxy obj, std::string fieldName);
 
-      virtual Slot addressOf(Assembler &a) const override;
+      virtual Slot addressOf(Assembler &a, API_CTX) const override;
       virtual Kind kind() const override;
       virtual bool dependsOn(SlotProxy other) const override;      
       virtual bool dependsOnDereferencedPointer() const override;      
@@ -202,7 +203,7 @@ namespace acus::proxy {
     public:
       DereferencedPointer(SlotProxy ptr);
 
-      virtual Slot addressOf(Assembler &a) const override;      
+      virtual Slot addressOf(Assembler &a, API_CTX) const override;      
       virtual bool dependsOn(SlotProxy other) const override; 
       virtual bool dependsOnDereferencedPointer() const override;      
       virtual bool directAbsolute() const override;

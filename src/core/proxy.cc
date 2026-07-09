@@ -22,8 +22,8 @@ namespace acus::proxy {
       return _ptr->type();
   }
 
-  Slot impl::SlotProxy::addressOf(Assembler &a) const {
-    return _ptr->addressOf(a);
+  Slot impl::SlotProxy::addressOf(Assembler &a, API_CTX) const {
+    return _ptr->addressOf(a, API_FWD);
   }
 
   bool impl::SlotProxy::dependsOn(impl::SlotProxy other) const {
