@@ -245,7 +245,98 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     else copySlotToNextFrame(slot, offset);
   };
 
-  auto const constructInNextFrame = [&](auto&& self, int &offset, Expression const &arg) -> void {
+  auto const copyOrMovePointerToNextFrame = [&](Slot slot, int &offset) {
+    int const destOffset = offset;
+    copyOrMoveSlotToNextFrame(slot, offset);
+    primitive::DInt const distance = currentFrameSize + paramStart + destOffset;;
+    moveTo(0, MacroCell::Value0);
+    emit<primitive::MovePointerRelative>(distance);
+    inc();
+    emit<primitive::MovePointerRelative>(-distance);
+  };
+
+  auto const copyOrMoveArrayToNextFrame = [&](auto&& init, Slot slot, int &offset) {
+    assert(types::isArray(slot.type()));
+    
+    auto arrayType = types::cast<types::ArrayType>(slot.type());
+    auto elementType = arrayType->elementType();
+	
+    for (int i = 0; i != arrayType->length(); ++i) {
+      auto const elementSlot = Slot {
+	SlotData {
+	  .name = "dummy",
+	  .type = elementType,
+	  .kind = Slot::Dummy,
+	  .offset = slot.offset() + i * elementType->size()
+	},
+	false
+      };
+
+      init(init, offset, rValue(elementSlot, API_FWD));
+    }
+  };
+
+  auto const copyOrMoveStructToNextFrame = [&](auto&& init, Slot slot, int &offset) {
+    assert(types::isStruct(slot.type()));
+	   
+    auto structType = types::cast<types::StructType>(slot.type());
+    for (int i = 0; i != structType->fieldCount(); ++i) {
+      auto fieldType = structType->fieldType(i);
+      auto const fieldSlot = Slot {
+	SlotData {
+	  .name = "dummy",
+	  .type = fieldType,
+	  .kind = Slot::Dummy,
+	  .offset = slot.offset() + structType->fieldOffset(i)
+	},
+	false
+      };
+      init(init, offset, rValue(fieldSlot, API_FWD));
+    }
+  };
+
+  auto const constructInteger = [&](literal::Literal val, int &offset) {
+    assert(types::isInteger(val.type()));
+	   
+    int const value = literal::cast<types::IntegerType>(val)->encodedValue();
+    moveTo(0, MacroCell::Value0);
+    primitive::DInt const diff = currentFrameSize + paramStart + offset;
+    emit<primitive::MovePointerRelative>(diff);
+    setToValue(value, Temps<1>::select(0, MacroCell::Scratch0));
+    switchField(MacroCell::Value1);
+    setToValue(val.type()->usesValue1() ? ((value >> 8) & 0xff) : 0, Temps<1>::select(0, MacroCell::Scratch0));
+    switchField(MacroCell::Value0);
+    emit<primitive::MovePointerRelative>(-diff);
+    offset += MacroCell::FieldCount;
+  };
+
+  auto const constructFunctionPointer = [&](literal::Literal val, int &offset) {
+    assert(types::isFunctionPointer(val.type()));
+    
+    std::string const &functionName = literal::cast<types::FunctionPointerType>(val)->functionName();
+    primitive::DInt const diff = currentFrameSize + paramStart + offset;
+    emit<primitive::MovePointerRelative>(diff);
+    zeroCell();
+    emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
+      return ctx.getBlockIndex(functionName) & 0xff;
+    });
+    switchField(MacroCell::Value1);
+    zeroCell();
+    emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
+      return (ctx.getBlockIndex(functionName) >> 8) & 0xff;
+    });
+    switchField(MacroCell::Value0);
+    emit<primitive::MovePointerRelative>(-diff);
+    offset += MacroCell::FieldCount;
+  };
+
+  auto const constructArrayOrString = [&](auto&& init, literal::Literal val, int &offset) {
+    for (int i = 0; i != types::cast<types::ArrayLike>(val.type())->length(); ++i) {
+      init(init, offset, rValue(literal::cast<types::ArrayLike>(val)->element(i), API_FWD));
+    }
+  };
+  
+  auto const init = [&](auto&& self, int &offset, Expression const &arg) -> void {
 
     if (arg.hasSlot()) { // Already stored on tape -> copy to next frame
       Slot const argSlot = materialize(arg.slot());
@@ -255,59 +346,13 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
       case types::S8:
       case types::S16:
       case types::STRING:
-      case types::FUNCTION_POINTER: {
-	copyOrMoveSlotToNextFrame(argSlot, offset);
-	break;
-      }
-      case types::POINTER: {
-	int const destOffset = offset;
-	copyOrMoveSlotToNextFrame(argSlot, offset);
-	primitive::DInt const distance = currentFrameSize + paramStart + destOffset;;
-	moveTo(0, MacroCell::Value0);
-	emit<primitive::MovePointerRelative>(distance);
-	inc();
-	emit<primitive::MovePointerRelative>(-distance);
-	break;
-      }	
-      case types::ARRAY: {
-	auto arrayType = types::cast<types::ArrayType>(argSlot.type());
-	auto elementType = arrayType->elementType();
-	
-	for (int i = 0; i != arrayType->length(); ++i) {
-	  auto const elementSlot = Slot {
-	    SlotData {
-	      .name = "dummy",
-	      .type = elementType,
-	      .kind = Slot::Dummy,
-	      .offset = argSlot + i * elementType->size()
-	    },
-	    false
-	  };
-	  self(self, offset, rValue(elementSlot, API_FWD));
-	}
-	break;
-      }
-      case types::STRUCT: {
-	auto structType = types::cast<types::StructType>(argSlot.type());
-	for (int i = 0; i != structType->fieldCount(); ++i) {
-	  auto fieldType = structType->fieldType(i);
-	  auto const fieldSlot = Slot {
-	    SlotData {
-	      .name = "dummy",
-	      .type = fieldType,
-	      .kind = Slot::Dummy,
-	      .offset = argSlot + structType->fieldOffset(i)
-	    },
-	    false
-	  };
-	  self(self, offset, rValue(fieldSlot, API_FWD));
-	}
-	break;
-      }
-      default: {
+      case types::FUNCTION_POINTER: copyOrMoveSlotToNextFrame(argSlot, offset);         break;
+      case types::POINTER:          copyOrMovePointerToNextFrame(argSlot, offset);      break;
+      case types::ARRAY:            copyOrMoveArrayToNextFrame(self, argSlot, offset);  break;
+      case types::STRUCT:           copyOrMoveStructToNextFrame(self, argSlot, offset); break;
+      default:
 	assert(false && "What type is this?");
 	std::unreachable();
-      }
       } // switch (tag)
     }
     else { // anonymous value -> construct in-place
@@ -316,50 +361,15 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
       case types::U8:
       case types::S8:
       case types::U16:
-      case types::S16: {
-	// Construct integer
-	int const value = literal::cast<types::IntegerType>(arg.literal())->encodedValue();
-	moveTo(0, MacroCell::Value0);
-	primitive::DInt const diff = currentFrameSize + paramStart + offset;
-	emit<primitive::MovePointerRelative>(diff);
-	setToValue(value, Temps<1>::select(0, MacroCell::Scratch0));
-	switchField(MacroCell::Value1);
-	setToValue(argType->usesValue1() ? ((value >> 8) & 0xff) : 0, Temps<1>::select(0, MacroCell::Scratch0));
-	switchField(MacroCell::Value0);
-	emit<primitive::MovePointerRelative>(-diff);
-	offset += MacroCell::FieldCount;
-	break;
-      }
-      case types::FUNCTION_POINTER: {
-	std::string const &functionName = literal::cast<types::FunctionPointerType>(arg.literal())->functionName();
-	primitive::DInt const diff = currentFrameSize + paramStart + offset;
-	emit<primitive::MovePointerRelative>(diff);
-	zeroCell();
-	emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
-	  return ctx.getBlockIndex(functionName) & 0xff;
-	});
-	switchField(MacroCell::Value1);
-	zeroCell();
-	emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
-	  return (ctx.getBlockIndex(functionName) >> 8) & 0xff;
-	});
-	switchField(MacroCell::Value0);
-	emit<primitive::MovePointerRelative>(-diff);
-	offset += MacroCell::FieldCount;
-	break;
-      }
+      case types::S16:              constructInteger(arg.literal(), offset);         break;
+      case types::FUNCTION_POINTER: constructFunctionPointer(arg.literal(), offset); break;
       case types::ARRAY:
-      case types::STRING: {
-	// recursive call for each element
-	for (int i = 0; i != types::cast<types::ArrayLike>(argType)->length(); ++i)
-	  self(self, offset, rValue(literal::cast<types::ArrayLike>(arg.literal())->element(i), API_FWD));
-	break;
-      }
-      case types::POINTER: {
-	assert(false && "there should not be anonymous pointers"); 
-      }
-      default: assert(false && "passing this type as arg is not supported"); 
-      }
+      case types::STRING:           constructArrayOrString(self, arg.literal(), offset);   break;
+      case types::POINTER:
+      default:
+	assert(false && "Unsupported type");
+	std::unreachable();
+      } // switch (tag)
     }
   };
 
@@ -368,7 +378,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
   // Copy arguments
   int offset = 0;
   for (Expression const &arg: args) {
-    constructInNextFrame(constructInNextFrame, offset, arg);
+    init(init, offset, arg);
   }
   
   popPtr();
