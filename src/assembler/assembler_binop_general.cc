@@ -17,10 +17,15 @@ void Assembler::binOpAssignSlot(Slot const lhs, Slot const rhs) {
    int const stride = types::cast<types::PointerType>(lhs.type())->pointeeType()->size();
    if (stride == 1) return {targetSlot, rhs, false};
 
-   Slot const copy = getTemp(rhs.type());
-   assignSlot(copy, rhs);
-   mulSlotByConst(copy, stride);
-   return {targetSlot, copy, true};
+   auto const [operandSlot, freeOperandSlot] = [&] -> std::pair<Slot, bool> {
+     if (rhs.kind() == Slot::Temp) return {rhs, false};
+     Slot const copy = getTemp(rhs.type());
+     assignSlot(copy, rhs);
+     return {copy, true};
+   }();
+
+   mulSlotByConst(operandSlot, stride);
+   return {targetSlot, operandSlot, freeOperandSlot};
  }();
 
  Operator::applyWithSlot(*this, targetSlot, operandSlot);

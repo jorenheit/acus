@@ -47,14 +47,22 @@ Expression Assembler::unOpImpl(Expression obj, API_CTX) {
   }
 
   // Apply to temp copy
-  Slot result = getTemp(obj.type());
-  assignSlot(result, materialize(obj.slot()));
-  unOpAssignImpl<Operator>(Expression{result}, API_FWD);
+  Slot src = materialize(obj.slot());
+  Slot result = [&]{
+    if (src.kind() == Slot::Temp) {
+      return src;
+    } else {
+      Slot copy = getTemp(obj.type());
+      assignSlot(copy, src);
+      return copy;
+    }
+  }();
 
+  unOpAssignImpl<Operator>(Expression{result}, API_FWD);
   if constexpr (std::is_same_v<Ret, bool>) {
     result.get().type = ts::u8();
   }
-  return Expression { result };  
+  return Expression { result };
 }
 
 #define INSTANTIATE_FOR(op)						\

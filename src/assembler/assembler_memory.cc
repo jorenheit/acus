@@ -279,7 +279,6 @@ void Assembler::declareGlobal(std::string const &name, types::TypeHandle type, A
   });
 }
 
-
 Expression Assembler::declareLocal(std::string const& name, types::TypeHandle type, API_FUNC) {
   API_FUNC_BEGIN();
   API_CHECK_EXPECTED();
