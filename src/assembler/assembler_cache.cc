@@ -148,50 +148,56 @@ void Assembler::Cache::forEntireSubtree(Entry& root, bool const includeRoot, aut
   if (includeRoot) action(root);
 }
 
-void Assembler::Cache::flushEntryIfDirty(Entry &entry) {
+void Assembler::Cache::flushEntryIfDirty(Entry &entry, FlushMode mode) {
   if (not entry.dirty || entry.pendingWrite) return;
   entry.dirty = false;
+
+  MoveGuard guard(_self, entry.slot, mode == FlushMode::Move);
   entry.proxy.write(_self, entry.slot);
   if (entry.parent != nullptr) entry.parent->dirty = true;
 }
       
 
-void Assembler::Cache::flushSubtree(SlotProxy proxy) {
+void Assembler::Cache::flushSubtree(SlotProxy proxy, FlushMode mode) {
   assert(not _flushing);
   _flushing = true;
   forEntireSubtree(proxy, [&](Entry &entry) {
-    flushEntryIfDirty(entry);
+    flushEntryIfDirty(entry, mode);
   });
   _flushing = false;
 }
 
-void Assembler::Cache::flushSubtree(Entry &root, bool const includeRoot) {
+void Assembler::Cache::flushSubtree(Entry &root, bool const includeRoot, FlushMode mode) {
   assert(not _flushing);  
   _flushing = true;
   forEntireSubtree(root, includeRoot, [&](Entry &entry){
-    flushEntryIfDirty(entry);
+    flushEntryIfDirty(entry, mode);
   });
   _flushing = false;
+}
+
+void Assembler::Cache::markEntryForDelete(Entry &entry) {
+  entry.markedForDelete = true;
 }
 
 void Assembler::Cache::markSubtreeForDelete(SlotProxy proxy) {
   forEntireSubtree(proxy, [&](Entry &entry){
-    entry.markedForDelete = true;
+    markEntryForDelete(entry);
   });
 }
 
 void Assembler::Cache::markSubtreeForDelete(Entry &root, bool const includeRoot) {
   forEntireSubtree(root, includeRoot, [&](Entry &entry){
-    entry.markedForDelete = true;
+    markEntryForDelete(entry);
   });
 }
 
 void Assembler::Cache::flushAndDeleteSubtree(SlotProxy proxy) {
   assert(not _flushing);
-  _flushing = true;
+  _flushing = true; // TODO: FlushGuard
   forEntireSubtree(proxy, [&](Entry &entry) {
-    flushEntryIfDirty(entry);	  
-    entry.markedForDelete = true;
+    flushEntryIfDirty(entry, FlushMode::Move);
+    markEntryForDelete(entry);
   });
   _flushing = false;
   
@@ -202,8 +208,8 @@ void Assembler::Cache::flushAndDeleteSubtree(Entry &root, bool const includeRoot
   assert(not _flushing);
   _flushing = true;
   forEntireSubtree(root, includeRoot, [&](Entry &entry) {
-    flushEntryIfDirty(entry);	  
-    entry.markedForDelete = true;
+    flushEntryIfDirty(entry, FlushMode::Move);
+    markEntryForDelete(entry);
   });
   _flushing = false;
   
@@ -268,11 +274,13 @@ void Assembler::Cache::returnBoundary() {
     if (entry->proxy.kind() == proxy::Kind::GlobalReference ||
 	entry->proxy.kind() == proxy::Kind::DereferencedPointer) {
 
-      flushSubtree(*entry, true);
+      // Entries can be flushed using move-semantics, since the cache tree
+      // will be abandoned anyway.
+      flushSubtree(*entry, true, FlushMode::Move);
     }
   }
   
-  // Free all cache slots
+  // Free all cache slots (should not be necessary but good practice anyway).
   for (auto const &entry: _entries) {
     _self.freeCacheSlot(entry->slot);
   }
@@ -335,7 +343,7 @@ void Assembler::Cache::invalidateDependencies(SlotProxy modifiedProxy) {
   // Go through the list of dependent entries in the order they were added to the vector
   // (deepest first) and flush, then delete.
   for (Entry *entry: dependentEntries) {
-    flushSubtree(*entry, true);
+    flushSubtree(*entry, true, FlushMode::Move);
   }
   
   deleteMarkedEntries();

@@ -14,7 +14,7 @@ SlotData SlotData::sub(types::TypeHandle subType, int subOffset) const {
   return SlotData {
     .name = name + "<" + std::to_string(subOffset) + ">",
     .type = subType,
-    .kind = this->kind == Temp ? Temp : Dummy,
+    .kind = Dummy, //this->kind == Temp ? Temp : Dummy,
     .offset = offset + subOffset,
     .scope = scope
   };

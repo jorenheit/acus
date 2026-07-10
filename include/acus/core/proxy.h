@@ -47,6 +47,7 @@ namespace acus::proxy {
       Slot addressOf(Assembler &a, API_CTX) const;
       bool dependsOn(SlotProxy other) const;
       bool dependsOnDereferencedPointer() const;
+      // TODO: I don't think directAbsolute is ever used, just rename directRelative to direct
       bool directAbsolute() const;
       bool directRelative() const;
       std::optional<SlotProxy> enclosingProxy();

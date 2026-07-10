@@ -201,6 +201,14 @@ namespace acus {
     };
     std::vector<LabelCheck> _deferredLabelChecks;
 
+    struct MoveGuard {
+      std::optional<Slot> _guardedSlot;
+      bool _oldConsumableStatus;
+    
+      MoveGuard(Assembler &a, SlotProxy proxy, bool const forceMove);
+      ~MoveGuard();
+    };
+    
     class Cache {
       struct Entry;
       using EntryPtr = std::unique_ptr<Entry>;
@@ -222,17 +230,23 @@ namespace acus {
 	std::vector<Entry*> children;
       };
 
+      enum class FlushMode {
+	Move,
+	Copy
+      };
+      
       Entry* findEntry(SlotProxy proxy) const;
       Entry* findCachedOwner(SlotProxy proxy) const;
       Entry &findOrCreateEntry(SlotProxy proxy, bool const skipMaterialization = false);
       Entry* ensureParentEntry(SlotProxy proxy);
-      void flushSubtree(SlotProxy proxy);
-      void flushSubtree(Entry &root, bool const includeRoot);
+      void flushSubtree(SlotProxy proxy, FlushMode mode = FlushMode::Copy);
+      void flushSubtree(Entry &root, bool const includeRoot, FlushMode mode = FlushMode::Copy);
+      void markEntryForDelete(Entry &entry);
       void markSubtreeForDelete(SlotProxy proxy);
       void markSubtreeForDelete(Entry &root, bool const includeRoot);
       void flushAndDeleteSubtree(SlotProxy proxy);
       void flushAndDeleteSubtree(Entry &root, bool const includeRoot);
-      void flushEntryIfDirty(Entry &entry);
+      void flushEntryIfDirty(Entry &entry, FlushMode mode);
       void deleteMarkedEntries();
       void invalidateDependencies(SlotProxy modifiedProxy);
       void flushAndClearRoots();
@@ -340,7 +354,6 @@ namespace acus {
     void assignSlot(Slot slot, literal::Literal val);
     void assignSlotBytewise(Slot dest, Slot src);
     void assignIntegerSlot(Slot dest, Slot src);
-    void moveSlotBytewise(Slot dest, Slot src);
 
     void notSlot(Slot rhs);
     void boolSlot(Slot rhs);
@@ -454,11 +467,12 @@ namespace acus {
     void loopClose(std::string const &tag = defaultCloseTag());
 
     void moveToDynamicOffset(Cell offsetLow, Cell offsetHigh);
-    void fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir);
+    void fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir, bool allowMove);
   
     void moveField(Cell dest);
     void copyField(Cell dest, Temps<1>);
-
+    void copyOrMoveField(bool const move, Cell dest, Temps<1>);
+    
     void setToValue(int value);
     void setToValue(int value, Temps<1>);
     void setToValue16(int value, Cell high);    

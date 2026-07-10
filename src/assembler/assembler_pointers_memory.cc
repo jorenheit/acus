@@ -58,6 +58,7 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   
   pushPtr();
 
+  // Prepare payload (index * sizeof(T))
   Slot scaledIndexSlot = getTemp(ts::u8());
   assignSlot(scaledIndexSlot, indexSlot);
   moveTo(scaledIndexSlot, MacroCell::Value0);
@@ -69,14 +70,21 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
 
   Payload payload(elementType->size(),
 		  elementType->usesValue1() ? Payload::Width::Double : Payload::Width::Single);
-  
+
+  // Mark Start of array
   moveTo(arrSlot, MacroCell::Value0);
   setSeekMarker();
+
+  // Fetch data
+  bool const allowMove = arrSlot.consumable();
   fetchFromDynamicOffset(Cell{scaledIndexSlot, MacroCell::Value0},
 			 Cell{scaledIndexSlot, MacroCell::Value1},
 			 payload,
-			 primitive::Left);
+			 primitive::Left,
+			 allowMove);
+  if (allowMove) arrSlot.get().wasConsumed();
 
+  // Move payload into element
   for (int i = 0; i != elementType->size(); ++i) {
     moveTo(arrSlot + i, MacroCell::Payload0);
     moveField(Cell{elementSlot + i, MacroCell::Value0});
@@ -85,7 +93,8 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
       moveField(Cell{elementSlot + i, MacroCell::Value1});
     }
   }
-  
+
+  // Return to start of array
   moveTo(arrSlot);
   resetSeekMarker();
   freeTempSlot(scaledIndexSlot);
@@ -128,19 +137,21 @@ void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot) 
   // Move back to the start of the array
   seek(MacroCell::SeekMarker, primitive::Left, {}, true);
   _dp.set(arrSlot);
-  
+
+  bool const allowMove = srcSlot.consumable();
   for (int i = 0; i != elementType->size(); ++i) {
     // Copy the contents into the payload cells
     moveTo(srcSlot + i, MacroCell::Value0);
-    copyField(Cell{arrSlot + i, MacroCell::Payload0},
-	      Temps<1>::select(arrSlot + i, MacroCell::Scratch0));
+    copyOrMoveField(allowMove, Cell{arrSlot + i, MacroCell::Payload0},
+		    Temps<1>::select(arrSlot + i, MacroCell::Scratch0));
     if (elementType->usesValue1()) {
       moveTo(srcSlot + i, MacroCell::Value1);
-      copyField(Cell{arrSlot + i, MacroCell::Payload1},
-		Temps<1>::select(arrSlot + i, MacroCell::Scratch0));
+      copyOrMoveField(allowMove, Cell{arrSlot + i, MacroCell::Payload1},
+		      Temps<1>::select(arrSlot + i, MacroCell::Scratch0));
     }
   }
-
+  if (allowMove) srcSlot.get().wasConsumed();
+  
   // Move the payload into the cell containing the marker (one beyond actual start of the element)
   moveTo(arrSlot);
 
@@ -240,10 +251,12 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src) {
 
   // Copy low byte to both fields of destination
   // TODO: optimize double-copy
+  bool const allowMove = src.consumable();
   moveTo(src, MacroCell::Value0);
-  copyField(Cell{dest, MacroCell::Value0}, Temps<1>::select(dest, MacroCell::Scratch0));
-  copyField(Cell{dest, MacroCell::Value1}, Temps<1>::select(dest, MacroCell::Scratch0));
-
+  copyOrMoveField(false,     Cell{dest, MacroCell::Value0}, Temps<1>::select(dest, MacroCell::Scratch0));
+  copyOrMoveField(allowMove, Cell{dest, MacroCell::Value1}, Temps<1>::select(dest, MacroCell::Scratch0));
+  if (allowMove) src.get().wasConsumed();
+  
   // If src.low byte >= 128, set dest.high byte to 0xff, otherwise to zero
   // The high byte in dest now contains a copy of its low-byte. Apply
   // destructive less < 128 on it and subtract 1:
@@ -264,10 +277,10 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src) {
 
 void Assembler::assignSlot(Slot dest, Slot src) {
   if (dest == src) return;
-  if (_state.allowTempAssign && src.kind() == Slot::Temp && dest.type() == src.type()) {
-    moveSlotBytewise(dest, src);
-    return;
-  }
+  // if (_state.allowTempAssign && src.kind() == Slot::Temp && dest.type() == src.type()) {
+  //   moveSlotBytewise(dest, src);
+  //   return;
+  // }
   
   if (types::isInteger(dest.type()) && types::isInteger(src.type()))
     return assignIntegerSlot(dest, src);
@@ -281,43 +294,26 @@ void Assembler::assignSlotBytewise(Slot dest, Slot src) {
   assert(dest.size() >= src.size());
 
   // Direct copy all of the cells
-  pushPtr();  
+  pushPtr();
+
+  bool const allowMove = src.consumable();
   for (int i = 0; i != src.size(); ++i) {
     moveTo(src + i, MacroCell::Value0);
-    copyField(Cell{dest + i, MacroCell::Value0},
-	      Temps<1>::select(dest + i, MacroCell::Scratch0));
+    copyOrMoveField(allowMove, Cell{dest + i, MacroCell::Value0},
+		    Temps<1>::select(dest + i, MacroCell::Scratch0));
     moveTo(src + i, MacroCell::Value1);
     if (src.type()->usesValue1()) {
-      copyField(Cell{dest + i, MacroCell::Value1},
-		Temps<1>::select(dest + i, MacroCell::Scratch0));
+      copyOrMoveField(allowMove, Cell{dest + i, MacroCell::Value1},
+		      Temps<1>::select(dest + i, MacroCell::Scratch0));
     }
     else {
       setToValue(0);
     }
   }
+  if (allowMove) src.get().wasConsumed();
   popPtr();
 
 }
-
-void Assembler::moveSlotBytewise(Slot dest, Slot src) {
-  assert(dest != src);
-  assert(dest.size() >= src.size());
-
-  pushPtr();  
-  for (int i = 0; i != src.size(); ++i) {
-    moveTo(src + i, MacroCell::Value0);
-    moveField(Cell{dest + i, MacroCell::Value0});
-    moveTo(src + i, MacroCell::Value1);
-    if (src.type()->usesValue1()) {
-      moveField(Cell{dest + i, MacroCell::Value1});
-    }
-    else {
-      setToValue(0);
-    }
-  }
-  popPtr();
-}
-
 
 void Assembler::assignSlot(Slot slot, literal::Literal val) {
   pushPtr();
@@ -385,20 +381,12 @@ Expression Assembler::assignImpl(Expression lhs, Expression rhs, bool allowTempA
   API_REQUIRE_ASSIGNABLE(lhs.type(), rhs.type());
   assert(not lhs.isLiteral());
 
-  struct TempAssignGuard {
-    bool &_state;
-    bool _old;
-    TempAssignGuard(bool &state, bool allow):
-      _state(state),
-      _old(state)
-    {
-      _state = allow;
-    }
-    ~TempAssignGuard() { _state = _old; }
-  } guard(_state.allowTempAssign, allowTempAssign);
   
   SlotProxy const dest = lhs.slot();
-  if (rhs.hasSlot()) _cache.write(dest, rhs.slot());
+  if (rhs.hasSlot()) {
+    MoveGuard guard(*this, rhs.slot(), false);
+    _cache.write(dest, rhs.slot());
+  }
   else _cache.write(dest, rhs.literal());
   return lhs;
 }
@@ -419,15 +407,17 @@ void Assembler::moveToPointee(Slot ptrSlot) {
   Cell const offsetHighPayload { 0 + RuntimePointer::Offset, MacroCell::Payload1 };
   
   // Copy pointer (frameDepth and offset) to the payload-cells of cell 0 and 1
+  bool const allowMove = ptrSlot.consumable();
   moveTo(frameDepth);
-  copyField(frameDepthPayload, Temps<1>::select(frameDepthPayload, MacroCell::Scratch0));
+  copyOrMoveField(allowMove, frameDepthPayload, Temps<1>::select(frameDepthPayload, MacroCell::Scratch0));
 
   moveTo(offsetLow);
-  copyField(offsetLowPayload,  Temps<1>::select(offsetLowPayload, MacroCell::Scratch0));
+  copyOrMoveField(allowMove, offsetLowPayload,  Temps<1>::select(offsetLowPayload, MacroCell::Scratch0));
 
   moveTo(offsetHigh);
-  copyField(offsetHighPayload, Temps<1>::select(offsetHighPayload, MacroCell::Scratch0));
+  copyOrMoveField(allowMove, offsetHighPayload, Temps<1>::select(offsetHighPayload, MacroCell::Scratch0));
 
+  if (allowMove) ptrSlot.get().wasConsumed();
 
   // If frameDepth is nonzero, we need to keep moving to the 
   // previous frame start until the depth-counter becomes 0.
@@ -468,16 +458,18 @@ void Assembler::writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot) 
   _dp.set(endOfFrame);
   
   // Copy contents of the source-slot into the payload at the end of the frame
+  bool const allowMove = srcSlot.consumable();
   for (int i = 0; i != srcSlot.size(); ++i) {
     moveTo(srcSlot + i, MacroCell::Value0);
-    copyField(Cell{endOfFrame + i, MacroCell::Payload0},
-	      Temps<1>::select(endOfFrame + i, MacroCell::Scratch0));
+    copyOrMoveField(allowMove, Cell{endOfFrame + i, MacroCell::Payload0},
+		    Temps<1>::select(endOfFrame + i, MacroCell::Scratch0));
     if (srcSlot.type()->usesValue1()) {
       moveTo(srcSlot + i, MacroCell::Value1);
-      copyField(Cell{endOfFrame + i, MacroCell::Payload1},
-		Temps<1>::select(endOfFrame + i, MacroCell::Scratch0));
+      copyOrMoveField(allowMove, Cell{endOfFrame + i, MacroCell::Payload1},
+		      Temps<1>::select(endOfFrame + i, MacroCell::Scratch0));
     }
   }
+  if (allowMove) srcSlot.get().wasConsumed();
 
   // Seek back to the pointee's slot
   moveTo(endOfFrame);
@@ -550,7 +542,7 @@ void Assembler::dereferencePointerIntoSlot(Slot ptrSlot, Slot derefSlot) {
   moveToPointee(ptrSlot);
   _dp.set(0);
 
-  // Copy the value into the payload
+  // Copy the value into the payload (never move)
   pushPtr();
   for (int i = 0; i != derefSlot.size(); ++i) {
     moveTo(i, MacroCell::Value0);

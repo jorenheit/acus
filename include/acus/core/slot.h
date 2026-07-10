@@ -7,7 +7,7 @@
 
 #include <string>
 #include <memory>
-
+#include <cassert>
 #include "acus/types/types_fwd.h"
 
 namespace acus {
@@ -29,15 +29,29 @@ namespace acus {
     Kind kind;
     int offset;
     void const *scope = nullptr;
+    bool consumable = false;
+    bool consumed = false;
   
     int size() const;
     operator int() const { return offset; }
+
+    void wasConsumed() {
+      assert(consumable);
+      consumable = false;
+      consumed = true;
+    }
+
+    void allowConsumption(bool value = true) {
+      assert(not consumed);
+      consumable = value;
+    }
 
     SlotData sub(types::TypeHandle subType, int subOffset) const;
     SlotData unsignedView() const;
   };
 
 
+  // TODO: removed managed flag; not necessary at all
   class Slot {
     std::shared_ptr<SlotData> _slot;
     bool _managed;
@@ -65,8 +79,12 @@ namespace acus {
     void const *scope() const { return _slot->scope; }
     int size() const { return _slot->size(); }
     int offset() const { return _slot->offset; }
+    bool consumable() const { return _slot->consumable; }
+    bool consumed() const { return _slot->consumed; }
+
     operator int() const { return offset(); }
     bool managed() const { return _managed; }
+    
     
     Slot sub(types::TypeHandle subType, int subOffset) const { return Slot{_slot->sub(subType, subOffset), false}; }
     Slot unsignedView() const { return Slot{_slot->unsignedView(), false}; }

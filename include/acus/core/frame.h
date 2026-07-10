@@ -27,6 +27,8 @@ struct FrameLayout {
   };
 
   int returnValueSize = 1;
+
+  // TODO: Make this a vector<SlotData> instead
   std::vector<Slot> locals;
 
   FrameLayout(int retSize): returnValueSize(retSize) {}

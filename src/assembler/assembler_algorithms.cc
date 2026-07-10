@@ -111,8 +111,11 @@ void Assembler::copyField(Cell dest, Temps<1> tmp) {
   emit<primitive::CopyData>(src, dst, tmp0);
 }
 
+void Assembler::copyOrMoveField(bool const move, Cell dest, Temps<1> tmp) {
+  if (move) moveField(dest);
+  else copyField(dest, tmp);
+}
 
-// TODO: remove compareToConst 
 void Assembler::compareToConstDestructive(int value, Temps<1> tmp) {
   auto [cur, tmp0] = getFieldIndices(_dp.current(), tmp.get<0>());
   emit<primitive::Cmp>(value, cur, tmp0);
@@ -193,7 +196,7 @@ void Assembler::moveToDynamicOffset(Cell offsetLow, Cell offsetHigh) {
   moveTo(base, MacroCell::Value0);
 }
 
-void Assembler::fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir) {
+void Assembler::fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir, bool allowMove) {
   assert(payload);
 
   int const base = _dp.current().offset;
@@ -204,10 +207,10 @@ void Assembler::fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload 
   // Load values into payload
   for (int i = 0; i != payload.size(); ++i) {
     moveTo(base + i, MacroCell::Value0);
-    copyField(Cell{base + i, MacroCell::Payload0}, Temps<1>::select(base + i, MacroCell::Scratch0));
+    copyOrMoveField(allowMove, Cell{base + i, MacroCell::Payload0}, Temps<1>::select(base + i, MacroCell::Scratch0));
     if (payload.width(i) == Payload::Width::Double) {
       moveTo(base + i, MacroCell::Value1);
-      copyField(Cell{base + i, MacroCell::Payload1}, Temps<1>::select(base + i, MacroCell::Scratch0));
+      copyOrMoveField(allowMove, Cell{base + i, MacroCell::Payload1}, Temps<1>::select(base + i, MacroCell::Scratch0));
     }
   }
   
