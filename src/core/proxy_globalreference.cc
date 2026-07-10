@@ -58,9 +58,9 @@ namespace acus::proxy {
     a.fetchGlobal(_slot, dest);
   }
       
-  void impl::GlobalReference::write(Assembler &a, SlotProxy src) const {
+  void impl::GlobalReference::write(Assembler &a, SlotProxy src, TransferMode mode) const {
     Slot const srcSlot = a.materialize(src);
-    a.putGlobal(_slot, srcSlot);
+    a.putGlobal(_slot, srcSlot, mode);
   }
       
   void impl::GlobalReference::write(Assembler &a, acus::literal::Literal src) const {
@@ -70,7 +70,7 @@ namespace acus::proxy {
   void impl::GlobalReference::write(Assembler &a, SlotWriteCallback const &writeInto) const {
     Slot tmp = a.getTemp(this->type());
     writeInto(tmp);
-    write(a, tmp);
+    write(a, tmp, TransferMode::Move);
     a.freeTempSlot(tmp);
   }
   

@@ -55,10 +55,9 @@ namespace acus::proxy {
 	.name = std::string("__field_") + name(),
 	.uniqueName = std::string("__field_") + uniqueName(),
 	.type = structType->_fields[_fieldIndex].type,
-	.kind = obj.kind() == Slot::Temp ? Slot::Temp : Slot::Dummy,
+	.kind = Slot::Dummy,
 	.offset = obj.offset() + _fieldOffset
-      },
-      false
+      }
     };
   }
     
@@ -79,11 +78,11 @@ namespace acus::proxy {
   }
 
   // Write a slot-proxy to a slot at known offset
-  void impl::StructField::write(Assembler &a, SlotProxy src) const {
+  void impl::StructField::write(Assembler &a, SlotProxy src, TransferMode mode) const {
     Slot const objSlot = a.materialize(_obj);
     Slot const srcSlot = a.materialize(src);
     Slot const fieldSlot = getFieldSlot(objSlot);
-    a.assignSlot(fieldSlot, srcSlot);
+    a.assignSlot(fieldSlot, srcSlot, mode);
   }
 
   void impl::StructField::write(Assembler &a, SlotWriteCallback const &writeInto) const {

@@ -201,13 +201,13 @@ namespace acus {
     };
     std::vector<LabelCheck> _deferredLabelChecks;
 
-    struct MoveGuard {
-      std::optional<Slot> _guardedSlot;
-      bool _oldConsumableStatus;
+    // struct MoveGuard {
+    //   std::optional<Slot> _guardedSlot;
+    //   bool _oldConsumableStatus;
     
-      MoveGuard(Assembler &a, SlotProxy proxy, bool const forceMove);
-      ~MoveGuard();
-    };
+    //   MoveGuard(Assembler &a, SlotProxy proxy, bool const forceMove);
+    //   ~MoveGuard();
+    // };
     
     class Cache {
       struct Entry;
@@ -230,37 +230,34 @@ namespace acus {
 	std::vector<Entry*> children;
       };
 
-      enum class FlushMode {
-	Move,
-	Copy
-      };
-      
       Entry* findEntry(SlotProxy proxy) const;
       Entry* findCachedOwner(SlotProxy proxy) const;
       Entry &findOrCreateEntry(SlotProxy proxy, bool const skipMaterialization = false);
       Entry* ensureParentEntry(SlotProxy proxy);
-      void flushSubtree(SlotProxy proxy, FlushMode mode = FlushMode::Copy);
-      void flushSubtree(Entry &root, bool const includeRoot, FlushMode mode = FlushMode::Copy);
+      void flushSubtree(SlotProxy proxy, TransferMode mode = TransferMode::Copy);
+      void flushSubtree(Entry &root, bool const includeRoot, TransferMode mode = TransferMode::Copy);
       void markEntryForDelete(Entry &entry);
       void markSubtreeForDelete(SlotProxy proxy);
       void markSubtreeForDelete(Entry &root, bool const includeRoot);
       void flushAndDeleteSubtree(SlotProxy proxy);
       void flushAndDeleteSubtree(Entry &root, bool const includeRoot);
-      void flushEntryIfDirty(Entry &entry, FlushMode mode);
+      void flushEntryIfDirty(Entry &entry, TransferMode mode);
       void deleteMarkedEntries();
       void invalidateDependencies(SlotProxy modifiedProxy);
       void flushAndClearRoots();
       void flushAndClearRoots(auto&& condition);
       void forEntireSubtree(SlotProxy root, auto&& action);
       void forEntireSubtree(Entry& root, bool const sortBeforeAction, auto&& action);      
+      void writeAliasSensitive(SlotProxy dest, SlotProxy src, TransferMode mode);
       void writeAliasSensitive(SlotProxy dest, auto&& src);
+      void writeDirect(SlotProxy dest, SlotProxy src, TransferMode mode);
       void writeDirect(SlotProxy dest, auto&& src);
       void writeIndirect(SlotProxy dest, auto&& assign);
       
     public:
       inline explicit Cache(Assembler &self): _self(self) {}
       Slot materialize(SlotProxy proxy);
-      void write(SlotProxy dest, SlotProxy src);
+      void write(SlotProxy dest, SlotProxy src, TransferMode mode);
       void write(SlotProxy dest, literal::Literal src);
       void write(SlotProxy dest, std::function<void(Slot )> const &writeInto);
       
@@ -350,10 +347,10 @@ namespace acus {
     std::optional<Slot> globalSlot(std::string const &varName) const;
     SlotProxy proxyFromVariableName(std::string const& name, API_CTX) const;
     
-    void assignSlot(Slot dest, Slot src);
+    void assignSlot(Slot dest, Slot src, TransferMode mode = TransferMode::Copy);
     void assignSlot(Slot slot, literal::Literal val);
-    void assignSlotBytewise(Slot dest, Slot src);
-    void assignIntegerSlot(Slot dest, Slot src);
+    void assignSlotBytewise(Slot dest, Slot src, TransferMode mode = TransferMode::Copy);
+    void assignIntegerSlot(Slot dest, Slot src, TransferMode mode = TransferMode::Copy);
 
     void notSlot(Slot rhs);
     void boolSlot(Slot rhs);
@@ -446,11 +443,11 @@ namespace acus {
     void slotGreaterEqualSlotSigned(Slot lhs, Slot rhs);
   
     void branchIfSlot(Slot slot, std::string const &trueLabel, std::string const &falseLabel);
-    void copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot);
+    void copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot, TransferMode mode = TransferMode::Copy);
     void copyConstIntoElement(literal::Literal const srcSlot, Slot arrSlot, Slot indexSlot);
-    void copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot);
+    void copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot, TransferMode mode = TransferMode::Copy);
     void dereferencePointerIntoSlot(Slot ptrSlot, Slot derefSlot);
-    void writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot);
+    void writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot, TransferMode mode = TransferMode::Copy);
     void writeConstThroughDereferencedPointer(Slot ptrSlot, literal::Literal const value);
     
     Slot addressOfSlot(Slot slot, API_CTX);
@@ -467,11 +464,11 @@ namespace acus {
     void loopClose(std::string const &tag = defaultCloseTag());
 
     void moveToDynamicOffset(Cell offsetLow, Cell offsetHigh);
-    void fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir, bool allowMove);
+    void fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir, TransferMode mode = TransferMode::Copy);
   
     void moveField(Cell dest);
     void copyField(Cell dest, Temps<1>);
-    void copyOrMoveField(bool const move, Cell dest, Temps<1>);
+    void copyOrMoveField(TransferMode ode, Cell dest, Temps<1>);
     
     void setToValue(int value);
     void setToValue(int value, Temps<1>);
@@ -638,7 +635,7 @@ namespace acus {
     
     // Global Data Synchronization (assembler_globals.cc)
     void fetchGlobal(Slot globalSlot, Slot localSlot);
-    void putGlobal(Slot globalSlot, Slot localSlot);
+    void putGlobal(Slot globalSlot, Slot localSlot, TransferMode mode);
     void putGlobal(Slot globalSlot, literal::Literal const value);
 
     // Code generation (assembler_codegen.cc)

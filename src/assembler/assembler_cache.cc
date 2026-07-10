@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "assembler.ih"
-
+#include "acus/util/util.h"
 
 Assembler::Cache::Entry* Assembler::Cache::findEntry(SlotProxy proxy) const {
   auto it = std::find_if(_entries.begin(), _entries.end(), [&](EntryPtr const &entry){
@@ -148,32 +148,30 @@ void Assembler::Cache::forEntireSubtree(Entry& root, bool const includeRoot, aut
   if (includeRoot) action(root);
 }
 
-void Assembler::Cache::flushEntryIfDirty(Entry &entry, FlushMode mode) {
+void Assembler::Cache::flushEntryIfDirty(Entry &entry, TransferMode mode) {
   if (not entry.dirty || entry.pendingWrite) return;
   entry.dirty = false;
 
-  MoveGuard guard(_self, entry.slot, mode == FlushMode::Move);
-  entry.proxy.write(_self, entry.slot);
+  entry.proxy.write(_self, entry.slot, mode);
   if (entry.parent != nullptr) entry.parent->dirty = true;
 }
       
 
-void Assembler::Cache::flushSubtree(SlotProxy proxy, FlushMode mode) {
+void Assembler::Cache::flushSubtree(SlotProxy proxy, TransferMode mode) {
   assert(not _flushing);
-  _flushing = true;
+
+  util::BoolGuard guard(_flushing, true);
   forEntireSubtree(proxy, [&](Entry &entry) {
     flushEntryIfDirty(entry, mode);
   });
-  _flushing = false;
 }
 
-void Assembler::Cache::flushSubtree(Entry &root, bool const includeRoot, FlushMode mode) {
+void Assembler::Cache::flushSubtree(Entry &root, bool const includeRoot, TransferMode mode) {
   assert(not _flushing);  
-  _flushing = true;
+  util::BoolGuard guard(_flushing, true);
   forEntireSubtree(root, includeRoot, [&](Entry &entry){
     flushEntryIfDirty(entry, mode);
   });
-  _flushing = false;
 }
 
 void Assembler::Cache::markEntryForDelete(Entry &entry) {
@@ -194,25 +192,21 @@ void Assembler::Cache::markSubtreeForDelete(Entry &root, bool const includeRoot)
 
 void Assembler::Cache::flushAndDeleteSubtree(SlotProxy proxy) {
   assert(not _flushing);
-  _flushing = true; // TODO: FlushGuard
+  util::BoolGuard guard(_flushing, true);
   forEntireSubtree(proxy, [&](Entry &entry) {
-    flushEntryIfDirty(entry, FlushMode::Move);
+    flushEntryIfDirty(entry, TransferMode::Move);
     markEntryForDelete(entry);
   });
-  _flushing = false;
-  
   deleteMarkedEntries();
 }
 
 void Assembler::Cache::flushAndDeleteSubtree(Entry &root, bool const includeRoot) {
   assert(not _flushing);
-  _flushing = true;
+  util::BoolGuard guard(_flushing, true);
   forEntireSubtree(root, includeRoot, [&](Entry &entry) {
-    flushEntryIfDirty(entry, FlushMode::Move);
+    flushEntryIfDirty(entry, TransferMode::Move);
     markEntryForDelete(entry);
   });
-  _flushing = false;
-  
   deleteMarkedEntries();
 }
 
@@ -220,7 +214,6 @@ void Assembler::Cache::deleteMarkedEntries() {
   for (EntryPtr const &entry : _entries) {
     if (not entry->markedForDelete) continue;
 
-    // Detach from parent (if the parent survives)
     if (entry->parent != nullptr && not entry->parent->markedForDelete) {
       std::erase(entry->parent->children, entry.get());
       entry->parent = nullptr;
@@ -276,7 +269,7 @@ void Assembler::Cache::returnBoundary() {
 
       // Entries can be flushed using move-semantics, since the cache tree
       // will be abandoned anyway.
-      flushSubtree(*entry, true, FlushMode::Move);
+      flushSubtree(*entry, true, TransferMode::Move);
     }
   }
   
@@ -343,19 +336,37 @@ void Assembler::Cache::invalidateDependencies(SlotProxy modifiedProxy) {
   // Go through the list of dependent entries in the order they were added to the vector
   // (deepest first) and flush, then delete.
   for (Entry *entry: dependentEntries) {
-    flushSubtree(*entry, true, FlushMode::Move);
+    flushSubtree(*entry, true, TransferMode::Move);
   }
   
   deleteMarkedEntries();
 }
 
 
+void Assembler::Cache::writeAliasSensitive(SlotProxy dest, SlotProxy src, TransferMode mode) {
+  flushAndClearRoots();
+  util::BoolGuard guard(_aliasWriteMode, true);
+  dest.write(_self, src, mode);
+  flushAndClearRoots();
+}
+
 void Assembler::Cache::writeAliasSensitive(SlotProxy dest, auto&& src) {
   flushAndClearRoots();
-  _aliasWriteMode = true;
-  dest.write(_self, src);
-  _aliasWriteMode = false;
+  util::BoolGuard guard(_aliasWriteMode, true);
+  dest.write(_self, src);   
   flushAndClearRoots();
+}
+
+
+void Assembler::Cache::writeDirect(SlotProxy dest, SlotProxy src, TransferMode mode) {
+  assert(dest.directRelative());
+  
+  flushAndDeleteSubtree(dest);
+  invalidateDependencies(dest);
+  dest.write(_self, src, mode);
+
+  if (Entry *cachedOwner = findCachedOwner(dest))
+    cachedOwner->dirty = true;
 }
 
 void Assembler::Cache::writeDirect(SlotProxy dest, auto&& src) {
@@ -363,11 +374,12 @@ void Assembler::Cache::writeDirect(SlotProxy dest, auto&& src) {
   
   flushAndDeleteSubtree(dest);
   invalidateDependencies(dest);
-  dest.write(_self, src);
+  dest.write(_self, src);   
 
   if (Entry *cachedOwner = findCachedOwner(dest))
     cachedOwner->dirty = true;
 }
+
 
 void Assembler::Cache::writeIndirect(SlotProxy dest, auto&& assign) {
   assert(not dest.directRelative());
@@ -387,23 +399,23 @@ void Assembler::Cache::writeIndirect(SlotProxy dest, auto&& assign) {
 }
 
 
-void Assembler::Cache::write(SlotProxy dest, SlotProxy src) {
+void Assembler::Cache::write(SlotProxy dest, SlotProxy src, TransferMode mode) {
   assert(not _flushing);
   
   if (dest == src) return;
   
   // If not in the flushing state, we need to check if the proxies are alias-sensitive.
   if ((dest.dependsOnDereferencedPointer() || src.dependsOnDereferencedPointer())) {
-    return writeAliasSensitive(dest, src);
+    return writeAliasSensitive(dest, src, mode);
   }
 
   if (dest.directRelative()) {
-    return writeDirect(dest, src);
+    return writeDirect(dest, src, mode);
   }
 
   writeIndirect(dest, [&](Slot destSlot){
     Slot const srcSlot = materialize(src);
-    _self.assignSlot(destSlot, srcSlot);
+    _self.assignSlot(destSlot, srcSlot, mode);
   });
 }
 

@@ -29,39 +29,36 @@ namespace acus {
     Kind kind;
     int offset;
     void const *scope = nullptr;
-    bool consumable = false;
-    bool consumed = false;
+    //    bool consumable = false;
+    //    bool consumed = false;
   
     int size() const;
     operator int() const { return offset; }
 
-    void wasConsumed() {
-      assert(consumable);
-      consumable = false;
-      consumed = true;
-    }
+    // void wasConsumed() {
+    //   assert(consumable);
+    //   consumable = false;
+    //   consumed = true;
+    // }
 
-    void allowConsumption(bool value = true) {
-      assert(not consumed);
-      consumable = value;
-    }
+    // void allowConsumption(bool value = true) {
+    //   assert(not consumed);
+    //   consumable = value;
+    // }
 
     SlotData sub(types::TypeHandle subType, int subOffset) const;
     SlotData unsignedView() const;
   };
 
 
-  // TODO: removed managed flag; not necessary at all
   class Slot {
     std::shared_ptr<SlotData> _slot;
-    bool _managed;
     
   public:
     using enum SlotData::Kind;
     
-    Slot(SlotData const &data, bool managed):
-      _slot(std::make_shared<SlotData>(data)),
-      _managed(managed)
+    Slot(SlotData const &data):
+      _slot(std::make_shared<SlotData>(data))
     {}
 
     Slot(Slot const &other) = default;
@@ -79,15 +76,13 @@ namespace acus {
     void const *scope() const { return _slot->scope; }
     int size() const { return _slot->size(); }
     int offset() const { return _slot->offset; }
-    bool consumable() const { return _slot->consumable; }
-    bool consumed() const { return _slot->consumed; }
-
+    // bool consumable() const { return _slot->consumable; }
+    // bool consumed() const { return _slot->consumed; }
     operator int() const { return offset(); }
-    bool managed() const { return _managed; }
     
     
-    Slot sub(types::TypeHandle subType, int subOffset) const { return Slot{_slot->sub(subType, subOffset), false}; }
-    Slot unsignedView() const { return Slot{_slot->unsignedView(), false}; }
+    Slot sub(types::TypeHandle subType, int subOffset) const { return Slot{_slot->sub(subType, subOffset)}; }
+    Slot unsignedView() const { return Slot{_slot->unsignedView()}; }
   };
 
 

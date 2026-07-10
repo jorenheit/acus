@@ -56,10 +56,10 @@ namespace acus::proxy {
     a.dereferencePointerIntoSlot(ptrSlot, target);
   }
 
-  void impl::DereferencedPointer::write(Assembler &a, SlotProxy src) const {
+  void impl::DereferencedPointer::write(Assembler &a, SlotProxy src, TransferMode mode) const {
     Slot const ptrSlot = a.materialize(_ptr);
     Slot const srcSlot = a.materialize(src);
-    a.writeSlotThroughDereferencedPointer(ptrSlot, srcSlot);
+    a.writeSlotThroughDereferencedPointer(ptrSlot, srcSlot, mode);
   }
 
   void impl::DereferencedPointer::write(Assembler &a, literal::Literal src) const {
@@ -70,7 +70,7 @@ namespace acus::proxy {
   void impl::DereferencedPointer::write(Assembler &a, SlotWriteCallback const &writeInto) const {
     Slot tmp = a.getTemp(this->type());
     writeInto(tmp);
-    write(a, tmp);
+    write(a, tmp, TransferMode::Move);
     a.freeTempSlot(tmp);
   }
   

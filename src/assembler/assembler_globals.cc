@@ -54,7 +54,7 @@ void Assembler::fetchGlobal(Slot globalSlot, Slot localSlot) {
   popPtr();
 }
 
-void Assembler::putGlobal(Slot globalSlot, Slot localSlot) {
+void Assembler::putGlobal(Slot globalSlot, Slot localSlot, TransferMode mode) {
   assert(globalSlot.type() == localSlot.type());
 
   bool const useValue1 = globalSlot.type()->usesValue1();
@@ -65,13 +65,13 @@ void Assembler::putGlobal(Slot globalSlot, Slot localSlot) {
   // Copy value into payload slots starting at the origin
   for (int i = 0; i != size; ++i) {
     moveTo(localSlot + i, MacroCell::Value0);
-    copyField(Cell{i, MacroCell::Payload0},
-	      Temps<1>::select(i, MacroCell::Scratch0));
+    copyOrMoveField(mode, Cell{i, MacroCell::Payload0},
+		    Temps<1>::select(i, MacroCell::Scratch0));
 
     if (useValue1) {
       moveTo(localSlot + i, MacroCell::Value1);
-      copyField(Cell{i, MacroCell::Payload1},
-		Temps<1>::select(i, MacroCell::Scratch0));
+      copyOrMoveField(mode, Cell{i, MacroCell::Payload1},
+		      Temps<1>::select(i, MacroCell::Scratch0));
     }
   }
 

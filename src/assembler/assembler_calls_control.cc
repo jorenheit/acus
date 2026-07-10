@@ -179,8 +179,7 @@ void Assembler::returnFromFunctionImpl(std::optional<Expression> const &ret, API
 	.kind = Slot::Dummy,
 	.offset = FrameLayout::ReturnValueStart,
 	.scope = nullptr
-      },
-      false
+      }
     };
       
     assignImpl(Expression{returnSlot}, *ret, true, API_FWD);
@@ -219,7 +218,6 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
   };
 
   auto const moveSlotToNextFrame = [&](Slot slot, int &offset) {
-    assert(slot.consumable());
     for (int i = 0; i != slot.type()->size(); ++i) {
       int const varIndex0 = getFieldIndex(slot + i, MacroCell::Value0);
       primitive::DInt const paramIndex0 = currentFrameSize + paramStart + offset + MacroCell::Value0;
@@ -240,7 +238,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
   };
 
   auto const copyOrMoveSlotToNextFrame = [&](Slot slot, int &offset) {
-    if (slot.consumable()) moveSlotToNextFrame(slot, offset);
+    if (slot.kind() == Slot::Temp) moveSlotToNextFrame(slot, offset);
     else copySlotToNextFrame(slot, offset);
   };
 
@@ -266,10 +264,8 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
 	  .name = "dummy",
 	  .type = elementType,
 	  .kind = Slot::Dummy,
-	  .offset = slot.offset() + i * elementType->size(),
-	  .consumable = slot.consumable()
-	},
-	false
+	  .offset = slot.offset() + i * elementType->size()
+	}
       };
 
       init(init, offset, rValue(elementSlot, API_FWD));
@@ -287,10 +283,8 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
 	  .name = "dummy",
 	  .type = fieldType,
 	  .kind = Slot::Dummy,
-	  .offset = slot.offset() + structType->fieldOffset(i),
-	  .consumable = slot.consumable()
-	},
-	false
+	  .offset = slot.offset() + structType->fieldOffset(i)
+	}
       };
       init(init, offset, rValue(fieldSlot, API_FWD));
     }

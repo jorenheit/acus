@@ -66,8 +66,8 @@ namespace acus::proxy {
     return _ptr->uniqueName();
   }
   
-  void impl::SlotProxy::write(Assembler &a, impl::SlotProxy src) const {
-    return _ptr->write(a, src);
+  void impl::SlotProxy::write(Assembler &a, impl::SlotProxy src, TransferMode mode) const {
+    return _ptr->write(a, src, mode);
   }
   
   void impl::SlotProxy::write(Assembler &a, acus::literal::Literal src) const {

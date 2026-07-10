@@ -56,7 +56,7 @@ namespace acus::proxy {
       void materialize(Assembler &a, Slot dest) const;
       std::string name() const;
       std::string uniqueName() const;
-      void write(Assembler &a, SlotProxy src) const;
+      void write(Assembler &a, SlotProxy src, TransferMode mode) const;
       void write(Assembler &a, acus::literal::Literal src) const;
       void write(Assembler &a, SlotWriteCallback const &writeInto) const;
 
@@ -81,7 +81,7 @@ namespace acus::proxy {
       virtual void materialize(Assembler &a, Slot dest) const = 0;      
       virtual std::string name() const = 0;
       virtual std::string uniqueName() const = 0;
-      virtual void write(Assembler &a, SlotProxy src) const = 0;
+      virtual void write(Assembler &a, SlotProxy src, TransferMode mode) const = 0;
       virtual void write(Assembler &a, acus::literal::Literal src) const = 0;
       virtual void write(Assembler &a, SlotWriteCallback const &writeInto) const = 0;
     };
@@ -104,7 +104,7 @@ namespace acus::proxy {
       virtual void materialize(Assembler &a, Slot dest) const override;
       virtual std::string name() const override;
       virtual std::string uniqueName() const override;
-      virtual void write(Assembler &a, SlotProxy src) const override;
+      virtual void write(Assembler &a, SlotProxy src, TransferMode mode) const override;
       virtual void write(Assembler &a, acus::literal::Literal src) const override;      
       virtual void write(Assembler &a, SlotWriteCallback const &writeInto) const override;
     };
@@ -126,7 +126,7 @@ namespace acus::proxy {
       virtual void materialize(Assembler &a, Slot dest) const override;      
       virtual std::string name() const override;
       virtual std::string uniqueName() const override;
-      virtual void write(Assembler &a, SlotProxy src) const override;      
+      virtual void write(Assembler &a, SlotProxy src, TransferMode mode) const override;      
       virtual void write(Assembler &a, acus::literal::Literal src) const override;      
       virtual void write(Assembler &a, SlotWriteCallback const &writeInto) const override;
     };
@@ -151,7 +151,7 @@ namespace acus::proxy {
       virtual void materialize(Assembler &a, Slot target) const override;      
       virtual std::string name() const override;
       virtual std::string uniqueName() const override;            
-      virtual void write(Assembler &a, SlotProxy src) const override;
+      virtual void write(Assembler &a, SlotProxy src, TransferMode mode) const override;
       virtual void write(Assembler &a, acus::literal::Literal src) const override;
       virtual void write(Assembler &a, SlotWriteCallback const &writeInto) const override;      
 
@@ -159,10 +159,10 @@ namespace acus::proxy {
       Slot materializeImpl(Assembler &a, int index) const;
       void materializeImpl(Assembler &a, SlotProxy index, Slot target) const;
 
-      void writeImpl(Assembler &a, int index, SlotProxy src) const;
+      void writeImpl(Assembler &a, int index, SlotProxy src, TransferMode mode) const;
       void writeImpl(Assembler &a, int index, acus::literal::Literal) const;
       void writeImpl(Assembler &a, int index, SlotWriteCallback const &writeInto) const;
-      void writeImpl(Assembler &a, SlotProxy index, SlotProxy src) const;
+      void writeImpl(Assembler &a, SlotProxy index, SlotProxy src, TransferMode mode) const;
       void writeImpl(Assembler &a, SlotProxy index, acus::literal::Literal) const;
       void writeImpl(Assembler &a, SlotProxy index, SlotWriteCallback const &writeInto) const;
 
@@ -190,7 +190,7 @@ namespace acus::proxy {
       virtual void materialize(Assembler &a, Slot target) const override;
       virtual std::string name() const override;
       virtual std::string uniqueName() const override;      
-      virtual void write(Assembler &a, SlotProxy src) const override;
+      virtual void write(Assembler &a, SlotProxy src, TransferMode mode) const override;
       virtual void write(Assembler &a, acus::literal::Literal src) const override;
       virtual void write(Assembler &a, SlotWriteCallback const &writeInto) const override;
       
@@ -215,7 +215,7 @@ namespace acus::proxy {
       virtual void materialize(Assembler &a, Slot target) const override;
       virtual std::string name() const override;
       virtual std::string uniqueName() const override;      
-      virtual void write(Assembler &a, SlotProxy src) const override;
+      virtual void write(Assembler &a, SlotProxy src, TransferMode mode) const override;
       virtual void write(Assembler &a, acus::literal::Literal src) const override;
       virtual void write(Assembler &a, SlotWriteCallback const &writeInto) const override;
     };

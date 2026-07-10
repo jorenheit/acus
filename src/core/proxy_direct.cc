@@ -33,8 +33,8 @@ namespace acus::proxy {
     assert(false && "trying to materialize a direct proxy into another slot");
   }
   
-  void impl::Direct::write(Assembler &a, SlotProxy src) const {
-    a.assignSlot(_slot, a.materialize(src));
+  void impl::Direct::write(Assembler &a, SlotProxy src, TransferMode mode) const {
+    a.assignSlot(_slot, a.materialize(src), mode);
   }
 
   void impl::Direct::write(Assembler &a, literal::Literal src) const {

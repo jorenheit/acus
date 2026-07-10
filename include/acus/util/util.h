@@ -19,4 +19,20 @@ namespace acus::util {
     return true;
   }
 
+  
+  struct BoolGuard {
+    bool &_flag;
+    bool const _old;
+    
+    BoolGuard(bool &flag, bool value):
+      _flag(flag),
+      _old(flag)
+    {
+      _flag = value;
+    }
+
+    ~BoolGuard() {
+      _flag = _old;
+    }
+  };
 }

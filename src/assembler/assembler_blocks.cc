@@ -110,8 +110,7 @@ void Assembler::setNextBlock(Expression obj) {
       .type = obj.type(),
       .kind = Slot::Dummy,
       .offset = FrameLayout::TargetBlock
-    },
-    false
+    }
   };
   
   if (obj.hasSlot()) {

@@ -67,10 +67,10 @@ namespace acus::proxy {
     materializeImpl(a, std::get<SlotProxy>(_index), target);
   }
       
-  void impl::ArrayElement::write(Assembler &a, SlotProxy src) const {
+  void impl::ArrayElement::write(Assembler &a, SlotProxy src, TransferMode mode) const {
     return std::holds_alternative<int>(_index)
-      ? writeImpl(a, std::get<int>(_index), src)
-      : writeImpl(a, std::get<SlotProxy>(_index), src);
+      ? writeImpl(a, std::get<int>(_index), src, mode)
+      : writeImpl(a, std::get<SlotProxy>(_index), src, mode);
   }
 
   void impl::ArrayElement::write(Assembler &a, acus::literal::Literal src) const {
@@ -120,11 +120,11 @@ namespace acus::proxy {
   }
 
   // Write a slot-proxy to a slot at known offset
-  void impl::ArrayElement::writeImpl(Assembler &a, int index, SlotProxy src) const {
+  void impl::ArrayElement::writeImpl(Assembler &a, int index, SlotProxy src, TransferMode mode) const {
     Slot const arrSlot = a.materialize(_arr);
     Slot const srcSlot = a.materialize(src);
     Slot const elementSlot = getElementSlot(arrSlot, index);
-    a.assignSlot(elementSlot, srcSlot);
+    a.assignSlot(elementSlot, srcSlot, mode);
   }
 
   // Apply a callback to a slot at known offset
@@ -142,18 +142,18 @@ namespace acus::proxy {
   }
 
   // Write a slot-proxy to a dynamic offset
-  void impl::ArrayElement::writeImpl(Assembler &a, SlotProxy index, SlotProxy src) const {
+  void impl::ArrayElement::writeImpl(Assembler &a, SlotProxy index, SlotProxy src, TransferMode mode) const {
     Slot const arrSlot = a.materialize(_arr);
     Slot const srcSlot = a.materialize(src);
     Slot const indexSlot = a.materialize(index);
-    a.copySlotIntoElement(srcSlot, arrSlot, indexSlot);
+    a.copySlotIntoElement(srcSlot, arrSlot, indexSlot, mode);
   }
 
   // Apply a callback to a dynamic offset
   void impl::ArrayElement::writeImpl(Assembler &a, SlotProxy index, SlotWriteCallback const &writeInto) const {
     Slot tmp = a.getTemp(this->type());
     writeInto(tmp);
-    writeImpl(a, index, tmp);
+    writeImpl(a, index, tmp, TransferMode::Move);
     a.freeTempSlot(tmp);
   }
 

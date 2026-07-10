@@ -50,11 +50,12 @@ Slot Assembler::addressOfSlot(Slot pointeeSlot, API_CTX) {
   return ptrSlot;
 }
 
-void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot) {
+void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot, TransferMode mode) {
   assert(types::isArrayLike(arrSlot.type()));
   assert(types::isInteger(indexSlot.type()));
   assert(elementSlot.type() == types::cast<types::ArrayLike>(arrSlot.type())->elementType());
   types::TypeHandle elementType = elementSlot.type();
+
   
   pushPtr();
 
@@ -76,13 +77,11 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   setSeekMarker();
 
   // Fetch data
-  bool const allowMove = arrSlot.consumable();
   fetchFromDynamicOffset(Cell{scaledIndexSlot, MacroCell::Value0},
 			 Cell{scaledIndexSlot, MacroCell::Value1},
 			 payload,
 			 primitive::Left,
-			 allowMove);
-  if (allowMove) arrSlot.get().wasConsumed();
+			 mode);
 
   // Move payload into element
   for (int i = 0; i != elementType->size(); ++i) {
@@ -102,7 +101,7 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
 
 }
 
-void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot) {
+void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot, TransferMode mode) {
   assert(types::isArrayLike(arrSlot.type()));
   assert(types::isInteger(indexSlot.type()));
 
@@ -138,19 +137,17 @@ void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot) 
   seek(MacroCell::SeekMarker, primitive::Left, {}, true);
   _dp.set(arrSlot);
 
-  bool const allowMove = srcSlot.consumable();
   for (int i = 0; i != elementType->size(); ++i) {
     // Copy the contents into the payload cells
     moveTo(srcSlot + i, MacroCell::Value0);
-    copyOrMoveField(allowMove, Cell{arrSlot + i, MacroCell::Payload0},
+    copyOrMoveField(mode, Cell{arrSlot + i, MacroCell::Payload0},
 		    Temps<1>::select(arrSlot + i, MacroCell::Scratch0));
     if (elementType->usesValue1()) {
       moveTo(srcSlot + i, MacroCell::Value1);
-      copyOrMoveField(allowMove, Cell{arrSlot + i, MacroCell::Payload1},
+      copyOrMoveField(mode, Cell{arrSlot + i, MacroCell::Payload1},
 		      Temps<1>::select(arrSlot + i, MacroCell::Scratch0));
     }
   }
-  if (allowMove) srcSlot.get().wasConsumed();
   
   // Move the payload into the cell containing the marker (one beyond actual start of the element)
   moveTo(arrSlot);
@@ -215,8 +212,7 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot arrSlot,
       .type = elementType,
       .kind = SlotData::Kind::Dummy,
       .offset = 0
-    },
-    false
+    }
   };
   assignSlot(elementSlot, value);
 
@@ -229,7 +225,7 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot arrSlot,
   popPtr();
 }
 
-void Assembler::assignIntegerSlot(Slot dest, Slot src) {
+void Assembler::assignIntegerSlot(Slot dest, Slot src, TransferMode mode) {
   assert(types::isInteger(dest.type()));
   assert(types::isInteger(src.type()));
   assert(dest != src);
@@ -237,25 +233,23 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src) {
   auto destInt = types::cast<types::IntegerType>(dest.type());
   auto srcInt  = types::cast<types::IntegerType>(src.type());  
 
-  if (destInt->bits() == srcInt->bits()) return assignSlotBytewise(dest, src);
+  if (destInt->bits() == srcInt->bits()) return assignSlotBytewise(dest, src, mode);
 
   assert(destInt->bits() > srcInt->bits());
   assert(srcInt->bits() == 8);
   assert(destInt->bits() == 16);
   assert(destInt->signedness() == srcInt->signedness());
 
-  if (not srcInt->isSigned()) return assignSlotBytewise(dest, src);
+  if (not srcInt->isSigned()) return assignSlotBytewise(dest, src, mode);
 
   // Signed widening
   pushPtr();
 
   // Copy low byte to both fields of destination
   // TODO: optimize double-copy
-  bool const allowMove = src.consumable();
   moveTo(src, MacroCell::Value0);
-  copyOrMoveField(false,     Cell{dest, MacroCell::Value0}, Temps<1>::select(dest, MacroCell::Scratch0));
-  copyOrMoveField(allowMove, Cell{dest, MacroCell::Value1}, Temps<1>::select(dest, MacroCell::Scratch0));
-  if (allowMove) src.get().wasConsumed();
+  copyField(Cell{dest, MacroCell::Value0}, Temps<1>::select(dest, MacroCell::Scratch0));
+  copyOrMoveField(mode, Cell{dest, MacroCell::Value1}, Temps<1>::select(dest, MacroCell::Scratch0));
   
   // If src.low byte >= 128, set dest.high byte to 0xff, otherwise to zero
   // The high byte in dest now contains a copy of its low-byte. Apply
@@ -275,42 +269,36 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src) {
   popPtr();
 }
 
-void Assembler::assignSlot(Slot dest, Slot src) {
+void Assembler::assignSlot(Slot dest, Slot src, TransferMode mode) {
   if (dest == src) return;
-  // if (_state.allowTempAssign && src.kind() == Slot::Temp && dest.type() == src.type()) {
-  //   moveSlotBytewise(dest, src);
-  //   return;
-  // }
   
   if (types::isInteger(dest.type()) && types::isInteger(src.type()))
-    return assignIntegerSlot(dest, src);
+    return assignIntegerSlot(dest, src, mode);
 
-  return assignSlotBytewise(dest, src);
+  return assignSlotBytewise(dest, src, mode);
 }
 
 
-void Assembler::assignSlotBytewise(Slot dest, Slot src) {
+void Assembler::assignSlotBytewise(Slot dest, Slot src, TransferMode mode) {
   assert(dest != src);
   assert(dest.size() >= src.size());
 
   // Direct copy all of the cells
   pushPtr();
 
-  bool const allowMove = src.consumable();
   for (int i = 0; i != src.size(); ++i) {
     moveTo(src + i, MacroCell::Value0);
-    copyOrMoveField(allowMove, Cell{dest + i, MacroCell::Value0},
+    copyOrMoveField(mode, Cell{dest + i, MacroCell::Value0},
 		    Temps<1>::select(dest + i, MacroCell::Scratch0));
     moveTo(src + i, MacroCell::Value1);
     if (src.type()->usesValue1()) {
-      copyOrMoveField(allowMove, Cell{dest + i, MacroCell::Value1},
+      copyOrMoveField(mode, Cell{dest + i, MacroCell::Value1},
 		      Temps<1>::select(dest + i, MacroCell::Scratch0));
     }
     else {
       setToValue(0);
     }
   }
-  if (allowMove) src.get().wasConsumed();
   popPtr();
 
 }
@@ -375,7 +363,7 @@ void Assembler::assignSlot(Slot slot, literal::Literal val) {
 }
 
 
-Expression Assembler::assignImpl(Expression lhs, Expression rhs, bool allowTempAssign, API_CTX) {
+Expression Assembler::assignImpl(Expression lhs, Expression rhs, bool allowMove, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_ASSIGNABLE(lhs.type(), rhs.type());
@@ -384,8 +372,14 @@ Expression Assembler::assignImpl(Expression lhs, Expression rhs, bool allowTempA
   
   SlotProxy const dest = lhs.slot();
   if (rhs.hasSlot()) {
-    MoveGuard guard(*this, rhs.slot(), false);
-    _cache.write(dest, rhs.slot());
+
+    TransferMode mode = [&] {
+      if (not rhs.slot().directRelative()) return TransferMode::Copy;
+      if (materialize(rhs.slot()).kind() != Slot::Temp) return TransferMode::Copy;
+      return TransferMode::Move;
+    }();
+    
+    _cache.write(dest, rhs.slot(), mode);
   }
   else _cache.write(dest, rhs.literal());
   return lhs;
@@ -407,17 +401,14 @@ void Assembler::moveToPointee(Slot ptrSlot) {
   Cell const offsetHighPayload { 0 + RuntimePointer::Offset, MacroCell::Payload1 };
   
   // Copy pointer (frameDepth and offset) to the payload-cells of cell 0 and 1
-  bool const allowMove = ptrSlot.consumable();
   moveTo(frameDepth);
-  copyOrMoveField(allowMove, frameDepthPayload, Temps<1>::select(frameDepthPayload, MacroCell::Scratch0));
+  copyField(frameDepthPayload, Temps<1>::select(frameDepthPayload, MacroCell::Scratch0));
 
   moveTo(offsetLow);
-  copyOrMoveField(allowMove, offsetLowPayload,  Temps<1>::select(offsetLowPayload, MacroCell::Scratch0));
+  copyField(offsetLowPayload,  Temps<1>::select(offsetLowPayload, MacroCell::Scratch0));
 
   moveTo(offsetHigh);
-  copyOrMoveField(allowMove, offsetHighPayload, Temps<1>::select(offsetHighPayload, MacroCell::Scratch0));
-
-  if (allowMove) ptrSlot.get().wasConsumed();
+  copyField(offsetHighPayload, Temps<1>::select(offsetHighPayload, MacroCell::Scratch0));
 
   // If frameDepth is nonzero, we need to keep moving to the 
   // previous frame start until the depth-counter becomes 0.
@@ -439,7 +430,7 @@ void Assembler::moveToPointee(Slot ptrSlot) {
 }
 
 
-void Assembler::writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot) {
+void Assembler::writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot, TransferMode mode) {
   assert(types::isPointer(ptrSlot.type()));
   assert(srcSlot.type() == types::cast<types::PointerType>(ptrSlot.type())->pointeeType());
 
@@ -458,18 +449,16 @@ void Assembler::writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot) 
   _dp.set(endOfFrame);
   
   // Copy contents of the source-slot into the payload at the end of the frame
-  bool const allowMove = srcSlot.consumable();
   for (int i = 0; i != srcSlot.size(); ++i) {
     moveTo(srcSlot + i, MacroCell::Value0);
-    copyOrMoveField(allowMove, Cell{endOfFrame + i, MacroCell::Payload0},
+    copyOrMoveField(mode, Cell{endOfFrame + i, MacroCell::Payload0},
 		    Temps<1>::select(endOfFrame + i, MacroCell::Scratch0));
     if (srcSlot.type()->usesValue1()) {
       moveTo(srcSlot + i, MacroCell::Value1);
-      copyOrMoveField(allowMove, Cell{endOfFrame + i, MacroCell::Payload1},
+      copyOrMoveField(mode, Cell{endOfFrame + i, MacroCell::Payload1},
 		      Temps<1>::select(endOfFrame + i, MacroCell::Scratch0));
     }
   }
-  if (allowMove) srcSlot.get().wasConsumed();
 
   // Seek back to the pointee's slot
   moveTo(endOfFrame);
@@ -517,8 +506,7 @@ void Assembler::writeConstThroughDereferencedPointer(Slot ptrSlot, literal::Lite
       .type = value.type(),
       .kind = SlotData::Kind::Dummy,
       .offset = 0
-    },
-    false
+    }
   };
   assignSlot(pointeeSlot, value);
   
