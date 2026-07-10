@@ -22,11 +22,7 @@ namespace acus::proxy {
     return true;
   }
       
-  bool impl::DereferencedPointer::directRelative() const {
-    return false;
-  }
-
-  bool impl::DereferencedPointer::directAbsolute() const {
+  bool impl::DereferencedPointer::direct() const {
     return false;
   }
 

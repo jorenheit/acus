@@ -17,11 +17,7 @@ namespace acus::proxy {
     return Kind::Direct;
   }     
   
-  bool impl::Direct::directAbsolute() const {
-    return true;
-  }
-
-  bool impl::Direct::directRelative() const {
+  bool impl::Direct::direct() const {
     return true;
   }
   

@@ -30,7 +30,7 @@ Assembler::Cache::Entry* Assembler::Cache::ensureParentEntry(SlotProxy proxy) {
 
   // Direct-relative proxies are not cache entries themselves. They are views
   // into their enclosing storage owner, so climb past them.
-  while (parentProxy && (*parentProxy).directRelative()) {
+  while (parentProxy && (*parentProxy).direct()) {
     parentProxy = (*parentProxy).enclosingProxy();
   }
 
@@ -45,7 +45,7 @@ Assembler::Cache::Entry* Assembler::Cache::ensureParentEntry(SlotProxy proxy) {
 
 Assembler::Cache::Entry& Assembler::Cache::findOrCreateEntry(SlotProxy proxy, bool const skipMaterialization) {
   // Direct proxies should never be cached.
-  assert(proxy.directRelative() == false);
+  assert(proxy.direct() == false);
 
   // If this proxy was already cached, return the cached entry.
   if (Entry *entry = findEntry(proxy)) {
@@ -87,7 +87,7 @@ Slot Assembler::Cache::materialize(SlotProxy proxy) {
     flushAndClearRoots();
   }
   
-  if (proxy.directRelative()) {
+  if (proxy.direct()) {
     if (not _flushing) flushSubtree(proxy);
     return proxy.materialize(_self);
   }
@@ -359,7 +359,7 @@ void Assembler::Cache::writeAliasSensitive(SlotProxy dest, auto&& src) {
 
 
 void Assembler::Cache::writeDirect(SlotProxy dest, SlotProxy src, TransferMode mode) {
-  assert(dest.directRelative());
+  assert(dest.direct());
   
   flushAndDeleteSubtree(dest);
   invalidateDependencies(dest);
@@ -370,7 +370,7 @@ void Assembler::Cache::writeDirect(SlotProxy dest, SlotProxy src, TransferMode m
 }
 
 void Assembler::Cache::writeDirect(SlotProxy dest, auto&& src) {
-  assert(dest.directRelative());
+  assert(dest.direct());
   
   flushAndDeleteSubtree(dest);
   invalidateDependencies(dest);
@@ -382,7 +382,7 @@ void Assembler::Cache::writeDirect(SlotProxy dest, auto&& src) {
 
 
 void Assembler::Cache::writeIndirect(SlotProxy dest, auto&& assign) {
-  assert(not dest.directRelative());
+  assert(not dest.direct());
 
   // When writing to an indirect proxy, there is no need to materialize the old value
   // into the cache, so we skip the materialization when creating a cache entry.
@@ -409,7 +409,7 @@ void Assembler::Cache::write(SlotProxy dest, SlotProxy src, TransferMode mode) {
     return writeAliasSensitive(dest, src, mode);
   }
 
-  if (dest.directRelative()) {
+  if (dest.direct()) {
     return writeDirect(dest, src, mode);
   }
 
@@ -426,7 +426,7 @@ void Assembler::Cache::write(SlotProxy dest, literal::Literal val) {
     return writeAliasSensitive(dest, val);
   }
   
-  if (dest.directRelative()) {
+  if (dest.direct()) {
     return writeDirect(dest, val);
   }
 
@@ -443,7 +443,7 @@ void Assembler::Cache::write(SlotProxy dest, std::function<void(Slot)> const &wr
     return writeAliasSensitive(dest, writeInto);
   }
   
-  if (dest.directRelative()) {
+  if (dest.direct()) {
     return writeDirect(dest, writeInto);
   }
 

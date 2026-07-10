@@ -14,7 +14,7 @@ namespace acus::proxy {
   {}
   
   impl::SlotProxy::SlotProxy(Slot slot):
-    SlotProxy(direct(slot))
+    SlotProxy(proxy::direct(slot))
   {}
 
 
@@ -34,12 +34,8 @@ namespace acus::proxy {
     return _ptr->dependsOnDereferencedPointer();
   }
   
-  bool impl::SlotProxy::directAbsolute() const {
-    return _ptr->directAbsolute();
-  }
-  
-  bool impl::SlotProxy::directRelative() const {
-    return _ptr->directRelative();
+  bool impl::SlotProxy::direct() const {
+    return _ptr->direct();
   }
   
   std::optional<impl::SlotProxy> impl::SlotProxy::enclosingProxy() {

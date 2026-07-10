@@ -47,9 +47,7 @@ namespace acus::proxy {
       Slot addressOf(Assembler &a, API_CTX) const;
       bool dependsOn(SlotProxy other) const;
       bool dependsOnDereferencedPointer() const;
-      // TODO: I don't think directAbsolute is ever used, just rename directRelative to direct
-      bool directAbsolute() const;
-      bool directRelative() const;
+      bool direct() const;
       std::optional<SlotProxy> enclosingProxy();
       Kind kind() const;
       Slot materialize(Assembler &a) const;
@@ -73,8 +71,7 @@ namespace acus::proxy {
       virtual Slot addressOf(Assembler &a, API_CTX) const = 0;
       virtual bool dependsOn(SlotProxy other) const = 0;
       virtual bool dependsOnDereferencedPointer() const = 0;
-      virtual bool directAbsolute() const = 0;
-      virtual bool directRelative() const = 0;
+      virtual bool direct() const = 0;
       virtual std::optional<SlotProxy> enclosingProxy() const = 0;
       virtual Kind kind() const = 0;
       virtual Slot materialize(Assembler &a) const = 0;
@@ -96,8 +93,7 @@ namespace acus::proxy {
       virtual Slot addressOf(Assembler &a, API_CTX) const override;
       virtual bool dependsOn(SlotProxy) const override;
       virtual bool dependsOnDereferencedPointer() const override;
-      virtual bool directAbsolute() const override;
-      virtual bool directRelative() const override;
+      virtual bool direct() const override;
       virtual std::optional<SlotProxy> enclosingProxy() const;
       virtual Kind kind() const override;
       virtual Slot materialize(Assembler &a) const override;
@@ -117,8 +113,7 @@ namespace acus::proxy {
 
       virtual Slot addressOf(Assembler &a, API_CTX) const override;
       virtual Kind kind() const override;
-      virtual bool directAbsolute() const override;
-      virtual bool directRelative() const override;
+      virtual bool direct() const override;
       virtual std::optional<SlotProxy> enclosingProxy() const override;
       virtual bool dependsOn(SlotProxy) const override;
       virtual bool dependsOnDereferencedPointer() const override;
@@ -142,8 +137,7 @@ namespace acus::proxy {
 
       virtual Slot addressOf(Assembler &a, API_CTX) const override;
       virtual Kind kind() const override;  
-      virtual bool directAbsolute() const override;
-      virtual bool directRelative() const override;      
+      virtual bool direct() const override;      
       virtual bool dependsOn(SlotProxy other) const override;
       virtual bool dependsOnDereferencedPointer() const override;
       virtual std::optional<SlotProxy> enclosingProxy() const override;
@@ -183,8 +177,7 @@ namespace acus::proxy {
       virtual Kind kind() const override;
       virtual bool dependsOn(SlotProxy other) const override;      
       virtual bool dependsOnDereferencedPointer() const override;      
-      virtual bool directAbsolute() const override;
-      virtual bool directRelative() const override;      
+      virtual bool direct() const override;      
       virtual std::optional<SlotProxy> enclosingProxy() const;
       virtual Slot materialize(Assembler &a) const override;
       virtual void materialize(Assembler &a, Slot target) const override;
@@ -207,8 +200,7 @@ namespace acus::proxy {
       virtual Slot addressOf(Assembler &a, API_CTX) const override;      
       virtual bool dependsOn(SlotProxy other) const override; 
       virtual bool dependsOnDereferencedPointer() const override;      
-      virtual bool directAbsolute() const override;
-      virtual bool directRelative() const override;
+      virtual bool direct() const override;
       virtual std::optional<SlotProxy> enclosingProxy() const override;      
       virtual Kind kind() const override;
       virtual Slot materialize(Assembler &a) const override;

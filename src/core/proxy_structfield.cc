@@ -20,12 +20,8 @@ namespace acus::proxy {
     return Kind::StructField;
   }     
       
-  bool impl::StructField::directRelative() const {
+  bool impl::StructField::direct() const {
     return true;
-  }
-      
-  bool impl::StructField::directAbsolute() const {
-    return _obj.directAbsolute();
   }
 
   bool impl::StructField::dependsOnDereferencedPointer() const {

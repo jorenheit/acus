@@ -226,15 +226,17 @@ void Assembler::slotLessEqualConstUnsigned(Slot lhs, int val) {
     moveTo(lhs); 
     setToValue16(1, Cell{lhs, MacroCell::Value1});
     popPtr();
+    return;
   }
   else if ((val & 0xff) == 0xff) {
     moveTo(lhs);
     setToValue(1);
     popPtr();
+    return;
   }
   
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
-  slotLessEqualSlotUnsigned(lhs, valSlot);
+  slotLessEqualSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
 
   popPtr();

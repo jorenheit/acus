@@ -10,13 +10,6 @@ Expression Assembler::addressOfImpl(Expression obj, API_CTX) {
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   assert(not obj.isLiteral());
   
-  if (obj.slot().directAbsolute()) {
-    Slot const slot = materialize(obj.slot());
-    API_REQUIRE(slot.kind() != Slot::Temp,
-		error::ErrorCode::TakingAddressOfTemporary,
-		"Cannot take the address of a temporary value.");
-  }
-  
   return Expression(obj.slot().addressOf(*this, API_FWD));
 }
 
@@ -51,6 +44,10 @@ Slot Assembler::addressOfSlot(Slot pointeeSlot, API_CTX) {
 }
 
 void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot, TransferMode mode) {
+  // TransferMode::Move is valid only when arrSlot is part of a source object
+  // being consumed as a whole, e.g. a temp/cache slot being discarded.
+  // It destructively extracts the selected element in this mode.
+  
   assert(types::isArrayLike(arrSlot.type()));
   assert(types::isInteger(indexSlot.type()));
   assert(elementSlot.type() == types::cast<types::ArrayLike>(arrSlot.type())->elementType());
@@ -363,7 +360,7 @@ void Assembler::assignSlot(Slot slot, literal::Literal val) {
 }
 
 
-Expression Assembler::assignImpl(Expression lhs, Expression rhs, bool allowMove, API_CTX) {
+Expression Assembler::assignImpl(Expression lhs, Expression rhs, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_ASSIGNABLE(lhs.type(), rhs.type());
@@ -374,7 +371,7 @@ Expression Assembler::assignImpl(Expression lhs, Expression rhs, bool allowMove,
   if (rhs.hasSlot()) {
 
     TransferMode mode = [&] {
-      if (not rhs.slot().directRelative()) return TransferMode::Copy;
+      if (not rhs.slot().direct()) return TransferMode::Copy;
       if (materialize(rhs.slot()).kind() != Slot::Temp) return TransferMode::Copy;
       return TransferMode::Move;
     }();

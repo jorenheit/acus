@@ -33,14 +33,10 @@ namespace acus::proxy {
     return false;
   }
 
-  bool impl::ArrayElement::directRelative() const {
+  bool impl::ArrayElement::direct() const {
     return std::holds_alternative<int>(_index);
   }
       
-  bool impl::ArrayElement::directAbsolute() const {
-    return _arr.directAbsolute() && directRelative();
-  }
-
   std::string impl::ArrayElement::constructName(auto&& getName) const {
     std::string idx = std::holds_alternative<int>(_index)
       ? std::to_string(std::get<int>(_index))

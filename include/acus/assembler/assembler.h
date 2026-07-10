@@ -317,7 +317,7 @@ namespace acus {
     Expression dereferencePointerImpl(Expression ptr, API_CTX);
 
     Expression addressOfImpl(Expression obj, API_CTX);
-    Expression assignImpl(Expression lhs, Expression rhs, bool allowTempAssign, API_CTX);
+    Expression assignImpl(Expression lhs, Expression rhs, API_CTX);
     Expression castImpl(Expression obj, types::TypeHandle toType, API_CTX);
     
     void jumpIfImpl(Expression condition, std::string const &trueLabel, std::string const &falseLabel, API_CTX);

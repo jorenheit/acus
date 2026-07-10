@@ -182,7 +182,7 @@ void Assembler::returnFromFunctionImpl(std::optional<Expression> const &ret, API
       }
     };
       
-    assignImpl(Expression{returnSlot}, *ret, true, API_FWD);
+    assignImpl(Expression{returnSlot}, *ret, API_FWD);
   }
   
   _cache.returnBoundary();

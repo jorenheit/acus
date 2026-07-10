@@ -21,11 +21,7 @@ namespace acus::proxy {
     return a.addressOfSlot(_slot, API_FWD);
   }
 
-  bool impl::GlobalReference::directAbsolute() const {
-    return false;
-  }
-
-  bool impl::GlobalReference::directRelative() const {
+  bool impl::GlobalReference::direct() const {
     return false;
   }
 

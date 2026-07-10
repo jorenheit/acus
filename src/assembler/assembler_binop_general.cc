@@ -99,7 +99,7 @@ Expression Assembler::binOpImpl(Expression lhs, Expression rhs, API_CTX) {
   }
 
   Slot result = getTemp(opResult.workType);
-  assignImpl(Expression{result}, lhs, false, API_FWD);
+  assignImpl(Expression{result}, lhs, API_FWD);
   binOpAssignImpl<Operator>(Expression{result}, rhs, API_FWD);
 
   result.get().type = opResult.type;
