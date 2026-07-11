@@ -85,10 +85,14 @@ namespace acus::proxy {
     return _arr;
   }
 
+  bool impl::ArrayElement::dependsOnStorage(Slot other) const {
+    if (_arr.dependsOnStorage(other)) return true;
+    return (std::holds_alternative<SlotProxy>(_index) && std::get<SlotProxy>(_index).dependsOnStorage(other));
+  }
+  
   bool impl::ArrayElement::dependsOn(SlotProxy other) const {
     if (other == _arr) return true;
-    if (std::holds_alternative<SlotProxy>(_index) && std::get<SlotProxy>(_index) == other) return true;
-    return false;
+    return (std::holds_alternative<SlotProxy>(_index) && std::get<SlotProxy>(_index) == other);
   }
       
     

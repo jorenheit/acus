@@ -29,6 +29,10 @@ namespace acus::proxy {
     return {};
   }
 
+  bool impl::GlobalReference::dependsOnStorage(Slot) const {
+    return false;
+  }
+  
   bool impl::GlobalReference::dependsOn(SlotProxy) const {
     return false;
   }

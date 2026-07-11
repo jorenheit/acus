@@ -69,7 +69,7 @@ void Assembler::label(std::string const &labelName, API_FUNC) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  _cache.internalBoundary();  
+  _cache.controlBoundary();  
   if (_currentBlock != nullptr) {
     setNextBlock(_currentFunction->name, labelName);    
     endBlock();
@@ -132,7 +132,7 @@ void Assembler::jump(std::string const &jumpLabel, API_FUNC) {
   // After a jump, a label is expected to prevent unreachable code.
 
   assert(_currentBlock != nullptr);
-  _cache.internalBoundary();
+  _cache.controlBoundary();
   setNextBlock(_currentFunction->name, jumpLabel);
   endBlock();
 
@@ -154,7 +154,7 @@ void Assembler::jumpIfImpl(Expression obj, std::string const &trueLabel,
 
   deferLabelCheck(_currentFunction->name, trueLabel, API_FWD);
   deferLabelCheck(_currentFunction->name, falseLabel, API_FWD);
-  _cache.internalBoundary();  
+  _cache.controlBoundary();  
   endBlock();
   
   API_EXPECT_NEXT("label");
@@ -185,7 +185,7 @@ void Assembler::constructMetaBlocks() {
 	_cache.write(returnSlot, [&](Slot const &slot){
 	  fetchReturnData(slot);
 	});
-	_cache.callBoundary();
+	_cache.controlBoundary();
       }
 
       // Check if the run-state has become 0. If so, unwind the stack

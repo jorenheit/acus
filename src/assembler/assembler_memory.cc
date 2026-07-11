@@ -9,8 +9,8 @@
 std::optional<Slot> Assembler::localSlot(std::string const &varName) const {
   Function::Scope *targetScope = _currentScope;
   while (true) {
-    for (SlotData const &slot: _currentFunction->frame.locals) {
-      if (slot.name == varName && slot.scope == targetScope) {
+    for (Slot const &slot: _currentFunction->frame.locals) {
+      if (slot.name() == varName && slot.scope() == targetScope) {
 	return slot;
       }
     }
@@ -22,9 +22,9 @@ std::optional<Slot> Assembler::localSlot(std::string const &varName) const {
 }
 
 std::optional<Slot> Assembler::globalSlot(std::string const &varName) const {
- for (SlotData const &slot: _program.globals) {
-   if (slot.name == varName) {
-     return Slot{slot};
+ for (Slot const &slot: _program.globals) {
+   if (slot.name() == varName) {
+     return slot;
    }
  }
  
@@ -72,18 +72,19 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
     
     // Now check if there is an existing slot that fits this type
     auto &frame = _currentFunction->frame;  
-    for (SlotData &slot: frame.locals) {
-      if (slot.kind != Slot::Available || slot.type->size() < type->size())
+    for (Slot &slot: frame.locals) {
+      if (slot.kind() != Slot::Available || slot.type()->size() < type->size())
 	continue;
 
-      int const diff = slot.type->size() - type->size();      
+      int const diff = slot.type()->size() - type->size();      
       
       // Reuse this slot
-      slot.name = name;
-      slot.uniqueName = makeFullName(name);
-      slot.type = type;
-      slot.kind = kind;
-      slot.scope = _currentScope;
+      SlotData &data = slot.get();
+      data.name = name;
+      data.uniqueName = makeFullName(name);
+      data.type = type;
+      data.kind = kind;
+      data.scope = (kind == Slot::Cache) ? nullptr : _currentScope;
       
       // Split the slot if there is still room
       if (diff > 0) {
@@ -96,11 +97,11 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
 	    .uniqueName = makeFullName(dummyName),
 	    .type = ts::raw(diff),
 	    .kind = Slot::Available,
-	    .offset = slot.offset + slot.type->size(),
+	    .offset = slot.offset() + slot.type()->size(),
 	    .scope = nullptr
 	  });
       }
-      return Slot{slot};
+      return Slot{data};
     }
     return {};
   };
@@ -116,7 +117,7 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
       .type = type,
       .kind = kind,
       .offset = frame.localBase() + frame.localAreaSize(),
-      .scope = _currentScope
+      .scope = (kind == Slot::Cache) ? nullptr : _currentScope
     };
 
     frame.locals.emplace_back(newSlot);
@@ -136,25 +137,25 @@ void Assembler::mergeAvailableSlots() {
     changed = false;
     
     for (size_t i = 0; i < locals.size() && !changed; ++i) {
-      SlotData &a = locals[i];
-      if (a.kind != Slot::Available) continue;
+      Slot &a = locals[i];
+      if (a.kind() != Slot::Available) continue;
 
       for (size_t j = 0; j < locals.size(); ++j) {
         if (i == j) continue;
-	SlotData &b = locals[j];
-        if (b.kind != Slot::Available) continue;
+	Slot &b = locals[j];
+        if (b.kind() != Slot::Available) continue;
 
 	// a just before b
-        if (a.offset + a.size() == b.offset) {
-          a.type = ts::raw(a.size() + b.size());
+        if (a.offset() + a.size() == b.offset()) {
+          a.get().type = ts::raw(a.size() + b.size());
           locals.erase(locals.begin() + static_cast<std::ptrdiff_t>(j));
           changed = true;
           break;
         }
 
 	// b just before a
-        if (b.offset + b.size() == a.offset) {
-          b.type = ts::raw(b.size() + a.size());
+        if (b.offset() + b.size() == a.offset()) {
+          b.get().type = ts::raw(b.size() + a.size());
           locals.erase(locals.begin() + static_cast<std::ptrdiff_t>(i));
           changed = true;
           break;
@@ -190,15 +191,20 @@ void Assembler::markSlotTemp(Slot slot) {
   data.kind = Slot::Temp;
 }
 
+void Assembler::freeSlot(Slot slot, bool const merge) {
+  markSlotAvailable(slot);
+  if (merge) mergeAvailableSlots();
+}
+
 bool Assembler::freeAllSlots(auto&& condition) {
   bool success = false;
   for (auto &slot: _currentFunction->frame.locals) {
     if (condition(slot)) {
-      markSlotAvailable(slot);
+      freeSlot(slot, false);
       success = true;
     }
   }
-
+  
   if (success) mergeAvailableSlots();
   return success;
 }
@@ -206,9 +212,7 @@ bool Assembler::freeAllSlots(auto&& condition) {
 
 void Assembler::freeTempSlot(Slot target) {
   assert(target.kind() == Slot::Temp);
-
-  markSlotAvailable(target);
-  mergeAvailableSlots();
+  freeSlot(target);
 }
 
 
@@ -220,9 +224,7 @@ void Assembler::freeTempSlots() {
 
 void Assembler::freeCacheSlot(Slot target) {
   assert(target.kind() == Slot::Cache);
-
-  markSlotAvailable(target);
-  mergeAvailableSlots();
+  freeSlot(target);
 }
 
 void Assembler::freeCacheSlots() {
@@ -232,13 +234,26 @@ void Assembler::freeCacheSlots() {
 }
 
 void Assembler::freeScope(Function::Scope const *scope) {
-  freeAllSlots([&](Slot slot) {
-    return slot.scope() == scope;
-  });
+  std::vector<Slot> doomed;
+  for (auto &slot: _currentFunction->frame.locals) {
+    if (scope == slot.scope()) doomed.push_back(slot);
+  }
+  if (doomed.empty()) return;
+
+  for (Slot &slot: doomed) {
+    _cache.freeSlotBoundary(slot);
+  }
+
+  for (Slot &slot: doomed) {
+    freeSlot(slot, false);
+  }
+  
+  mergeAvailableSlots();
 }
 
 Slot Assembler::getTemp(types::TypeHandle type) {
   assert(_currentBlock != nullptr);
+  // TODO: struct Counters
   static size_t tmpID = 0;
   return allocSlot("__tmp_" + std::to_string(tmpID++), type, Slot::Temp);
 }
@@ -251,6 +266,7 @@ Slot Assembler::getTemp(literal::Literal value) {
 
 Slot Assembler::getCache(types::TypeHandle type) {
   assert(_currentBlock != nullptr);
+  // TODO: struct Counters
   static size_t cacheID = 0;
   return allocSlot("__cache_" + std::to_string(cacheID++), type, Slot::Cache);
 }

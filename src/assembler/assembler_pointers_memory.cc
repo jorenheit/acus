@@ -56,15 +56,18 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   
   pushPtr();
 
-  // Prepare payload (index * sizeof(T))
-  Slot scaledIndexSlot = getTemp(ts::u8());
-  assignSlot(scaledIndexSlot, indexSlot);
-  moveTo(scaledIndexSlot, MacroCell::Value0);
-  mulConst(elementType->size(),
-	   Temps<3>::select(scaledIndexSlot, MacroCell::Scratch0,
-			    scaledIndexSlot, MacroCell::Scratch1,			  
-			    scaledIndexSlot, MacroCell::Payload0
-			    ));
+  // Prepare offset-payload (index * sizeof(T))
+  auto [scaledIndexSlot, freeScaledIndexSlot] = [&] -> std::pair<Slot, bool> {
+    if (indexSlot.type()->usesValue1() && elementType->size() == 1) {
+      // Index can be used as-is
+      return {indexSlot, false};
+    }
+    
+    Slot scaled = getTemp(ts::u16());
+    assignSlot(scaled, indexSlot);
+    mulSlotByConst(scaled, elementType->size());
+    return {scaled, true};
+  }();
 
   Payload payload(elementType->size(),
 		  elementType->usesValue1() ? Payload::Width::Double : Payload::Width::Single);
@@ -93,7 +96,7 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   // Return to start of array
   moveTo(arrSlot);
   resetSeekMarker();
-  freeTempSlot(scaledIndexSlot);
+  if (freeScaledIndexSlot) freeTempSlot(scaledIndexSlot);
   popPtr();
 
 }
@@ -107,14 +110,18 @@ void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot, 
 
   pushPtr();
 
-  Slot scaledIndexSlot = getTemp(ts::u8());
-  assignSlot(scaledIndexSlot, indexSlot);
-  moveTo(scaledIndexSlot, MacroCell::Value0);
-  mulConst(elementType->size(),
-	   Temps<3>::select(scaledIndexSlot, MacroCell::Scratch0,
-			    scaledIndexSlot, MacroCell::Scratch1,			  
-			    scaledIndexSlot, MacroCell::Payload0
-			    ));
+  // Prepare offset-payload (index * sizeof(T))
+  auto [scaledIndexSlot, freeScaledIndexSlot] = [&] -> std::pair<Slot, bool> {
+    if (indexSlot.type()->usesValue1() && elementType->size() == 1) {
+      // Index can be used as-is
+      return {indexSlot, false};
+    }
+    
+    Slot scaled = getTemp(ts::u16());
+    assignSlot(scaled, indexSlot);
+    mulSlotByConst(scaled, elementType->size());
+    return {scaled, true};
+  }();
   
   // Plant a seek marker at the start of the array
   moveTo(arrSlot, MacroCell::Value0);
@@ -127,7 +134,7 @@ void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot, 
   _dp.set(0);
   moveTo(elementType->size()); 
   setSeekMarker();
-  freeTempSlot(scaledIndexSlot);
+  if (freeScaledIndexSlot) freeTempSlot(scaledIndexSlot);
   moveTo(0);
 
   // Move back to the start of the array
@@ -185,14 +192,18 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot arrSlot,
 
   pushPtr();
 
-  Slot scaledIndexSlot = getTemp(ts::u8());
-  assignSlot(scaledIndexSlot, indexSlot);
-  moveTo(scaledIndexSlot, MacroCell::Value0);
-  mulConst(elementType->size(),
-	   Temps<3>::select(scaledIndexSlot, MacroCell::Scratch0,
-			    scaledIndexSlot, MacroCell::Scratch1,			  
-			    scaledIndexSlot, MacroCell::Payload0
-			    ));
+  // Prepare offset-payload (index * sizeof(T))
+  auto [scaledIndexSlot, freeScaledIndexSlot] = [&] -> std::pair<Slot, bool> {
+    if (indexSlot.type()->usesValue1() && elementType->size() == 1) {
+      // Index can be used as-is
+      return {indexSlot, false};
+    }
+    
+    Slot scaled = getTemp(ts::u16());
+    assignSlot(scaled, indexSlot);
+    mulSlotByConst(scaled, elementType->size());
+    return {scaled, true};
+  }();
   
   // Plant a seek marker at the start of the array
   moveTo(arrSlot, MacroCell::Value0);
@@ -217,7 +228,7 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot arrSlot,
   seek(MacroCell::SeekMarker, primitive::Left, {}, true);
   _dp.set(arrSlot);
   resetSeekMarker();
-  freeTempSlot(scaledIndexSlot);
+  if (freeScaledIndexSlot) freeTempSlot(scaledIndexSlot);
 
   popPtr();
 }
@@ -293,6 +304,7 @@ void Assembler::assignSlotBytewise(Slot dest, Slot src, TransferMode mode) {
 		      Temps<1>::select(dest + i, MacroCell::Scratch0));
     }
     else {
+      moveTo(dest + i, MacroCell::Value1);
       setToValue(0);
     }
   }

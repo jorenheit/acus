@@ -159,7 +159,7 @@ void Assembler::endScope(API_FUNC) {
 
   // TODO: should this actually be a cache boundary?
   // Rather, cache entries should not be scoped?
-  _cache.internalBoundary();
+  //  _cache.controlBoundary();
   freeScope(_currentScope);
   _currentScope = _currentScope->parent;
 }

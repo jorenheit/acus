@@ -40,6 +40,11 @@ namespace acus::proxy {
     return _obj;
   }
 
+  bool impl::StructField::dependsOnStorage(Slot other) const {
+    return _obj.dependsOnStorage(other);
+  }
+
+  
   bool impl::StructField::dependsOn(SlotProxy other) const {
     return other == _obj;
   }

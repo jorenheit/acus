@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <unordered_set>
 #include "assembler.ih"
 #include "acus/util/util.h"
 
@@ -242,15 +243,39 @@ void Assembler::Cache::flushAndClearRoots() {
   flushAndClearRoots([](EntryPtr const &entry) { return true; });
 }
 
-void Assembler::Cache::internalBoundary() {
-  // At internal control-flow boundaries, we don't need to synchronize globals
-  flushAndClearRoots([&](EntryPtr const &entry) {
-    return entry->proxy.kind() != proxy::Kind::GlobalReference;
-  });
+void Assembler::Cache::freeSlotBoundary(Slot slot) {
+  std::vector<Entry*> affected;
+
+  for (auto const &entry: _entries) {
+    if (entry->proxy.dependsOnStorage(slot)) {
+      affected.push_back(entry.get());
+    }
+  }
+  
+  if (affected.empty()) return;
+
+  std::unordered_set<Entry*> const affectedSet{affected.begin(), affected.end()};
+  std::unordered_set<Entry*> roots;
+
+  for (Entry *entry: affected) {
+    Entry *root = entry;
+
+    while (root->parent != nullptr && affectedSet.contains(root->parent)) {
+      root = root->parent;
+    }
+
+    roots.insert(root);
+  }
+
+  for (Entry *entry: roots) {
+    flushSubtree(*entry, true, TransferMode::Move);
+  }
+
+  deleteMarkedEntries();
 }
 
-void Assembler::Cache::callBoundary() {
-  // At call boundaries, we flush the entire cache to make sure all aliased slots are in sync
+void Assembler::Cache::controlBoundary() {
+  // At control boundaries, we flush the entire cache to make sure all aliased slots are in sync
   flushAndClearRoots();;
   assert(_entries.empty());
 }

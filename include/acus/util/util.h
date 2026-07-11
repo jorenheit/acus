@@ -35,4 +35,17 @@ namespace acus::util {
       _flag = _old;
     }
   };
+
+  namespace math {
+    inline int div(int num, int denom) {
+      if (denom != 0) return num / denom;
+      if (num == 0) return 0;
+      return static_cast<int>(static_cast<size_t>(-1));
+    }
+
+    inline int mod(int num, int denom) {
+      if (denom != 0) return num % denom;
+      return 0;
+    }
+  }
 }

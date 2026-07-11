@@ -26,6 +26,10 @@ namespace acus::proxy {
     return _ptr->addressOf(a, API_FWD);
   }
 
+  bool impl::SlotProxy::dependsOnStorage(Slot slot) const {
+      return _ptr->dependsOnStorage(slot);
+  }
+
   bool impl::SlotProxy::dependsOn(impl::SlotProxy other) const {
     return _ptr->dependsOn(other);
   }

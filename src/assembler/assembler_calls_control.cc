@@ -36,7 +36,7 @@ void Assembler::callFunctionImpl(std::string const &functionName, std::optional<
   setNextBlock(_currentFunction->name, metaBlockName);
 
   // Prepare frame (set target, copy args) and push next frame onto the stack
-  _cache.callBoundary();  
+  _cache.controlBoundary();  
   prepareNextFrame(functionName, args, API_FWD);
   pushFrame();
   _cache.reset();
@@ -76,7 +76,7 @@ void Assembler::callFunctionImpl(Expression fPtr, std::optional<Expression> cons
     });
 
   // Prepare frame (set target, copy args) and push next frame onto the stack
-  _cache.callBoundary();
+  _cache.controlBoundary();
   prepareNextFrame(fPtr, args, API_FWD);
   pushFrame();
   _cache.reset();

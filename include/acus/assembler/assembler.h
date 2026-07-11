@@ -13,6 +13,7 @@
 #include <concepts>
 #include <unordered_set>
 
+#include "acus/util/util.h"
 #include "acus/core/proxy.h"
 #include "acus/core/program.h"
 #include "acus/core/data.h"
@@ -260,9 +261,9 @@ namespace acus {
       void write(SlotProxy dest, SlotProxy src, TransferMode mode);
       void write(SlotProxy dest, literal::Literal src);
       void write(SlotProxy dest, std::function<void(Slot )> const &writeInto);
-      
-      void internalBoundary();
-      void callBoundary();
+
+      void freeSlotBoundary(Slot slot);
+      void controlBoundary();
       void returnBoundary();
       void reset(); 
       bool empty() const; 
@@ -620,6 +621,7 @@ namespace acus {
     void markSlotAvailable(Slot slot);
     void markSlotsAvailable(auto&& condition);
     void markSlotTemp(Slot slot);
+    void freeSlot(Slot slot, bool const merge = true);
     void freeTempSlots();
     void freeTempSlot(Slot slot);
     void freeCacheSlots();
@@ -702,8 +704,8 @@ namespace acus {
     DEFINE_BINARY_OPERATOR(Add, BinOp::Add, int, x+y, addSlotToSlot,   addConstToSlot);
     DEFINE_BINARY_OPERATOR(Sub, BinOp::Sub, int, x-y, subSlotFromSlot, subConstFromSlot);
     DEFINE_BINARY_OPERATOR(Mul, BinOp::Mul, int, x*y, mulSlotBySlot,   mulSlotByConst);
-    DEFINE_BINARY_OPERATOR(Div, BinOp::Div, int, x/y, divSlotBySlot,   divSlotByConst);
-    DEFINE_BINARY_OPERATOR(Mod, BinOp::Mod, int, x%y, modSlotBySlot,   modSlotByConst);
+    DEFINE_BINARY_OPERATOR(Div, BinOp::Div, int, util::math::div(x, y), divSlotBySlot,   divSlotByConst);
+    DEFINE_BINARY_OPERATOR(Mod, BinOp::Mod, int, util::math::mod(x, y), modSlotBySlot,   modSlotByConst);
 
     DEFINE_BINARY_OPERATOR(And,  BinOp::And,  bool, x&&y,    andSlotWithSlot,  andSlotWithConst);
     DEFINE_BINARY_OPERATOR(Nand, BinOp::Nand, bool, !(x&&y), nandSlotWithSlot, nandSlotWithConst);

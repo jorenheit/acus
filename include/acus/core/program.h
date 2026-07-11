@@ -30,7 +30,7 @@ struct Program {
   
   std::vector<Function> functions;
   std::unordered_map<std::string, size_t> functionByName;
-  std::vector<SlotData> globals;
+  std::vector<Slot> globals;
   std::vector<Function::Block*> globalBlockOrder;
 
   inline Function& createFunction(std::string name, types::FunctionType const *type) {
@@ -71,7 +71,7 @@ struct Program {
   }
 
   inline int globalIndex(std::string const &name) const {
-    for (size_t i = 0; i != globals.size(); ++i) if (globals[i].name == name) return i;
+    for (size_t i = 0; i != globals.size(); ++i) if (globals[i].name() == name) return i;
     return -1;
   }
 

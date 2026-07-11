@@ -456,9 +456,53 @@ using namespace acus::api;
 
 static std::vector<bftest::TestCase> buildTests() {
   std::vector<bftest::TestCase> tests;
-  tests.reserve(128);  
-    
-  tests.push_back(expectOutput("Global Variables 1",
+
+tests.push_back(expectOutput("Global cache internal boundary",
+                             "T", [] {
+#include "tests/global_cache_internal_boundary.cc"
+                             }));
+
+tests.push_back(expectOutput("Scope cache entry must flush on endScope",
+                             "abcd", [] {
+#include "tests/scope_cache_entry_must_flush_on_endscope.cc"
+                             }));
+ 
+tests.push_back(expectOutput("Global cache path-dependent join",
+                             "I", [] {
+#include "tests/global_cache_path_dependent_join.cc"
+                             }));
+
+tests.push_back(expectOutput("Comparison LE unsigned max edge",
+                             "BBBB", [] {
+#include "tests/comparison_le_unsigned_max_edge.cc"
+                             }));
+
+tests.push_back(expectOutput("Literal div/mod zero folding",
+                             "ABCD", [] {
+#include "tests/literal_div_mod_zero.cc"
+                             }));
+
+tests.push_back(expectOutput("Logical negative constants",
+                             "BAB", [] {
+#include "tests/logical_negative_constants.cc"
+                             })); 
+
+tests.push_back(expectOutput("Dynamic array u16 index",
+                             "Z", [] {
+#include "tests/dynamic_array_u16_index.cc"
+                             }));
+
+tests.push_back(expectOutput("Dynamic array scaled offset overflow",
+                             "ZZCD", [] {
+#include "tests/dynamic_array_scaled_offset_overflow.cc"
+                             }));
+
+tests.push_back(expectOutput("Unsigned widening clears high byte",
+                             "66", [] {
+#include "tests/unsigned_widening_clears_high_byte.cc"
+                             }));
+ 
+tests.push_back(expectOutput("Global Variables 1",
 			       "AF", []() {
 #include "tests/global_variables_1.cc"
 			       }));

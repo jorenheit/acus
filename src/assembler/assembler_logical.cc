@@ -99,7 +99,7 @@ void Assembler::orSlotWithConst(Slot lhs, int val) {
   pushPtr();
   moveTo(lhs);
 
-  if (val > 0) {
+  if (val != 0) {
     setToValue(1);
     moveTo(lhs, MacroCell::Value1);
     zeroCell();
@@ -143,7 +143,7 @@ void Assembler::norSlotWithConst(Slot lhs, int val) {
   pushPtr();
   moveTo(lhs);
 
-  if (val > 0) {
+  if (val != 0) {
     setToValue(0);
     moveTo(lhs, MacroCell::Value1);
     zeroCell();
@@ -187,7 +187,7 @@ void Assembler::xorSlotWithConst(Slot lhs, int val) {
   pushPtr();
   moveTo(lhs);
 
-  if (val > 0) {
+  if (val != 0) {
     if (lhs.type()->usesValue1()) {
       not16Destructive(Cell{lhs, MacroCell::Value1},
 		       Temps<1>::select(lhs, MacroCell::Scratch0));

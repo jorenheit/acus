@@ -37,7 +37,11 @@ namespace acus::proxy {
   std::optional<SlotProxy> impl::DereferencedPointer::enclosingProxy() const {
     return {};
   }
-      
+
+  bool impl::DereferencedPointer::dependsOnStorage(Slot other) const {
+    return _ptr.dependsOnStorage(other);
+  }
+  
   bool impl::DereferencedPointer::dependsOn(SlotProxy other) const {
     return other == _ptr;
   }

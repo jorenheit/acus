@@ -61,6 +61,16 @@ namespace acus::proxy {
     return {};
   }
 
+  bool impl::Direct::dependsOnStorage(Slot other) const {
+    // check whether the slot is equal to or overlaps with the direct slot
+    int const myBegin = _slot.offset();
+    int const myEnd = _slot.offset() + _slot.size();
+    int const otherBegin = other.offset();
+    int const otherEnd = other.offset() + other.size();
+
+    return otherBegin < myEnd && otherEnd > myBegin;
+  }
+  
   bool impl::Direct::dependsOn(SlotProxy) const {
     return false;
   }
