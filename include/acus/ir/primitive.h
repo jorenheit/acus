@@ -73,10 +73,13 @@ namespace acus::primitive {
   // ========= Primitive Nodes =============
 
 #define COMMON_INTERFACE				 \
-  std::string text(Context const&) const override;	 \
-  std::string generate(Context const&) const override;	 \
+  virtual std::string text(Context const&) const override;	 \
+  virtual std::string generate(Context const&) const override;	 \
 
-
+#define MERGABLE \
+  virtual std::shared_ptr<Node> merge(Node const *other) const override;
+  
+  
   struct Comment: Node {
     std::string txt;
     inline explicit Comment(std::string txt): txt(std::move(txt)) {}
@@ -107,9 +110,9 @@ namespace acus::primitive {
      */
     
     inline explicit MovePointerRelative(DInt amount): amount(std::move(amount)) {}
-    virtual std::shared_ptr<Node> merge(Node const *other) const override;
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
   
@@ -122,8 +125,8 @@ namespace acus::primitive {
       Invariants: -
      */
 
-    virtual std::shared_ptr<Node> merge(Node const *other) const override;         
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
   struct ZeroCellPlus: Node {
@@ -135,8 +138,8 @@ namespace acus::primitive {
       Invariants: -
      */
     
-    virtual std::shared_ptr<Node> merge(Node const *other) const override;    
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
   struct ConstructConstant: Node {
@@ -159,7 +162,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
-    // TODO: merge
+    MERGABLE;
   };
 
   
@@ -175,8 +178,7 @@ namespace acus::primitive {
     
     inline explicit ChangeBy(DInt d): delta(std::move(d)) {}
     COMMON_INTERFACE;
-
-    virtual std::shared_ptr<Node> merge(Node const *other) const override;
+    MERGABLE;
   };
 
   struct MoveData: Node {
@@ -202,7 +204,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
-    virtual std::shared_ptr<Node> merge(Node const *other) const override;
+    MERGABLE;
   };
   
   struct CopyData: Node {
@@ -223,7 +225,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
-    virtual std::shared_ptr<Node> merge(Node const *other) const override;
+    MERGABLE;
   };
 
   struct In: Node {
@@ -251,8 +253,7 @@ namespace acus::primitive {
     {}
     
     COMMON_INTERFACE;
-    
-    // TODO: Bool + Not -> Not, Bool + Bool -> Bool
+    MERGABLE;
   };
   
   struct Not: Node {
@@ -273,6 +274,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
   
 
@@ -297,6 +299,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
   struct Xor: Node {
@@ -321,6 +324,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
   
   struct And: Node {
@@ -345,6 +349,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
   struct Less: Node {
@@ -370,6 +375,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
   struct LessOrEqual: Node {
@@ -395,6 +401,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
   struct Greater: Node {
@@ -420,6 +427,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
   struct GreaterOrEqual: Node {
@@ -445,6 +453,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
 
@@ -468,6 +477,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
     
   
@@ -490,6 +500,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
 
@@ -511,6 +522,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
   struct Subtract: Node {
@@ -531,6 +543,7 @@ namespace acus::primitive {
     {}
 
     COMMON_INTERFACE;
+    MERGABLE;
   };
   
 } // namespace acus::ir

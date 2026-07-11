@@ -91,7 +91,8 @@ void Assembler::endProgram(API_FUNC) {
   _state.begun = false;
 
   // Store resulting code
-  auto prog = simplifySequence(compilePrimitives(API_FWD));
+  auto prog = compilePrimitives(API_FWD);
+  simplifySequence(prog);
   primitive::Context ctx = constructContext();  
   _txt[_program.name] = prog.dumpText(ctx);
   _bf[_program.name] = simplifyBrainfuck(prog.dumpCode(ctx));

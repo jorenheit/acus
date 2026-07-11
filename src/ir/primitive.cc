@@ -478,106 +478,52 @@ namespace acus::Algorithm {
   
 }
 
-
 #define TXT(Name) std::string primitive::Name::text(Context const &ctx) const 
 #define GEN(Name) std::string primitive::Name::generate(Context const &ctx) const
 #define MERGE(Name) std::shared_ptr<primitive::Node> primitive::Name::merge(Node const *other) const
+#define RULE(Other, Result, ...)					\
+  if ([[maybe_unused]] auto const *rhs = dynamic_cast<Other const *>(other)) { \
+    return std::make_shared<Result>(__VA_ARGS__);			\
+  }
 
-// Comment
-TXT(Comment) { return txt; }
-GEN(Comment) { return ""; } // TODO: implement check for BF characters and just paste verbatim
+// Codegen
 
-// LoopOpen
-TXT(LoopOpen) { return "LOOP_START: " + tag; }
-GEN(LoopOpen) { return "["; }
+GEN(Comment) {
+  return "";
+} // TODO: implement check for BF characters and just paste verbatim
 
-// LoopClose
-TXT(LoopClose) { return "LOOP_END: " + tag; }
-GEN(LoopClose) { return "]"; }
+GEN(LoopOpen) {
+  return "[";
+}
 
-// MovePointerRelative
-TXT(MovePointerRelative) {
-  int const n = amount.resolve(ctx);
-  if (n == 0) return "";
-  return ((n < 0) ? "LEFT: " : "RIGHT: ") + std::to_string(std::abs(n));
+GEN(LoopClose) {
+  return "]";
 }
 
 GEN(MovePointerRelative) {
   return Algorithm::movePtr(amount.resolve(ctx));
 }
 
-MERGE(MovePointerRelative) {
-  if (auto ptr = dynamic_cast<MovePointerRelative const *>(other)) {
-    return std::make_shared<MovePointerRelative>(amount + ptr->amount);
-  }
-  return nullptr;
+GEN(ZeroCell) {
+  return Algorithm::zero();
 }
 
-// ZeroCell
-TXT(ZeroCell) { return "ZERO"; }
-GEN(ZeroCell) { return Algorithm::zero(); }
-MERGE(ZeroCell) {
-  if (dynamic_cast<ZeroCell const *>(other))     return std::make_shared<ZeroCell>();
-  if (dynamic_cast<ZeroCellPlus const *>(other)) return std::make_shared<ZeroCell>();
-  return nullptr;
+GEN(ZeroCellPlus) {
+  return Algorithm::zeroPlus();
 }
 
-// ZeroCellPlus
-TXT(ZeroCellPlus) { return "ZERO+"; }
-GEN(ZeroCellPlus) { return Algorithm::zeroPlus(); }
-MERGE(ZeroCellPlus) {
-  if (dynamic_cast<ZeroCellPlus const *>(other)) return std::make_shared<ZeroCellPlus>();
-  if (dynamic_cast<ZeroCell const *>(other))     return std::make_shared<ZeroCellPlus>();
-  return nullptr;
-}
-
-// ConstructConstant
-TXT(ConstructConstant) { return "CONSTANT: " + std::to_string(value.resolve(ctx)); }
 GEN(ConstructConstant) {
   auto const [val, cur, tmp] = defer::resolve(ctx, value, current, scratch);
   return Algorithm::setToValue(val, cur, tmp);
 }
 
-
-// ChangeBy
-TXT(ChangeBy) {
-  int const n = delta.resolve(ctx);
-  if (n == 0) return "";
-  return ((n > 0) ? "INC: " : "DEC: ") + std::to_string(std::abs(n));
+GEN(ChangeBy) {
+  return Algorithm::modify(delta.resolve(ctx));
 }
-
-
-GEN(ChangeBy) { return Algorithm::modify(delta.resolve(ctx)); }
-MERGE(ChangeBy) {
-  if (auto ptr = dynamic_cast<ChangeBy const *>(other))     return std::make_shared<ChangeBy>(delta + ptr->delta);
-  if (dynamic_cast<ZeroCell const *>(other))     return std::make_shared<ZeroCell>();
-  if (dynamic_cast<ZeroCellPlus const *>(other)) return std::make_shared<ZeroCellPlus>();
-  return nullptr;
-}
-
-// MoveData
-TXT(MoveData) {
-  auto const [cur, dst] = defer::resolve(ctx, current, dest);
-  if (cur == dst) return "";
-  return "MOVE: " + std::to_string(dst - cur);
-} 
 
 GEN(MoveData) {
   auto const [cur, dst] = defer::resolve(ctx, current, dest);
   return Algorithm::moveValue(cur, dst);
-}
-
-MERGE(MoveData) {
-  if (dynamic_cast<ZeroCell const *>(other))     return std::make_shared<MoveData>(*this);
-  if (dynamic_cast<ZeroCellPlus const *>(other)) return std::make_shared<MoveData>(*this);
-  return nullptr;
-}
-
-// CopyData
-TXT(CopyData) {
-  auto const [cur, dst] = defer::resolve(ctx, current, dest);
-  if (cur == dst) return "";
-  return "COPY: " + std::to_string(dst - cur);
 }
 
 GEN(CopyData) {
@@ -585,124 +531,326 @@ GEN(CopyData) {
   return Algorithm::copyValue(cur, dst, tmp);
 }
 
-MERGE(CopyData) {
-  if (dynamic_cast<ZeroCell const *>(other))     return std::make_shared<MoveData>(current, dest);
-  if (dynamic_cast<ZeroCellPlus const *>(other)) return std::make_shared<MoveData>(current, dest);
-  return nullptr;
-}
-
-// Compare to constant
-TXT(Cmp) {
-  int const val = value.resolve(ctx);
-  return "CMP: " + std::to_string(val);
-} 
 GEN(Cmp) {
   auto [val, cur, tmp] = defer::resolve(ctx, value, current, scratch);
   return Algorithm::cmpConst(val, cur, tmp);
 }
 
-// Boolean (destructive)
-TXT(Boolean) { return "BOOL"; } 
 GEN(Boolean) {
   auto [cur, tmp] = defer::resolve(ctx, current, scratch);
   return Algorithm::boolean(cur, tmp);
 }
 
-// Not (destructive)
-TXT(Not) { return "NOT"; } 
 GEN(Not) {
   auto [cur, tmp] = defer::resolve(ctx, current, scratch);
   return Algorithm::notValue(cur, tmp);
 }
 
-
-// Or (destructive)
-TXT(Or) {
-  auto [cur, oth] = defer::resolve(ctx, current, other);
-  return "OR: " + std::to_string(oth - cur);
-} 
 GEN(Or) {
   auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
   return Algorithm::orValues(cur, oth, tmp);
 }
 
-
-// And (destructive)
-TXT(And) {
-  auto [cur, oth] = defer::resolve(ctx, current, other);
-  return "AND: " + std::to_string(oth - cur);
-}
 GEN(And) {
   auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
   return Algorithm::andValues(cur, oth, tmp);
 }
 
-// Xor (destructive)
-TXT(Xor) {
-  auto [cur, oth] = defer::resolve(ctx, current, other);
-  return "XOR: " + std::to_string(oth - cur);
-}
 GEN(Xor) {
   auto [cur, oth, tmp1, tmp2] = defer::resolve(ctx, current, other, scratch1, scratch2);
   return Algorithm::xorValues(cur, oth, tmp1, tmp2);
 }
 
-// In
-TXT(In) { return "IN"; }
-GEN(In) { return ","; }
+GEN(In) {
+  return ",";
+}
 
+GEN(Out) {
+  return ".";
+}
 
-// Out
-TXT(Out) { return "OUT"; }
-GEN(Out) { return "."; }
-
-
-// Add
-TXT(Add) { return "ADD"; } 
 GEN(Add) {
   auto [cur, oth] = defer::resolve(ctx, current, other);
   return Algorithm::add(cur, oth);
 }
 
-// Subtract
-TXT(Subtract) { return "SUB"; } 
 GEN(Subtract) {
   auto [cur, oth] = defer::resolve(ctx, current, other);
   return Algorithm::subtract(cur, oth);
 }
 
-// Less
-TXT(Less) { return "LT"; } 
 GEN(Less) {
   auto [cur, oth, tmp1, tmp2] = defer::resolve(ctx, current, other, scratch1, scratch2);
   return Algorithm::less(cur, oth, tmp1, tmp2);
 }
 
-// LessOrEqual
-TXT(LessOrEqual) { return "LE"; } 
 GEN(LessOrEqual) {
   auto [cur, oth, tmp1, tmp2] = defer::resolve(ctx, current, other, scratch1, scratch2);
   return Algorithm::lessOrEqual(cur, oth, tmp1, tmp2);
 }
 
-
-// Greater
-TXT(Greater) { return "GT"; } 
 GEN(Greater) {
   auto [cur, oth, tmp1, tmp2] = defer::resolve(ctx, current, other, scratch1, scratch2);
   return Algorithm::greater(cur, oth, tmp1, tmp2);
 }
 
-// GreaterOrEqual
-TXT(GreaterOrEqual) { return "GE"; } 
 GEN(GreaterOrEqual) {
   auto [cur, oth, tmp1, tmp2] = defer::resolve(ctx, current, other, scratch1, scratch2);
   return Algorithm::greaterOrEqual(cur, oth, tmp1, tmp2);
 }
 
-// Equal
-TXT(Equal) { return "EQ"; } 
 GEN(Equal) {
   auto [cur, oth] = defer::resolve(ctx, current, other);
   return Algorithm::equal(cur, oth);
 }
+
+// Merge Rules
+MERGE(Equal) {
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(ConstructConstant, ConstructConstant, *rhs);
+  RULE(Boolean, Equal, *this);
+  return nullptr;
+}
+
+MERGE(MovePointerRelative) {
+  RULE(MovePointerRelative, MovePointerRelative, amount + rhs->amount);
+  return nullptr;
+}
+
+MERGE(ZeroCell) {
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCell);
+  return nullptr;
+}
+
+MERGE(ZeroCellPlus) {
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(ZeroCell, ZeroCellPlus);
+  return nullptr;
+}
+
+MERGE(ConstructConstant) {
+  RULE(ChangeBy, ConstructConstant, value + rhs->delta, current, scratch);
+  RULE(ConstructConstant, ConstructConstant, *rhs);
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(Boolean, ConstructConstant, !!value, current, scratch);
+  RULE(Not, ConstructConstant, !value, current, scratch);
+  RULE(Cmp, ConstructConstant, (value == rhs->value), current, scratch);
+  return nullptr;
+}
+
+MERGE(ChangeBy) {
+  RULE(ChangeBy, ChangeBy, delta + rhs->delta);
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(ConstructConstant, ConstructConstant, *rhs);
+  return nullptr;
+}
+
+MERGE(MoveData) {
+  RULE(ZeroCell, MoveData, *this);
+  RULE(ZeroCellPlus, MoveData, *this);
+  return nullptr;
+}
+
+MERGE(CopyData) {
+  RULE(ZeroCell, MoveData, current, dest);
+  RULE(ZeroCellPlus, MoveData, current, dest);
+  return nullptr;
+}
+
+MERGE(Cmp) {
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(Boolean, Cmp, *this);
+  return nullptr;
+}
+
+MERGE(Boolean) {
+  RULE(Boolean, Boolean, *this);
+  RULE(Not, Not, current, scratch);
+  return nullptr;
+}
+
+MERGE(Not) {
+  RULE(Boolean, Not, *this);
+  RULE(Not, Boolean, current, scratch);
+  return nullptr;
+}
+
+MERGE(Or) {
+  RULE(Boolean, Or, *this);
+  return nullptr;
+}
+
+MERGE(And) {
+  RULE(Boolean, And, *this);
+  return nullptr;
+}
+
+MERGE(Xor) {
+  RULE(Boolean, Xor, *this);
+  return nullptr;
+}
+
+MERGE(Add) {
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(ConstructConstant, ConstructConstant, *rhs);
+  return nullptr;
+}
+
+MERGE(Subtract) {
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(ConstructConstant, ConstructConstant, *rhs);
+  return nullptr;
+}
+
+MERGE(Less) {
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(ConstructConstant, ConstructConstant, *rhs);
+  RULE(Boolean, Less, *this);
+  return nullptr;
+}
+
+MERGE(LessOrEqual) {
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(ConstructConstant, ConstructConstant, *rhs);
+  RULE(Boolean, LessOrEqual, *this);
+  return nullptr;
+}
+
+MERGE(Greater) {
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(ConstructConstant, ConstructConstant, *rhs);
+  RULE(Boolean, Greater, *this);
+  return nullptr;
+}
+
+MERGE(GreaterOrEqual) {
+  RULE(ZeroCell, ZeroCell);
+  RULE(ZeroCellPlus, ZeroCellPlus);
+  RULE(ConstructConstant, ConstructConstant, *rhs);
+  RULE(Boolean, GreaterOrEqual, *this);
+  return nullptr;
+}
+
+
+// Textual representation (TODO)
+TXT(Comment) {
+  return txt;
+}
+
+TXT(LoopOpen) {
+  return "LOOP_START: " + tag;
+}
+
+TXT(LoopClose) {
+  return "LOOP_END: " + tag;
+}
+
+TXT(MovePointerRelative) {
+  int const n = amount.resolve(ctx);
+  if (n == 0) return "";
+  return ((n < 0) ? "LEFT: " : "RIGHT: ") + std::to_string(std::abs(n));
+}
+
+TXT(ZeroCell) {
+  return "ZERO";
+}
+
+TXT(ZeroCellPlus) {
+  return "ZERO+";
+}
+
+TXT(ConstructConstant) {
+  return "CONSTANT: " + std::to_string(value.resolve(ctx));
+}
+
+TXT(ChangeBy) {
+  int const n = delta.resolve(ctx);
+  if (n == 0) return "";
+  return ((n > 0) ? "INC: " : "DEC: ") + std::to_string(std::abs(n));
+}
+
+TXT(MoveData) {
+  auto const [cur, dst] = defer::resolve(ctx, current, dest);
+  if (cur == dst) return "";
+  return "MOVE: " + std::to_string(dst - cur);
+} 
+
+TXT(CopyData) {
+  auto const [cur, dst] = defer::resolve(ctx, current, dest);
+  if (cur == dst) return "";
+  return "COPY: " + std::to_string(dst - cur);
+}
+
+TXT(Cmp) {
+  int const val = value.resolve(ctx);
+  return "CMP: " + std::to_string(val);
+} 
+
+TXT(Boolean) {
+  return "BOOL";
+}
+
+TXT(Not) {
+  return "NOT";
+} 
+
+TXT(Or) {
+  auto [cur, oth] = defer::resolve(ctx, current, other);
+  return "OR: " + std::to_string(oth - cur);
+} 
+
+TXT(And) {
+  auto [cur, oth] = defer::resolve(ctx, current, other);
+  return "AND: " + std::to_string(oth - cur);
+}
+
+TXT(Xor) {
+  auto [cur, oth] = defer::resolve(ctx, current, other);
+  return "XOR: " + std::to_string(oth - cur);
+}
+
+TXT(In) {
+  return "IN";
+}
+
+TXT(Out) {
+  return "OUT";
+}
+
+TXT(Add) {
+  return "ADD";
+} 
+
+TXT(Subtract) {
+  return "SUB";
+} 
+
+TXT(Less) {
+  return "LT";
+} 
+
+TXT(LessOrEqual) {
+  return "LE";
+} 
+
+TXT(Greater) {
+  return "GT";
+} 
+
+TXT(GreaterOrEqual) {
+  return "GE";
+}
+
+TXT(Equal) {
+  return "EQ";
+} 

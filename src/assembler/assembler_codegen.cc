@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
 #include "assembler.ih"
 
 std::string Assembler::defaultOpenTag() {
@@ -133,23 +134,31 @@ std::string Assembler::primitives(std::string const &name, API_FUNC) const {
   return _txt.at(name);
 }
 
-primitive::Sequence Assembler::simplifySequence(primitive::Sequence const &seq) {
-  primitive::Sequence result;
-  if (seq.nodes.empty()) return result;
+void Assembler::simplifySequence(primitive::Sequence &seq) {
+  if (seq.nodes.empty()) return;
+  
+  primitive::Sequence merged;
 
-  result.nodes.push_back(seq.nodes[0]);
-  for (size_t next = 1; next != seq.nodes.size(); ++next) {
-    auto n0 = result.nodes.back();
-    auto n1 = seq.nodes[next];
+  while (true) {
+    merged.nodes.push_back(seq.nodes[0]);
+    for (size_t next = 1; next != seq.nodes.size(); ++next) {
+      auto n0 = merged.nodes.back();
+      auto n1 = seq.nodes[next];
 
-    if (auto merged = n0->merge(n1.get())) {
-      result.nodes.back() = merged;
+      if (auto mergeResult = n0->merge(n1.get())) {
+	merged.nodes.back() = mergeResult;
+      }
+      else {
+	merged.nodes.push_back(n1);
+      }
     }
-    else {
-      result.nodes.push_back(n1);
-    }
+
+    std::swap(merged.nodes, seq.nodes);
+    if (merged.nodes.size() == seq.nodes.size()) return;
+    merged.nodes.clear();
   }
-  return result;
+
+  std::unreachable();
 }
 
 

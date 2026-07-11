@@ -72,11 +72,25 @@ namespace acus::defer {
     return [lhs, rhs](C const &ctx) { return lhs.resolve(ctx) * rhs.resolve(ctx); };
   }
 
+  template <typename T, typename U, typename C> requires std::convertible_to<U, T>
+  Type<T, C> operator==(U const &lhs, Type<T, C> const &rhs) { return rhs == lhs; }
+  
+  template <typename T, typename C>
+  Type<T, C> operator==(Type<T, C> const &lhs, Type<T, C> const &rhs) {
+    return [lhs, rhs](C const &ctx) { return lhs.resolve(ctx) == rhs.resolve(ctx); };
+  }
+  
   template <typename T, typename C>
   Type<T, C> operator-(Type<T, C> const &op) {
     return [op](C const &ctx) { return -op.resolve(ctx); };
   }
 
+  template <typename T, typename C>
+  Type<T, C> operator!(Type<T, C> const &op) {
+    return [op](C const &ctx) { return !op.resolve(ctx); };
+  }
+
+  
   template <typename C, typename ... DeferPack>
   auto resolve(C const &ctx, DeferPack&& ... args) {
     return std::tuple{ args.resolve(ctx)... };

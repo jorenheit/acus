@@ -653,7 +653,7 @@ namespace acus {
     primitive::Context constructContext() const;    
     primitive::Sequence compilePrimitives(API_CTX);
     static std::string simplifyBrainfuck(std::string const &bf);
-    static primitive::Sequence simplifySequence(primitive::Sequence const &seq);
+    static void simplifySequence(primitive::Sequence &seq);
 
     // Function call and block name checks
     void functionCallTypeCheck(types::FunctionType const *functionType, std::vector<Expression> const &args, API_CTX);

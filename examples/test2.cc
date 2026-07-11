@@ -1,8 +1,3 @@
-// Acus - A C++ library for generating Brainfuck programs.
-// Copyright (C) 2026 Joren Heit
-//
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #include <iostream>
 #include "acus/assembler/assembler.h"
 using namespace acus;
@@ -17,28 +12,15 @@ int main() try {
 
     c.function("main").begin(); {
 
-      c.declareLocal("arr", ts::array(ts::u16(), 10));
-      c.declareLocal("i", ts::u8());
+      c.declareLocal("x", ts::s16());
+      c.declareLocal("y", ts::s16());
+      c.declareLocal("z", ts::s16());
 
-      for (int n = 0; n != 10; ++n) {
-	c.assign(c.arrayElement("arr", n), literal::u16(1000 + n));
-      }
-
-      for (int rep = 0; rep != 100; ++rep) {
-	for (int n = 0; n != 10; ++n) {
-	  c.assign("i", literal::u8(n));
-
-	  // Dirty cached dynamic element.
-	  c.addAssign(c.arrayElement("arr", "i"), literal::u16(1));
-
-	  // Direct write to same array should invalidate/flush dynamic children.
-	  // Add zero-ish rewrite preserving the current intended value is hard here,
-	  // so use a known value after the dirty flush has happened.
-	  c.assign(c.arrayElement("arr", n), literal::u16(1000 + n + rep + 1));
-	}
-      }
-
-      c.print(c.arrayElement("arr", 9));
+      c.assign("x", literal::s16(10));
+      c.assign("y", literal::s16(0));
+      c.assign("z", c.mod("x", "y"));
+      
+      c.print("z");
 
      c.returnFromFunction();
     } c.endFunction();
