@@ -33,7 +33,7 @@ struct Program {
   std::vector<Slot> globals;
   std::vector<Function::Block*> globalBlockOrder;
 
-  inline Function& createFunction(std::string name, types::FunctionType const *type) {
+  inline Function& createFunction(std::string name, types::FunctionType const *type, size_t scopeID) {
     assert(!functionByName.contains(name));
     size_t idx = functions.size();
     functionByName[name] = idx;
@@ -43,7 +43,7 @@ struct Program {
 	.frame  = FrameLayout{type->returnType()->size()},
 	.type   = type
       });
-    functions.back().createScope(nullptr);
+    functions.back().createScope(nullptr, scopeID);
     return functions.back();
   }
   

@@ -84,8 +84,7 @@ struct Function {
     return blockByName.find(b) != blockByName.end();
   }
 
-  inline Scope &createScope(Scope *parent) {
-    static size_t scopeID = 0;
+  inline Scope &createScope(Scope *parent, size_t scopeID) {
     bool valid = false;
     for (auto const &scope: scopes) {
       if (scope.get() == parent) {
@@ -94,7 +93,7 @@ struct Function {
       }
     }
     assert(valid || parent == nullptr);
-    scopes.emplace_back(std::make_unique<Scope>(parent, scopeID++));
+    scopes.emplace_back(std::make_unique<Scope>(parent, scopeID));
     return *scopes.back();
   }
 };

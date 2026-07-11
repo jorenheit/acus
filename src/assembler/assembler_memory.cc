@@ -253,9 +253,7 @@ void Assembler::freeScope(Function::Scope const *scope) {
 
 Slot Assembler::getTemp(types::TypeHandle type) {
   assert(_currentBlock != nullptr);
-  // TODO: struct Counters
-  static size_t tmpID = 0;
-  return allocSlot("__tmp_" + std::to_string(tmpID++), type, Slot::Temp);
+  return allocSlot("__tmp_" + std::to_string(_counters.tmpID++), type, Slot::Temp);
 }
 
 Slot Assembler::getTemp(literal::Literal value) {
@@ -267,8 +265,7 @@ Slot Assembler::getTemp(literal::Literal value) {
 Slot Assembler::getCache(types::TypeHandle type) {
   assert(_currentBlock != nullptr);
   // TODO: struct Counters
-  static size_t cacheID = 0;
-  return allocSlot("__cache_" + std::to_string(cacheID++), type, Slot::Cache);
+  return allocSlot("__cache_" + std::to_string(_counters.cacheID++), type, Slot::Cache);
 }
 
 Slot Assembler::getCache(literal::Literal value) {

@@ -112,7 +112,7 @@ void Assembler::beginFunctionImpl(std::string const &name, types::TypeHandle typ
   API_REQUIRE_PARAM_COUNT_MATCHES_FUNCTION(fType, params);
   
   _state.allowGlobalDeclarations = false;
-  _currentFunction = &_program.createFunction(name, fType);
+  _currentFunction = &_program.createFunction(name, fType, _counters.scopeID++);
   _cache.reset();
 
   std::unordered_set<std::string> paramSet;
@@ -149,7 +149,7 @@ void Assembler::beginScopeImpl(API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  _currentScope = &_currentFunction->createScope(_currentScope);
+  _currentScope = &_currentFunction->createScope(_currentScope, _counters.scopeID++);
 }
 
 void Assembler::endScope(API_FUNC) {

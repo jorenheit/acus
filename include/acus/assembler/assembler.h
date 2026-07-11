@@ -173,6 +173,12 @@ namespace acus {
       bool allowTempAssign = false;
     } _state;
 
+    struct {
+      size_t tmpID = 0;
+      size_t cacheID = 0;
+      size_t scopeID = 0;
+    } _counters;
+    
     struct MetaBlock {
       std::string name;
       std::string caller;
