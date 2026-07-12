@@ -8,16 +8,22 @@ using namespace acus;
 int main() try {
   Assembler c;
 
+  auto check = [&](Expression actual, literal::Literal expected) {
+    c.print(c.eq(actual, expected));
+    c.write(literal::u8(10));
+  };
+  
   c.program("test", "main").begin(); {
 
     c.function("main").begin(); {
 
-      c.declareLocal("x", ts::s8());
-      c.assign("x", literal::s8(10));
-      
-      //c.print(c.add("x", literal::s8(2)));
-      c.print(c.add(literal::s8(2), "x"));
+      c.declareLocal("x", ts::u8());
+      c.declareLocal("y", ts::u8());
 
+      c.assign("x", literal::u8(1));
+      c.assign("y", literal::u8(0));
+      check(c.lxor("x", "y"), literal::u8(1));
+      
      c.returnFromFunction();
     } c.endFunction();
 

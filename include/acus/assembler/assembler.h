@@ -753,26 +753,34 @@ namespace acus {
   
 #undef COMMUTATIVE_OPERATOR
 
-#define SWAPPABLE_OPERATOR(name, swapOp, ...)				\
+#define SWAPPABLE_OPERATOR(name, swapOp)				\
     template <typename Dummy>						\
     struct BinaryOperatorAfterOperandSwap<name, Dummy>: name {		\
       static constexpr bool Allowed = true;				\
       static name::ReturnType fold(int x, int y) { return swapOp::fold(x, y); } \
       static void applyWithSlot(Assembler &, Slot, Slot) { std::unreachable(); } \
       static void applyWithConst(Assembler &self, Slot slot, int value) { \
-	__VA_ARGS__;							\
+	swapOp::applyWithConst(self, slot, value);			\
       }									\
     };
-
-    SWAPPABLE_OPERATOR(Sub, -Sub,
-		       self.subConstFromSlot(slot, value);
-		       self.negateSlot(slot));
-		       
-    SWAPPABLE_OPERATOR(Lt, Gt, self.slotGreaterConst(slot, value); )
-    SWAPPABLE_OPERATOR(Le, Ge, self.slotGreaterEqualConst(slot, value); )
-    SWAPPABLE_OPERATOR(Gt, Lt, self.slotLessConst(slot, value); )
-    SWAPPABLE_OPERATOR(Ge, Le, self.slotLessEqualConst(slot, value); )    
     
+    SWAPPABLE_OPERATOR(Lt, Gt);
+    SWAPPABLE_OPERATOR(Le, Ge);
+    SWAPPABLE_OPERATOR(Gt, Lt);
+    SWAPPABLE_OPERATOR(Ge, Le);
+
+    // Special case for sub:
+    template <typename Dummy>						
+    struct BinaryOperatorAfterOperandSwap<Sub, Dummy>: Sub {		
+      static constexpr bool Allowed = true;				
+      static int fold(int x, int y) { return -Sub::fold(x, y); } 
+      static void applyWithSlot(Assembler &, Slot, Slot) { std::unreachable(); } 
+      static void applyWithConst(Assembler &self, Slot slot, int value) {
+	Sub::applyWithConst(self, slot, value);
+	self.negateSlot(slot);
+      }									
+    };
+
 #undef SWAPPABLE_OPERATOR
     
     // General helpers (inline definitions, assembler_private.tpp)

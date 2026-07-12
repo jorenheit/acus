@@ -260,6 +260,7 @@ namespace acus::Algorithm {
 	<<   zero()
 	<< "]"
 	<< movePtr(other, current)
+	<< boolean(other, tmp)
 	<< "["
 	<<   moveValue(other, result)
 	<< "]"
