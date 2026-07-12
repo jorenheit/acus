@@ -264,7 +264,6 @@ Slot Assembler::getTemp(literal::Literal value) {
 
 Slot Assembler::getCache(types::TypeHandle type) {
   assert(_currentBlock != nullptr);
-  // TODO: struct Counters
   return allocSlot("__cache_" + std::to_string(_counters.cacheID++), type, Slot::Cache);
 }
 

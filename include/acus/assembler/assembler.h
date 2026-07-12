@@ -678,7 +678,7 @@ namespace acus {
     template <typename Ret> struct BinaryOperator { using ReturnType = Ret; };
  
 #define DEFINE_UNARY_OPERATOR(name, type, ret, foldExpr, slotOp)	\
-    struct name: BinaryOperator<ret> {					\
+    struct name: UnaryOperator<ret> {					\
       static ret fold(int x) { return foldExpr; }			\
       static void applyToSlot(Assembler &self, Slot slot) {		\
 	return self.slotOp(slot);					\
@@ -693,8 +693,7 @@ namespace acus {
     DEFINE_UNARY_OPERATOR(Abs,         UnOp::Abs,     int,   std::abs(x), absSlot);
 
 #undef DEFINE_UNARY_OPERATOR
-    
-    
+
 #define DEFINE_BINARY_OPERATOR(name, type, ret, foldExpr, slotOp, constOp) \
     struct name: BinaryOperator<ret> {					\
       static ret fold(int x, int y) { return foldExpr; }		\
@@ -728,6 +727,52 @@ namespace acus {
     DEFINE_BINARY_OPERATOR(Ge,  BinOp::Ge,  bool, x>=y, slotGreaterEqualSlot, slotGreaterEqualConst);
 
 #undef DEFINE_BINARY_OPERATOR
+
+    template <typename Operator, typename = void>
+    struct BinaryOperatorAfterOperandSwap: Operator {
+      static constexpr bool Allowed = false;
+    };
+
+    // Commutative Operators
+#define COMMUTATIVE_OPERATOR(name)				\
+    template <typename Dummy>					\
+    struct BinaryOperatorAfterOperandSwap<name, Dummy> : name {	\
+      static constexpr bool Allowed = true;			\
+    };
+  
+  COMMUTATIVE_OPERATOR(Add);
+  COMMUTATIVE_OPERATOR(Mul);
+  COMMUTATIVE_OPERATOR(And);
+  COMMUTATIVE_OPERATOR(Nand);
+  COMMUTATIVE_OPERATOR(Or);
+  COMMUTATIVE_OPERATOR(Nor);
+  COMMUTATIVE_OPERATOR(Xnor);
+  COMMUTATIVE_OPERATOR(Eq);
+  COMMUTATIVE_OPERATOR(Neq);
+  
+#undef COMMUTATIVE_OPERATOR
+
+#define SWAPPABLE_OPERATOR(name, swapOp, ...)				\
+    template <typename Dummy>						\
+    struct BinaryOperatorAfterOperandSwap<name, Dummy>: name {		\
+      static constexpr bool Allowed = true;				\
+      static name::ReturnType fold(int x, int y) { return swapOp::fold(x, y); } \
+      static void applyWithSlot(Assembler &, Slot, Slot) { std::unreachable() } \
+      static void applyWithConst(Assembler &self, Slot slot, int value) { \
+	__VA_ARGS__;							\
+      }									\
+    };
+
+    SWAPPABLE_OPERATOR(Sub, -Sub,
+		       self.subConstFromSlot(slot, value);
+		       self.negateSlot(slot));
+		       
+    SWAPPABLE_OPERATOR(Lt, Gt, self.slotGreaterConst(slot, value); )
+    SWAPPABLE_OPERATOR(Le, Ge, self.slotGreaterEqualConst(slot, value); )
+    SWAPPABLE_OPERATOR(Gt, Lt, self.slotLessConst(slot, value); )
+    SWAPPABLE_OPERATOR(Ge, Le, self.slotLessEqualConst(slot, value); )    
+    
+#undef SWAPPABLE_OPERATOR
     
     // General helpers (inline definitions, assembler_private.tpp)
     template <typename Primitive, typename ... Args>

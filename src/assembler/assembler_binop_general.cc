@@ -98,9 +98,19 @@ Expression Assembler::binOpImpl(Expression lhs, Expression rhs, API_CTX) {
     std::unreachable();
   }
 
+  using SwapOperator = BinaryOperatorAfterOperandSwap<Operator>; // Swoperator
+
+  bool swapped = false;  
+  if (SwapOperator::Allowed && lhs.isLiteral() && rhs.hasSlot()) {
+    std::swap(lhs, rhs);
+    swapped = true;
+  }
+  
   Slot result = getTemp(opResult.workType);
   assignImpl(Expression{result}, lhs, API_FWD);
-  binOpAssignImpl<Operator>(Expression{result}, rhs, API_FWD);
+
+  if (swapped) binOpAssignImpl<SwapOperator>(Expression{result}, rhs, API_FWD);
+  else         binOpAssignImpl<Operator>(Expression{result}, rhs, API_FWD);
 
   result.get().type = opResult.type;
   return Expression{result};

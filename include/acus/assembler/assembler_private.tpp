@@ -9,6 +9,7 @@ template <typename Primitive, typename ... Args>
 void Assembler::emit(Args&& ... args) {
   assert(_currentSeq != nullptr);
   _currentSeq->emplace<Primitive>(std::forward<Args>(args)...);
+  
 }
 
 template <typename... Args> requires ((std::convertible_to<Args, Cell>) && ...)

@@ -139,7 +139,7 @@ void Assembler::simplifySequence(primitive::Sequence &seq) {
   
   primitive::Sequence merged;
 
-  while (true) {
+  while (not seq.nodes.empty()) {
     merged.nodes.push_back(seq.nodes[0]);
     for (size_t next = 1; next != seq.nodes.size(); ++next) {
       auto n0 = merged.nodes.back();

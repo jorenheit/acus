@@ -12,15 +12,11 @@ int main() try {
 
     c.function("main").begin(); {
 
-      c.declareLocal("x", ts::s16());
-      c.declareLocal("y", ts::s16());
-      c.declareLocal("z", ts::s16());
-
-      c.assign("x", literal::s16(10));
-      c.assign("y", literal::s16(0));
-      c.assign("z", c.mod("x", "y"));
+      c.declareLocal("x", ts::s8());
+      c.assign("x", literal::s8(10));
       
-      c.print("z");
+      //c.print(c.add("x", literal::s8(2)));
+      c.print(c.add(literal::s8(2), "x"));
 
      c.returnFromFunction();
     } c.endFunction();
