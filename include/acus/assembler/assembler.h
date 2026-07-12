@@ -740,15 +740,16 @@ namespace acus {
       static constexpr bool Allowed = true;			\
     };
   
-  COMMUTATIVE_OPERATOR(Add);
-  COMMUTATIVE_OPERATOR(Mul);
-  COMMUTATIVE_OPERATOR(And);
-  COMMUTATIVE_OPERATOR(Nand);
-  COMMUTATIVE_OPERATOR(Or);
-  COMMUTATIVE_OPERATOR(Nor);
-  COMMUTATIVE_OPERATOR(Xnor);
-  COMMUTATIVE_OPERATOR(Eq);
-  COMMUTATIVE_OPERATOR(Neq);
+    COMMUTATIVE_OPERATOR(Add);
+    COMMUTATIVE_OPERATOR(Mul);
+    COMMUTATIVE_OPERATOR(And);
+    COMMUTATIVE_OPERATOR(Nand);
+    COMMUTATIVE_OPERATOR(Or);
+    COMMUTATIVE_OPERATOR(Nor);
+    COMMUTATIVE_OPERATOR(Xor);
+    COMMUTATIVE_OPERATOR(Xnor);
+    COMMUTATIVE_OPERATOR(Eq);
+    COMMUTATIVE_OPERATOR(Neq);
   
 #undef COMMUTATIVE_OPERATOR
 
@@ -757,7 +758,7 @@ namespace acus {
     struct BinaryOperatorAfterOperandSwap<name, Dummy>: name {		\
       static constexpr bool Allowed = true;				\
       static name::ReturnType fold(int x, int y) { return swapOp::fold(x, y); } \
-      static void applyWithSlot(Assembler &, Slot, Slot) { std::unreachable() } \
+      static void applyWithSlot(Assembler &, Slot, Slot) { std::unreachable(); } \
       static void applyWithConst(Assembler &self, Slot slot, int value) { \
 	__VA_ARGS__;							\
       }									\

@@ -1039,6 +1039,16 @@ tests.push_back(expectOutput("Logical XOR",
 #include "tests/comparison_not_equal.cc"
 			      }));
 
+ tests.push_back(expectOutput("Binary Operand Swapping",
+                             std::string(38, 'B'), []() {
+#include "tests/binary_operand_swapping.cc"
+                             }));
+
+ tests.push_back(expectOutput("Pointer Addition Operand Swapping",
+                             "CC", []() {
+#include "tests/pointer_addition_operand_swapping.cc"
+                             }));
+
 tests.push_back(expectOutput("Signed Negate",
                              "ABCDEFF",
                              [] {
