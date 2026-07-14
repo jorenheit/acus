@@ -2,6 +2,7 @@
 !.gitignore
 !Makefile
 !README.md
+!README-sugar.md
 !LICENSE
 !todo.txt
 !include/

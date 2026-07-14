@@ -1,17 +1,32 @@
-<p align="center"><img src="assets/logo_transparent.png" alt="Acus logo" width="200"/></p>
+<p align="center">
+  <img src="assets/logo_transparent.png" alt="Acus logo" width="200">
+</p>
 
-# Acus
+# Acus: A Compiler Backend Targeting Brainfuck (C++23)
 
-Acus is a C++23 backend toolkit for generating Brainfuck programs through an API that resembles a simple programming language. It lets you construct a program in C++ using functions, scopes, local and global variables, arrays, structs, pointers, function pointers, arithmetic, comparisons, logical operations, labels, branches, and returns. Acus then lowers that structured program to Brainfuck.
+## Introduction
+Acus is primarily intended for building experimental languages and DSLs that target Brainfuck. It's a C++23 library that provides the machinery that a higher-level language frontend can call into: declaring variables, creating functions, pointers, arrays, user-defined types, flow control, etc... Acus lays these constructs out on the Brainfuck tape and lowers them to plain Brainfuck source.
 
-The intended use case is to build higher-level frontends on top of Acus while still keeping the backend usable directly from C++ for experiments, tests, and low-level code generation.
+> [!TIP]
+> If you just want to get started with generating BF programs, try [Acus Sugar](README-sugar.md). 
 
-#### Let's be real
-Above all, this library is meant to have fun with. Brainfuck is a language that exists for esoteric reasons, not practical use. If you create some weird language on top of Acus to generate BF, let me know and I will link to it from this page! Contact me at [this_github_username]@gmail.com.
+### Why this exists
+This project is related to [Synapse-191](https://github.com/jorenheit/bfcpu), which aimed to build a Brainfuck computer from scratch (and succeeded). To complete the circle of the Brainfuck computing environment that emerged from this project, a compiler was still a necessary component. That is, a compiler that takes a human-readable and familiar syntax and translates this to Brainfuck, which can then be executed natively on the machine. Please note: Acus is not a compiler! Instead, I set out to build a language-agnostic backend that can be called into by different frontends implementing wildly different languages. 
 
-## Minimal example: Hello, World!
+### Acus Sugar
+At the moment of writing, no such frontends exist. However, a thin layer of syntactic sugar was sprinkled on top of Acus (Acus Sugar) to implement a DSL (Domain Specific Language) that feels a lot like a normal programming language, but is embedded in the C++ syntax (making use of operator overloading, template meta-programming and macro's to achieve this). A simple Python script (`acs`), that takes a source-file containing only Acus Sugar syntax, is meant to be used by people who just want to produce BF and not deal with any of the C++ boilerplate. For example, this is a valid `acs` source-file that will produce a BF source-file for the classic Hello World program. More sweet examples are included in the [examples](/frontend/examples) folder.
 
-The program below features a simple Hello World example and outlines the way an Acus program must be structured:
+```cpp
+function_<void()>("main") | define {
+  println("Hello, World!");
+  return_;
+};	
+```
+Visit the [Sugar Readme page here](README-sugar.md).
+
+
+### Core API: Minimal Example
+When writing your own frontend to Acus, you won't be using the Sugar layer. Instead, you'll need to create an `acus::Assembler` object and use its public interface to construct a program. The Sugar example above actually compiles down into the code below, which we will go over in more detail.
 
 ```cpp
 #include <iostream>
@@ -31,817 +46,849 @@ int main() try {
 
   } a.endProgram();
 
-  std::cout << a.brainfuck("hello") << '\n';
+  std::cout << a.brainfuck("hello");
 }
-catch (Error const &e) {
-  std::cerr << e.what() << " (" << e.code() << ")\n";
+catch (std::exception const &e) {
+  std::cerr << e.what() << '\n';
+  return 1;
 }
 ```
 
-This constructs a program named `hello`, defines `main` as its entry function that simply prints  `Hello, World!`. After defining the BF-program, the generated Brainfuck source is printed to `stdout`. More involved examples are included below.
+#### Header and Namespace
+To use Acus, you need to include the main acus header: `acus/acus.h`. This will make the necessary types and functions available in the `acus` namespace and several sub-namespaces. Simply import all of the necessary symbols into the global namespace with `using namespace acus::api`. 
 
-## Building
-To start off, clone this repository:
-```sh
-git clone https://github.com/jorenheit/acus
-```
-Acus uses a small Make-based build system. The project has no external dependencies beyond a C++23 compiler, `make`, and the C++ standard library.
+#### Program Block
+After creating an instance of the `Assembler`, a new program is started. `Acus::program` takes two string arguments: the name of the program and its entry-point. The necessary `.begin()` might look weird at this point, but was added for consistency (more detail below on *builders*). A program block ends at `endProgram`. Note: the curly braces encapsulating the program are only for aestetic reasons.
 
-### Build targets
+#### Function Signature
+This program contains only a single function: `main`, which was also set as the entry-point for the program. The `Assembler::function` member expects a single string, the name of the function, and returns a builder-object which can be used to add arguments and return-types (more on this later). In this case, our function does not accept arguments and does not return anything, so `begin()` can be called immediately to finalize the signature and start the body.
 
-The root Makefile provides the following targets:
+#### Function Body
+The body of `main` contains only two statements: a call to the builtin `print` function and an explicit return from `main`. The print-function takes a string-literal, which is a special type defined in the `literal` namespace. An explicit return is mandatory; in this case it doesn't take any arguments because `main` returns `void`. 
 
-| Target              | Description                                     |
-|---------------------|-------------------------------------------------|
-| `make` / `make all` | Build the static Acus library                   |
-| `make examples`     | Build all examples in the `examples/` directory |
-| `make tests`        | Build the test binaries                         |
-| `make check`        | Build and run the test suite                    |
-| `make install`      | Install the static library and public headers   |
-| `make uninstall`    | Remove installed Acus files                     |
-| `make clean`        | Remove generated build artifacts                |
+#### Output
+After a program has been fully defined (i.e. after `endProgram()`), the corresponding BF program can be requested using `Assembler::brainfuck("program")`. A `std::string` will be returned that contains the full brainfuck source for this program. Multiple programs can be constructed using the same `Assembler` object if necessary.
 
-### Building the static library
+#### Errors
+Acus will try to report useful errors through exceptions. In this example, the exception is simply caught and displayed.
 
-To build Acus as a static library:
+#### Compilation
+After installing Acus (making `libacus` and the headers available on the path), the program above can be compiled and run: 
 
 ```sh
-make
+$ c++ -std=c++23 hello.cc -lacus -o hello
+$ ./hello
+>[-]+<[-]+>>>>>>>>>>>>>>>>>>>>>>>>>>>[-]+>>[-]>[-]>>>>>>>>[-]+[<<<<<[-]<[-]<
+<<[->>>>+<+<<<][-]>>>[-<<<+>>>]<[-]>[-]<<[->+>+<<][-]>>[-<<+>>][-]+>[[-]<[-]
+>][-]<[->+<][-]+<[[-]>[-]<][-]>[-<+>][-]>[-<+>]<[[-]<[[-]>>[-]+<<]>]>>>>>>>>
+>>[-]<[-]<<<[->>>>+<+<<<][-]>>>[-<<<+>>>]<[-]>[-]<<<<<<<<[->>>>>>>+>+<<<<<<<
+<][-]>>>>>>>>[-<<<<<<<<+>>>>>>>>][-]>[-<+>]<[[-]<[[-]>>[-]+<<]>]<<<<<<<<[-]>
+>>>>>>>>[[-]>>>>>[-]>>++++++++[-<<+++++++++>>]<<.+++++++++++++++++++++++++++
+++.+++++++..+++.------------------------------------------------------------
+-------.------------.+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+.++++++++++++++++++++++++.+++.------.--------.------------------------------
+-------------------------------------.-----------------------.[-]<<<<<<<<<[-
+]>>>>]<<<<<<<<<[-]<[-]<<<[->>>>+<+<<<][-]>>>[-<<<+>>>]<[-]>[-]<<[->+>+<<][-]
+>>[-<<+>>]>-<[-]+>[[-]<[-]>][-]<[->+<][-]+<[[-]>[-]<][-]>[-<+>][-]>[-<+>]<[[
+-]<[[-]>>[-]+<<]>]>>>>>>>>>>[-]<[-]<<<[->>>>+<+<<<][-]>>>[-<<<+>>>]<[-]>[-]<
+<<<<<<<[->>>>>>>+>+<<<<<<<<][-]>>>>>>>>[-<<<<<<<<+>>>>>>>>][-]>[-<+>]<[[-]<[
+[-]>>[-]+<<]>]<<<<<<<<[-]>>>>>>>>>[[-]]<<<<]
 ```
 
-The resulting archive is written to:
-
-```text
-lib/libacus.a
-```
-
-### Installing
-
-To install the static library and public headers system-wide:
-
+The result is a lot less efficient when compared to a dedicated Hello World implementation like the one found on [Wikipedia](https://en.wikipedia.org/wiki/Brainfuck):
 ```sh
-sudo make install
+++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.
+<.+++.------.--------.>>+.>++.
 ```
 
-By default, this installs into `/usr/local`:
+This is the tradeoff that needs to be made when using Acus: generality vs efficiency. Acus tries to optimize its output as much as possible, but it still needs to setup the machinery to allow for jumps the simulation of random access memory (to implement pointers). You can actually se the boiler-plate for this in the output above: the first sequence of eight `+` commands is where the construction of the *Hello World* string actually begins. Everything before that is related to the setup of a 'virtual machine'. If you're interested in the technical details of the Acus implementation, please refer to the report in the [Synapse-191 repository](https://github.com/jorenheit/bfcpu).
 
-```text
-/usr/local/lib/libacus.a
-/usr/local/include/acus/
-```
+## Acus Component Breakdown
 
-To install somewhere else, override `PREFIX`:
-
-```sh
-make install PREFIX="$HOME/.local"
-```
-
-This installs to:
-
-```text
-$HOME/.local/lib/libacus.a
-$HOME/.local/include/acus/
-```
-
-When using a non-standard install prefix, you may need to pass the include and
-library paths explicitly when compiling programs that use Acus:
-
-```sh
-c++ -std=c++23 hello.cc -I$HOME/.local/include -L$HOME/.local/lib -lacus
-```
-
-### Building examples
-
-Examples live in the `examples/` directory. They can be built from the root directory with:
-
-```sh
-make examples
-```
-
-This delegates to the Makefile inside `examples/`. You can also build the examples directly:
-
-```sh
-cd examples
-make
-```
-
-The examples Makefile assumes that the Acus static library has already been built and is available at:
-
-```text
-../lib/libacus.a
-```
-
-Example binaries are written to:
-
-```text
-examples/bin/
-```
-
-### Running tests
-
-To build the tests:
-
-```sh
-make tests
-```
-
-To build and run the tests:
-
-```sh
-make check
-```
-
-### Uninstalling
-
-If Acus was installed with `make install`, it can be removed with:
-
-```sh
-sudo make uninstall
-```
-
-or, if a custom prefix was used:
-
-```sh
-make uninstall PREFIX="$HOME/.local"
-```
-
-### Using Acus from another project
-
-After installation, a program can be linked against Acus like this:
-
-```sh
-c++ -std=c++23 main.cc -lacus
-```
-
-If Acus has not been installed system-wide, point the compiler at the local
-headers and static library:
-
-```sh
-c++ -std=c++23 main.cc -I/path/to/acus/include -L/path/to/acus/lib -lacus
-```
-
-For example, from a project next to the Acus source tree:
-
-```sh
-c++ -std=c++23 main.cc -I../acus/include -L../acus/lib -lacus
-```
-
-## Public include files
-
-To use the library, you need to include the main Acus header: `acus.h`. This header will include all necessary headers for you and expose the `acus::api` namespace that you can import for ease of use.
-
-```cpp
-#include <acus/acus.h>
-using namespace acus::api;
-```
 The table below shows the classes and namespaces available after `acus.h` has been included (full path) and, optionally, when the `acus::api` namespace is imported (short path):
 
 | Full path                | Short path         | type       | Description                                         |
 |--------------------------|--------------------|------------|-----------------------------------------------------|
 | `acus::Assembler`        | `Assembler`        | class      | The main assembler class used to generate BF.       |
-| `acus::literal`          | `literal`          | namespace  | Namespace for literal-generation.                   |
-| `acus::literal::Literal` | `Literal`          | class      | Literal object, representing a compile-time value.  |
 | `acus::ts`               | `ts`               | namespace  | Typesystem namespace, used to request type-handles. |
 | `acus::ts::TypeHandle`   | `TypeHandle`       | class      | Object representing a type.                         |
+| `acus::literal`          | `literal`          | namespace  | Namespace for literal-generation.                   |
+| `acus::literal::Literal` | `Literal`          | class      | Literal object, representing a compile-time value.  |
+| `acus::Expression`       | `Expression`       | class      | Object representing expressions.                    |
 | `acus::error::Error`     | `error::Error`     | class      | Error object, thrown when an error occurs.          |
 | `acus::error::ErrorCode` | `error::ErrorCode` | enum class | Error code embedded in the Error object.            |
 
-## Acus Programming
-### `Assembler`
+Each of these will be described in more detail below.
 
-`acus::Assembler` is the main public entry point. It owns the program under construction and exposes methods for declaring data, defining functions, creating expressions, emitting control flow, and generating Brainfuck.
+### Assembler
+`acus::Assembler` is the main public entry point. It owns the program under construction and exposes methods for declaring data, defining functions, creating expressions, emitting control flow, and generating Brainfuck. The full API is listed at the bottom of this page.
 
 A typical program has this shape:
 
 ```cpp
+// 1. Instantiate the Assembler object
 Assembler a;
 
-a.program("program_name", "main").begin(); {
-  // global variable declarations
+// 2. Start a new program
+a.program("program_name", "main").begin();
 
-  a.function("main").begin(); {
-    // Function body
-    a.returnFromFunction();
-  } a.endFunction();
-  
-  // Other functions
-  
-} a.endProgram();
+/* 
+    Optional: global variable declarations using Assembler::declareGlobal.
+*/
 
+// 3. Entrypoint function (not necessarily the first one)
+a.function("main").begin(); 
+
+/* 
+	Function body 
+*/
+
+// 4. Mandatory explicit return
+a.returnFromFunction(); 
+
+// 5. End of the function definition
+a.endFunction();
+  
+/*
+	Optional: other functions.
+*/
+
+// 6. End of the program definition
+a.endProgram();
+
+// 7. Request the BF code
 std::string bf = c.brainfuck("program_name");
 ```
 
-The usage of C++ scope blocks is mainly for convenience (the C++ scope matches the BF scope and indentation is handled automatically by your editor) but not necessary for creating valid programs.
+### Typesystem and Variables
+#### Builtin Types
+The typesystem `acus::ts` is used to acquire `TypeHandle` objects representing types. These handles can be passed to the `Assembler` when, for instance, new variables or functions are being declared. Acus supports the following builtin types:
 
-### Functions
-#### Defining a Function
+| Type          | Description                   | Typesystem Call   |
+|---------------|-------------------------------|-------------------|
+| `u8`          | Unsigned 8-bit integer        | `ts::u8()`        |
+| `u16`         | Unsigned 16-bit integer       | `ts::u16()`       |
+| `s8`          | Signed 8-bit integer          | `ts::s8()`        |
+| `s16`         | Signed 16-bit integer         | `ts::s16()`       |
+| `array(T, N)` | Array of N elements of type T | `ts::array(T, N)` |
+| `pointer(T)`  | Pointer to data of type T     | `ts::pointer(T)`  |
 
-A function is defined using `Assembler::function`, which returns a `FunctionBuilder` object. You then call the `param` and `ret` methods on this object until the entire function signature has been completed, at which point you call `begin` to start the body of the function:
-
-```cpp
-a.function("foo")
-  .param("x", ts::u8())
-  .ret(ts::u8())
-  .begin();
-```
-This starts a function that takes a single `u8` parameter named `x` and returns an `u8`. A simpler function that takes no arguments and returns void might simply be defined with: 
-```cpp
-a.function("bar").begin();
-```
-The function-body is closed by calling `endFunction()`. Before closing a function, all flow-paths within that function should either end in a return (`Assembler::returnFromFunction(...)`) or an abort (`Assembler::abortProgram`). If there exists a flow-path that does not terminate in a return, an error will be thrown. If a function was defined with a return-type, a value of a compatible type must be passed to `returnFromFunction`. `abortProgram` is called without arguments and will terminate the entire program immediately without return-values being evaluated.
+In these calls, `T` must be a `TypeHandle`. For example, to define a type for an array of 10 `u8` integers, one could do:
 
 ```cpp
-a.function("universe")
-  .ret(ts::u8())
-  .begin();
-{
-  a.returnFromFunction(literal::u8(42));
-} a.endFunction();
-
+TypeHandle arrT = ts::array(ts::u8(), 10);
 ```
 
-#### Calling a Function
-
-Function calls use the same builder-pattern as function definitions, the difference being that you call `arg` to pass arguments (one by one), `into` to specify the target to store the return-value into and `done` to finish the builder and perform the call. 
-
-```cpp
-a.callFunction("foo")
-  .arg("x")
-  .into("y")
-  .done();
-```
-In the snippet above, there has to exist a variable `x` with a type that is compatible with the first (and only) parameter of `foo`, and another variable `y` that is compatible with the return-type of `foo`. Note that, while many API calls return `Expression` objects, a function-call returns void and cannot therefore be embedded in other API calls that expect `Expression`s.
-
-### Expressions
-
-Most expression-operations accept flexible operands such as:
-
-- variable names, e.g. `"x"`,
-- literals, e.g. `literal::u8(42)`,
-- expressions returned by other assembler calls,
-- array elements,
-- struct fields,
-- dereferenced pointers.
-
-For example:
+#### User-Defined Types
+In addition to builtin types, compound types (structs) can be defined as well. The function `ts::defineStruct` takes the name of the type and returns a builder object of type `ts::StructTypeBuilder`. This object is used to incrementally define the type by adding named fields to it. When all fields have been added, `done()` finalizes the type and returns a handle.
 
 ```cpp
-a.assign("x", literal::u8(10));             // x = 10
-a.assign("y", c.add("x", literal::u8(5)));  // y = x + 5
-a.print(c.arrayElement("arr", "idx"));      // print(arr[idx]) 
+// In one go:
+TypeHandle pointT = ts::defineStruct("Point")
+	.field("x", ts::s16())
+	.field("y", ts::s16())
+	.done();
+	
+// Or spread out:
+ts::StructTypeBuilder builder = ts::defineStruct("Point");
+builder.field("x", ts::s16());
+builder.field("y", ts::s16());
+TypeHandle pointT = builder.done();
 ```
 
-### Data types
-
-Types are created through the `acus::ts` namespace. Each type-factory returns a `ts::TypeHandle` object (just a pointer internally) that you can pass to other API functions that require a type.
-
-#### Integer types
-There are four integer types available: two unsigned types and two signed types, both available in 8 or 16 bits:
+#### Declaring Variables
+Variables can be declared through `Assembler::declareLocal` and `Assembler::declareGlobal`. The first is used in function-scope and returns an expression to the declared variable. The latter must be used before any functions are defined and does not return an expression. If you need an expression object to represent a global variable, the `Assembler::expr` function can be used (at function scope) to produce one.
 
 ```cpp
-TypeHandle u8  = ts::u8();
-TypeHandle s8  = ts::s8();
-TypeHandle u16 = ts::u16();
-TypeHandle s16 = ts::s16();
+// At global scope:
+a.declareGlobal("g", ts::u8());
+
+// At function scope:
+Expression x = a.declareLocal("x", ts::u8()); 
+
+a.print(a.add(x, "g"));   // Option 1: use expression object to refer to x
+a.print(a.add("x", "g")); // Option 2: use variable name to refer to x
+
+// Using an expression object for g
+Expression g = a.expr("g");
+a.print(a.add(x, g));
 ```
 
-#### Arrays and strings
-Array-types can be defined by passing a previously defined type and the size of the required array to `ts::array`. This will return a unique handle for each unique type/size combination. Strings are more flexible. They are defined by their maximum capacity but can be assigned to other strings of larger capacity; this does not hold for arrays.
+### Expressions and Operators
+
+All `Assembler` functions that act as operators accept a common expression abstraction as their operands: `acus::Expression`. An expression may refer to a local or global variable, a literal, an array element, a struct field, a dereferenced pointer, or the result of another operation. For example, addition of two variables returns a new expression that refers to a temporary containing the result of the addition.
 
 ```cpp
-auto bytes4 = ts::array(u8, 4);
-auto string  = ts::string(32);
+// Declare 3 local u8 variables
+TypeHandle u8 = ts::u8();
+Expression x = a.declareLocal("x", u8); // store a handle to "x"
+Expression y = a.declareLocal("y", u8);
+a.declareLocal("z", u8);                // not stored
+
+// Assign values to x and y
+a.assign(x, literal::u8(24));           // use the expression directly
+a.assign(y, literal::u8(18));
+
+// Compute x + y and assign to z
+Expression result = a.add(x, y);
+a.assign("z", result);                  // refer to z by name
+
+// Or equivalently
+a.assign("z", a.add("x", "y"));         // only use names
+
+/* !! Don't use 'result' after the assignment !! */
 ```
 
-Arrays and strings can be indexed using `Assembler::arrayElement`:
+#### Temporaries and Undefined Behavior
+In the example above, different approaches were used. When declaring a local variable, the result is an `Expression` referring to the result of that declaration (the variable itself). When this expression is stored, it can later be passed to operators like `add`. The same is true for the result of such an operator: the `Expression` object returned by an operator represents the result after application of that operator. However, in this case the result is not bound to any variables and is therefore stored in a temporary object. Passing a temporary to `assign` will cause it to be consumed (move-semantics) and become invalid after the assignment, even if you still own the result-object. Using expressions beyond their scope is therefore undefined behavior.
+
+### Errors
+When Acus encounters an ill-defined program, it will throw an exception containing details about the error, including file and line information referring to the C++ source where the error was made. Exceptions thrown by Acus all derive from `std::exception`, so the easiest way to deal with them is to simply catch them, print the message and exit the program.
 
 ```cpp
-a.declareLocal("arr", string);
-a.declareLocal("idx", u8);
-c.assign("str", literal::string("Hello"));
-
-Literal u8_1 = literal::u8(1);
-c.assign("idx", u8_1);
-c.write(c.arrayElement("str", "idx")); // runtime index (slow) -> prints 'e'
-c.write(c.arrayElement("str", u8_1));  // literal index (fast) -> prints 'e'
+try {
+  ...
+} catch (std::exception &e) {
+  std::cerr << e.what() << '\n';
+  std::exit(1);
+}
 ```
 
-In the example above, `idx` is a runtime variable (even though we can see what its value will be), so finding the appropriate address in memory will be a lot slower compared to using a literal index.
-
-#### Structs
-
-Struct types are built with `ts::defineStruct(name)`. This function returns a builder object that expects you to call `field` for each field of the struct and finish the definition by calling `done`:
+For more advanced handling of errors, they need to be caught as `error::Error` objects. These give access to their error-code and allow for relocation (i.e. changing their file and line information). The example below prints the error-code, relocates the error and throws it to be handled elsewhere.
 
 ```cpp
-auto point = ts::defineStruct("Point")
-  .field("x", u8)
-  .field("y", u8)
-  .done();
+try {
+  ...
+} catch (error::Error &e) {
+  std::cerr << "Code: " << e.code() << '\n';
+  e.relocate("source.src", line, col);
+  throw;
+}
 ```
 
-Struct fields can be accessed by either their name or by index:
+A full table of error-codes is shown at the bottom of this page.
+
+
+## Control Flow
+### Labels and Jumps
+Acus exposes a basic system of labels and jumps to implement flow-control, rather providing loops and conditionals. This makes it suitable for many different frontends without making assumptions about language structure. The snippet below shows how a for-loop could be implemented using labels and jumps:
 
 ```cpp
-a.declareLocal("p", point);
-auto x = a.structField("p", "x"); // p.x
-auto y = a.structField("p", 1);   // p.y
-```
+// for (i = 0; i < n; ++i) { ... }
 
-#### Pointers
-Acus supports pointers (and function pointers, see below):
-
-```cpp
-auto u8ptr = ts::pointer(u8); 
-```
-
-Pointers can point to locals, globals, array elements, struct fields, and other addressable objects and are initialized using the `Assembler::addressOf` function:
-
-```cpp
-a.declareLocal("p", u8ptr);
-a.declareLocal("x", u8);
-
-a.assign("p", a.addressOf("x"));
-a.assign(a.dereferencePointer("p"), literal::u8('A'));
-a.write("x"); // writes 'A' to the output
-```
-
-#### Function types and function pointers
-
-To create a function-pointer type, one must first define the type of the function that it points to, with `ts::function()`. This is similar to a function definition, except that no parameter-names are passed to the `param` function.
-
-```cpp
-// fnType takes u8 and returns u8
-auto fnType = ts::function()
-  .ret(u8)
-  .param(u8)
-  .done();
-```
-
-Function pointer types can then be created from function types:
-
-```cpp
-auto fPtr = ts::function_pointer(fnType);
-```
-
-Function pointers are initialized through literals that refer to named functions and called similarly to normal functions, using `Assembler::callFunctionPointer` instead (the builder works exactly the same):
-
-```cpp
-a.declareLocal("fptr", ts::function_pointer(fnType));
-a.assign("fptr", literal::function_pointer(fnType, "foo"));
-a.callFunctionPointer("fptr").arg("x").into("y").done();
-```
-
-### Literals
-Literals (represented by the `Literal` type) are compile-time objects that can be used to initialize runtime objects.
-
-
-#### Integers and Strings
-Literals are created through the `acus::literal` namespace. Each builtin type has a corresponding literal factory:
-
-```cpp
-literal::u8(65)
-literal::s8(-3)
-literal::u16(1024)
-literal::s16(-300)
-literal::string("Hello")
-```
-
-#### Arrays
-Arrays use builders to compose multiple literals into an array-literal:
-
-```cpp
-auto arrType = ts::array(ts::u8(), 4);
-
-auto arr = literal::array(arrType)
-  .push(literal::u8('A'))
-  .push(literal::u8('B'))
-  .push(literal::u8('C'))
-  .push(literal::u8('D'))
-  .done();
-```
-
-#### Struct
-One can also build literal struct instantiations at compile-time, once a struct type has been defined:
-
-```cpp
-auto point = ts::defineStruct("Point")
-  .field("x", ts::u8())
-  .field("y", ts::u8())
-  .done();
-
-auto p = literal::struct_t(point)
-  .init("x", literal::u8('A'))
-  .init("y", literal::u8('B'))
-  .done();
-```
-
-### Global Variables
-
-Global variables are declared inside a program, before the first function-definition. Every function will then be able to access this variable through its name:
-
-```cpp
-a.program("globals", "main").begin(); {
-
-  a.declareGlobal("g", ts::u8());
-
-  a.function("main").begin(); {
-    a.assign("g", literal::u8('A'));
-    a.callFunction("foo").done();
-    a.write("g"); // writes F
-    a.returnFromFunction();
-  } a.endFunction();
-
-  a.function("foo").begin(); {
-    a.assign("g", literal::u8('F'));
-    a.returnFromFunction();
-  } a.endFunction();
-
-} a.endProgram();
-```
-
-### Input/Output
-#### Input
-To read a single byte from the input, `Assembler::read` is called, where the argument refers to the destination variable. This destination may refer to any variable of size 1, but most commonly this is `u8`:
-```cpp
-a.declareLocal("x", u8);
-a.read("x");
-```
-
-Note that, depending on terminal settings, your terminal will often buffer until you press Enter (which is a character by itself). Acus does not implement any input-parsing. Many terminals support Ctrl+D for end of input.
-
-#### Output
-Acus has two main output operations:
-
-```cpp
-a.write(value);
-a.print(value);
-```
-
-`write` writes the raw byte or bytes represented by the value. Arrays and structs can are written word-wise, where 16-bit fields are written in big endian order.
-
-`print` is defined for integers and strings. Integers are sent to the output in decimal notation; it supports the integer widths and signedness currently provided by the type system, for example `u8`, `s8`, `u16`, and `s16`. Strings are written until the terminating null is encountered (in contrast, when passing a string to `write`, all bytes are written, even if the string only takes up part of the total capacity).
-
-```cpp
-a.declareLocal("x", ts::s16());
-a.assign("x", literal::s16(-300));
-a.print("x"); // "-300"
-```
-
-### Control flow
-
-Control-flow within a function is achieved by setting labels and jumping between those labels. This is all that's needed to create conditionals and loops. A label is set using `Assembler::label`, which can be jumped to unconditionally using `Assembler::jump` or conditionally using `Assembler::jumpIf`. The latter takes an expression that will be evaluated as a boolean expression (any nonzero will evaluate to true), the label to jump to when the expression evaluates to true, and the label to jump to when the expression evaluates to false. In the example below, a for-loop that would be written in C/C++ as `for (int i = 0; i < n; ++i) { ... }`, is implemented using labels and jumps:
-
-```cpp
 a.assign("i", literal::u8(0));
+
 a.label("check");
-a.jumpIf(c.lt("i", "n"), "body", "done");
+a.jumpIf(a.lt("i", "n"), "body", "done");
+
 a.label("body");
 // ...
 a.addAssign("i", literal::u8(1));
 a.jump("check");
+
 a.label("done");
 ```
-### Scope
+### Functions and calls
+#### Function Definitions
+Both functions and calls use builders to construct them. A function definition is started by acquiring a builder throught the `Assembler::function` method. This returns an `Assembler::FunctionBuilder` object, exposing its `param`, `ret` and `begin` functions. The `param` function can be called repeatedly on the builder: once for every parameter the function takes. Calling `ret` is optional and is only necessary for functions that return non-void. When the signature is fully defined, `begin` is called and the function-scope is entered. 
 
-Even though functions already have their own local scope, it can be useful to subdivide that scope into smaller scopes. Variables declared within scopes will be freed at the end of their scope, so this is a way to avoid nameclashes and to manage stack-memory in a simple way. A scope is started using a builder for consistency's sake, but it does not provide any modifying functions. Simply:
-
-```cpp
-a.scope().begin(); {
-// ...
-} a.endScope();
-
-```
-
-### Integer Casts
-Integer types may be implicitly cast when there is no size or signedness conflict. For example, a `u8` may be used wherever a `u16` is expected. For all other conversions, an explicit cast can be used with `Assembler::cast`.
+Each function is closed by `Assembler::endFunction`. Before doing so, each possible path through the function must terminate in either a call to `Assembler::returnFromFunction` or `Assembler::abortProgram`.
 
 ```cpp
-a.declareLocal("x", s8);
-a.declareLocal("y", u8);
+a.function("double")
+  .param("x", ts::u16())
+  .ret(ts::u16())
+  .begin(); {
+    a.returnFromFunction(a.mul("x", literal::u16(2)));
+  } a.endFunction();
 
-a.assign("y", literal::u8(200)); 
-a.assign("x", "y");             // fails, different signedness
-a.assign("x", a.cast("y", s8)); // OK
+// Or equivalently:
+Assembler::FunctionBuilder builder = a.function("double");
+builder.param("x", ts::u16());
+builder.ret(ts::u16());
+builder.begin();
+a.returnFromFunction(a.mul("x", literal::u16(2));
+a.endFunction();
 ```
 
-### Unary and Binary Operations
-Many common unary and binary operations have been defined for all integer types. These have dedicated functions (see the full API table below) but can also be called using generic `unOp/unOpAssign` and `binOp/binOpAssign` functions, that take an enum-value as their first argument.
+#### Function Calls
+Calls also use a builder to set them up properly. The `Assembler::callFunction` takes the function-name as its only parameter and returns an `Assembler::FunctionCallBuilder` object, exposing its members `arg` (to pass an argument), `into` (to specify a return target) and `done` to finalize and execute the call.
 
 ```cpp
-a.negate("x");
-a.unOp(UnOp::Neg, "x");
-
-a.add("x", "y");
-a.binOp(BinOp::Add, "x", "y"); 
+a.callFunction("double")
+  .arg("x")
+  .into("y")
+  .done();
+  
+// Or equivalently:
+Assembler::FunctionCallBuilder builder = a.callFunction("double");
+builder.arg("x");
+builder.into("y");
+buider.done();
 ```
 
-#### Unary Operators
-The table below lists all unary operations. Each of these has a `xxxAssign` version, where the operator is applied to the operand immediately.
+#### Calling a Function Pointer
+Calls can also be done dynamically using a function pointer. The syntax is equivalent to that of a normal call, except that it takes an expression representing a function-pointer instead of a string. In order to define a function-pointer type, one first must define the function-type, from which the function-pointer-type can be defined. A variable of this type can then be declared and assigned a `function_pointer` literal. Depending on runtime conditions, different functions can be assigned to the pointer, resulting in dynamic dispatch.
 
-| Function                | `UnOp::xxx` |
-|-------------------------|-------------|
-| `lnot/lnotAssign`       | `Not`       |
-| `lbool/lboolAssign`     | `Bool`      |
-| `negate/negateAssign`   | `Neg`       |
-| `abs/absAssign`         | `Abs`       |
-| `signBit/signBitAssign` | `SignBit`   |
+```cpp
 
-#### Binary Operators
-The table below lists all binary operations. Each of these has a `xxxAssign` version, where the operator is applied to the left-hand operand immediately.
+// 1. Define the function-type
+TypeHandle fooType = ts::function()
+	.param(ts::s16())
+	.ret(ts::s16())
+	.done();
 
-| Function            | `BinOp::xxx` |
-|---------------------|--------------|
-| `add/addAssign`     | `Add`        |
-| `sub/subAssign`     | `Sub`        |
-| `mul/mulAssign`     | `Mul`        |
-| `div/divAssign`     | `Div`        |
-| `mod/modAssign`     | `Mod`        |
-| `lnand/lnandAssign` | `Nand`       |
-| `land/landAssign`   | `And`        |
-| `lor/lorAssign`     | `Or`         |
-| `lnor/lnorAssign`   | `Nor`        |
-| `lxor/lxorAssign`   | `Xor`        |
-| `lxnor/lxnorAssign` | `Xnor`       |
-| `eq/eqAssign`       | `Eq`         |
-| `neq/neqAssign`     | `Neq`        |
-| `lt/ltAssign`       | `Lt`         |
-| `le/leAssign`       | `Le`         |
-| `gt/gtAssign`       | `Gt`         |
-| `ge/geAssign`       | `Ge`         |
+// 2. Construct function pointers as literals
+Literal doubleFunction = literal::function_pointer(fooType, "double");
+Literal tripleFunction = literal::function_pointer(fooType, "triple");
 
+// 3. Define function-pointer type
+auto fooPtrType = ts::function_pointer(fooType);
 
-## Public API overview
-A full overview of all API functions is shown in the table below:
+// 4. Declare the function pointer
+c.declareLocal("fPtr", fooPtrType);
+
+// 5. Ask user for input:
+c.declareLocal("input", ts::s16());
+c.print(literal::string("Enter 'd' or 't': "));
+c.read("input");
+
+// 6. Branch based on the input
+c.jumpIf(c.eq("input", literal::u8('d')), "useDouble", "useTriple");
+
+// 7. Branch 1
+c.label("useDouble");
+c.assign("fPtr", doubleFunction);
+c.jump("done");
+
+// 8. Branch 2
+c.label("useTriple");
+c.assign("fPtr", tripleFunction);
+
+// 9. Call through pointer and print result
+c.label("done");
+c.declareLocal("x", ts::s16());
+c.assign("x", literal::s16(21));
+c.callFunctionPointer("fPtr")
+  .arg("x")
+  .into("x")
+  .done();
+
+c.print("x");
+```
+
+## Public API reference
+
+The tables below describe the supported user-facing backend API exposed by `<acus/acus.h>`. For readability, the final optional `std::source_location` argument accepted by API functions is omitted from the signatures. Low-level storage, proxy, cache, and primitive-IR types that are transitively visible through the implementation headers are not treated as stable frontend API here.
+
+Most `Assembler` operands may be supplied as a variable name, an `Expression`, a `Literal`, or—at the lower level—a `SlotProxy`. Operations requiring an lvalue accept only an addressable variable or expression.
+
+<details>
+<summary><strong>Expand the complete API tables</strong></summary>
+
+### Names imported by `acus::api`
+
+After:
+
+```cpp
+using namespace acus::api;
+```
+
+these names are available directly:
+
+| Imported name | Original name | Purpose |
+|---|---|---|
+| `Assembler` | `acus::Assembler` | Constructs programs and emits Brainfuck. |
+| `Expression` | `acus::Expression` | Represents a literal value or an addressable runtime value. |
+| `TypeHandle` | `acus::ts::TypeHandle` | Handle to an Acus type. |
+| `Literal` | `acus::literal::Literal` | Compile-time literal value. |
+| `ts` | `acus::ts` | Type factories and type builders. |
+| `literal` | `acus::literal` | Literal factories and literal builders. |
+
+`acus::error`, `acus::types`, `acus::BinOp`, and `acus::UnOp` are not re-exported into `acus::api`; use their fully qualified names or import them separately.
 
 ### `acus::Assembler`
 
-#### Construction and output
+#### Construction and generated output
 
-| Function     | Returns       | Description                                                                                 |
-|--------------|---------------|---------------------------------------------------------------------------------------------|
-| `primitives` | `std::string` | Returns a textual dump of the generated primitive instruction sequence for a named program. |
-| `brainfuck`  | `std::string` | Returns the generated Brainfuck source for a named program.                                 |
+| Function | Returns | Description |
+|---|---|---|
+| `Assembler()` | — | Constructs an independent assembler instance. The same instance may generate multiple named programs sequentially. |
+| `primitives(name)` | `std::string` | Returns the textual primitive-IR listing stored for a completed program. Throws `NoSuchProgram` if the name is unknown. |
+| `brainfuck(name)` | `std::string` | Returns the generated Brainfuck source stored for a completed program. Throws `NoSuchProgram` if the name is unknown. |
 
 #### Program, function, and scope structure
 
-| Function      | Returns           | Description                                                                                                   |
-|---------------|-------------------|---------------------------------------------------------------------------------------------------------------|
-| `program`     | `ProgramBuilder`  | Creates a program builder for a named program and entry function. Finalize with `begin`.                      |
-| `function`    | `FunctionBuilder` | Creates a function builder. Add parameters/return type if needed, then finalize with `begin`.                 |
-| `scope`       | `ScopeBuilder`    | Creates a nested lexical scope builder. Finalize with `begin`.                                                |
-| `endProgram`  | `void`            | Finishes the current program, validates it, constructs generated support blocks, and stores generated output. |
-| `endFunction` | `void`            | Ends the current function.                                                                                    |
-| `endScope`    | `void`            | Ends the current lexical scope and frees its locals.                                                          |
+| Function | Returns | Description |
+|---|---|---|
+| `program(name, entry)` | `ProgramBuilder` | Starts configuring a named program and its entry function. Finalize the builder with `begin()`. |
+| `function(name)` | `FunctionBuilder` | Starts configuring a function definition. Finalize with `begin()`. |
+| `scope()` | `ScopeBuilder` | Starts configuring a nested lexical scope. Finalize with `begin()`. |
+| `endProgram()` | `void` | Validates and completes the current program, emits support blocks, and stores its primitive and Brainfuck output. |
+| `endFunction()` | `void` | Ends the current function after all nested scopes have been closed. |
+| `endScope()` | `void` | Ends the current lexical scope and releases its local storage for reuse. |
 
-#### Declarations and global visibility
+#### Declarations
 
-| Function        | Returns      | Description                                                                                      |
-|-----------------|--------------|--------------------------------------------------------------------------------------------------|
-| `declareLocal`  | `Expression` | Declares a local variable in the current scope.                                                  |
-| `declareGlobal` | `void`       | Declares a global variable in the current program.                                               |
-| `referGlobals`  | `void`       | Makes selected globals visible inside the current function through local global-reference slots. |
+| Function | Returns | Description |
+|---|---|---|
+| `declareLocal(name, type)` | `Expression` | Declares a local in the current function/scope and returns its addressable expression. |
+| `declareGlobal(name, type)` | `void` | Declares a program-global object. Globals may subsequently be referenced by name from functions. |
 
-#### Function calls and returns
+#### Function calls, returns, and termination
 
-| Function              | Returns               | Description                                                        |
-|-----------------------|-----------------------|--------------------------------------------------------------------|
-| `callFunction`        | `FunctionCallBuilder` | Starts a direct function call.                                     |
-| `callFunctionPointer` | `FunctionCallBuilder` | Starts an indirect function-pointer call.                          |
-| `returnFromFunction`  | `void`                | Returns from the current function, optionally with a return value. |
-| `abortProgram`        | `void`                | Emits an abort path for the program.                               |
+| Function | Returns | Description |
+|---|---|---|
+| `callFunction(name)` | `FunctionCallBuilder` | Starts a direct call. The callee may be defined later; validation is deferred until `endProgram()`. |
+| `callFunctionPointer(pointer)` | `FunctionCallBuilder` | Starts an indirect call through a function-pointer expression. |
+| `returnFromFunction()` | `void` | Returns from a `void` function. |
+| `returnFromFunction(value)` | `void` | Returns a value compatible with the current function's declared return type. |
+| `abortProgram()` | `void` | Emits a path that terminates the entire generated program immediately. |
 
-#### Expression conversion, assignment, and casting
+#### Expression construction, assignment, and access
 
-| Function | Returns      | Description                                                                        |
-|----------|--------------|------------------------------------------------------------------------------------|
-| `assign` | `Expression` | Assigns a value into an lvalue expression and returns the assigned lvalue.         |
-| `cast`   | `Expression` | Converts an (integer) expression to another type and returns the converted result. |
+| Function | Returns | Description |
+|---|---|---|
+| `expr(value)` | `Expression` | Converts an addressable operand into an `Expression`. Unlike ordinary rvalue conversion, literals are not accepted. |
+| `assign(lhs, rhs)` | `Expression` | Assigns `rhs` to an addressable `lhs` and returns the destination expression. |
+| `cast(value, type)` | `Expression` | Converts an addressable integer expression to another integer type and returns a temporary result. |
+| `structField(object, fieldName)` | `Expression` | Selects a struct field by name. Works for runtime expressions and struct literals. |
+| `structField(object, fieldIndex)` | `Expression` | Selects a struct field by zero-based index. |
+| `arrayElement(array, constantIndex)` | `Expression` | Selects an array or string element using a compile-time index. |
+| `arrayElement(array, runtimeIndex)` | `Expression` | Selects an array or string element using an integer expression. |
+| `dereferencePointer(pointer)` | `Expression` | Produces an addressable expression for the pointee of a runtime pointer. |
+| `addressOf(object)` | `Expression` | Produces a pointer to an addressable non-temporary object. |
 
-#### Access expressions
+#### Generic unary and binary dispatch
 
-| Function             | Returns      | Description                                                                                |
-|----------------------|--------------|--------------------------------------------------------------------------------------------|
-| `structField`        | `Expression` | Produces an expression for a struct field, selected by field name or field index.          |
-| `arrayElement`       | `Expression` | Produces an expression for an array/string element, selected by constant or runtime index. |
-| `dereferencePointer` | `Expression` | Produces an expression for the value pointed to by a runtime pointer.                      |
-| `addressOf`          | `Expression` | Produces a pointer expression referring to an addressable object.                          |
-
-#### Generic unary and binary operations
-
-| Function      | Returns      | Description                                                |
-|---------------|--------------|------------------------------------------------------------|
-| `unOp`        | `Expression` | Applies a unary operation and returns a temporary result.  |
-| `unOpAssign`  | `Expression` | Applies a unary operation in-place.                        |
-| `binOp`       | `Expression` | Applies a binary operation and returns a temporary result. |
-| `binOpAssign` | `Expression` | Applies a binary operation in-place to the left-hand side. |
+| Function | Returns | Description |
+|---|---|---|
+| `unOp(op, value)` | `Expression` | Applies an `UnOp` and returns a temporary result. |
+| `unOpAssign(op, value)` | `Expression` | Applies an `UnOp` in place to an addressable operand. |
+| `binOp(op, lhs, rhs)` | `Expression` | Applies a `BinOp` and returns a temporary result. |
+| `binOpAssign(op, lhs, rhs)` | `Expression` | Applies a `BinOp` in place to the addressable left operand. |
 
 #### Unary operations
 
-| Function        | Returns      | Description                                                        |
-|-----------------|--------------|--------------------------------------------------------------------|
-| `lnot`          | `Expression` | Computes logical NOT into a temporary result.                      |
-| `lnotAssign`    | `Expression` | Applies logical NOT in-place.                                      |
-| `lbool`         | `Expression` | Converts a value to a boolean-like `0` or `1` result.              |
-| `lboolAssign`   | `Expression` | Converts a value to boolean form in-place.                         |
-| `negate`        | `Expression` | Computes arithmetic negation into a temporary result.              |
-| `negateAssign`  | `Expression` | Applies arithmetic negation in-place.                              |
-| `abs`           | `Expression` | Computes absolute value into a temporary result.                   |
-| `absAssign`     | `Expression` | Applies absolute value in-place.                                   |
-| `signBit`       | `Expression` | Computes the sign bit of a signed integer into a temporary result. |
-| `signBitAssign` | `Expression` | Replaces a signed integer with its sign bit.                       |
+| Temporary-result function | In-place function | Description |
+|---|---|---|
+| `lnot(value)` | `lnotAssign(value)` | Logical NOT; produces canonical `0` or `1`. |
+| `lbool(value)` | `lboolAssign(value)` | Converts an integer to canonical Boolean form. |
+| `negate(value)` | `negateAssign(value)` | Arithmetic negation. |
+| `abs(value)` | `absAssign(value)` | Absolute value. |
+| `signBit(value)` | `signBitAssign(value)` | Extracts the sign bit of a signed integer as `0` or `1`. |
 
 #### Arithmetic operations
 
-| Function    | Returns      | Description                                   |
-|-------------|--------------|-----------------------------------------------|
-| `add`       | `Expression` | Computes `lhs + rhs` into a temporary result. |
-| `sub`       | `Expression` | Computes `lhs - rhs` into a temporary result. |
-| `mul`       | `Expression` | Computes `lhs * rhs` into a temporary result. |
-| `div`       | `Expression` | Computes `lhs / rhs` into a temporary result. |
-| `mod`       | `Expression` | Computes `lhs % rhs` into a temporary result. |
-| `addAssign` | `Expression` | Applies `lhs += rhs`.                         |
-| `subAssign` | `Expression` | Applies `lhs -= rhs`.                         |
-| `mulAssign` | `Expression` | Applies `lhs *= rhs`.                         |
-| `divAssign` | `Expression` | Applies `lhs /= rhs`.                         |
-| `modAssign` | `Expression` | Applies `lhs %= rhs`.                         |
+| Temporary-result function | In-place function | Description |
+|---|---|---|
+| `add(lhs, rhs)` | `addAssign(lhs, rhs)` | Addition / `+=`. Also supports the pointer-plus-integer combinations permitted by the type rules. |
+| `sub(lhs, rhs)` | `subAssign(lhs, rhs)` | Subtraction / `-=`. |
+| `mul(lhs, rhs)` | `mulAssign(lhs, rhs)` | Multiplication / `*=`. |
+| `div(lhs, rhs)` | `divAssign(lhs, rhs)` | Integer division / `/=`. |
+| `mod(lhs, rhs)` | `modAssign(lhs, rhs)` | Integer remainder / `%=`. |
 
 #### Logical operations
 
-| Function      | Returns      | Description                                    |
-|---------------|--------------|------------------------------------------------|
-| `land`        | `Expression` | Computes logical AND into a temporary result.  |
-| `lnand`       | `Expression` | Computes logical NAND into a temporary result. |
-| `lor`         | `Expression` | Computes logical OR into a temporary result.   |
-| `lnor`        | `Expression` | Computes logical NOR into a temporary result.  |
-| `lxor`        | `Expression` | Computes logical XOR into a temporary result.  |
-| `lxnor`       | `Expression` | Computes logical XNOR into a temporary result. |
-| `landAssign`  | `Expression` | Applies logical AND in-place.                  |
-| `lnandAssign` | `Expression` | Applies logical NAND in-place.                 |
-| `lorAssign`   | `Expression` | Applies logical OR in-place.                   |
-| `lnorAssign`  | `Expression` | Applies logical NOR in-place.                  |
-| `lxorAssign`  | `Expression` | Applies logical XOR in-place.                  |
-| `lxnorAssign` | `Expression` | Applies logical XNOR in-place.                 |
+These are integer truth-value operations; they do not provide host-language short-circuit evaluation.
+
+| Temporary-result function | In-place function | Description |
+|---|---|---|
+| `land(lhs, rhs)` | `landAssign(lhs, rhs)` | Logical AND. |
+| `lnand(lhs, rhs)` | `lnandAssign(lhs, rhs)` | Logical NAND. |
+| `lor(lhs, rhs)` | `lorAssign(lhs, rhs)` | Logical OR. |
+| `lnor(lhs, rhs)` | `lnorAssign(lhs, rhs)` | Logical NOR. |
+| `lxor(lhs, rhs)` | `lxorAssign(lhs, rhs)` | Logical XOR. |
+| `lxnor(lhs, rhs)` | `lxnorAssign(lhs, rhs)` | Logical XNOR. |
 
 #### Comparison operations
 
-| Function    | Returns      | Description                                            |
-|-------------|--------------|--------------------------------------------------------|
-| `eq`        | `Expression` | Computes `lhs == rhs` into a temporary boolean result. |
-| `neq`       | `Expression` | Computes `lhs != rhs` into a temporary boolean result. |
-| `lt`        | `Expression` | Computes `lhs < rhs` into a temporary boolean result.  |
-| `le`        | `Expression` | Computes `lhs <= rhs` into a temporary boolean result. |
-| `gt`        | `Expression` | Computes `lhs > rhs` into a temporary boolean result.  |
-| `ge`        | `Expression` | Computes `lhs >= rhs` into a temporary boolean result. |
-| `eqAssign`  | `Expression` | Applies equality comparison in-place.                  |
-| `neqAssign` | `Expression` | Applies inequality comparison in-place.                |
-| `ltAssign`  | `Expression` | Applies less-than comparison in-place.                 |
-| `leAssign`  | `Expression` | Applies less-or-equal comparison in-place.             |
-| `gtAssign`  | `Expression` | Applies greater-than comparison in-place.              |
-| `geAssign`  | `Expression` | Applies greater-or-equal comparison in-place.          |
+| Temporary-result function | In-place function | Description |
+|---|---|---|
+| `eq(lhs, rhs)` | `eqAssign(lhs, rhs)` | Equality comparison. |
+| `neq(lhs, rhs)` | `neqAssign(lhs, rhs)` | Inequality comparison. |
+| `lt(lhs, rhs)` | `ltAssign(lhs, rhs)` | Less-than comparison. |
+| `le(lhs, rhs)` | `leAssign(lhs, rhs)` | Less-than-or-equal comparison. |
+| `gt(lhs, rhs)` | `gtAssign(lhs, rhs)` | Greater-than comparison. |
+| `ge(lhs, rhs)` | `geAssign(lhs, rhs)` | Greater-than-or-equal comparison. |
 
-#### Control flow
+Comparison results are canonical `u8` Boolean values. The in-place forms replace the left operand with that result.
 
-| Function      | Returns | Description                                                                                                                 |
-|---------------|---------|-----------------------------------------------------------------------------------------------------------------------------|
-| `label`       | `void`  | Starts a labeled code block. If already inside a block, the previous block is ended and made to fall through to this label. |
-| `jump`        | `void`  | Ends the current block and sets the next block to a label.                                                                  |
-| `jumpIf`      | `void`  | Ends the current block and selects one of two labels based on an integer condition.                                         |
-| `unreachable` | `void`  | Marks the current block as intentionally unreachable.                                                                       |
+#### Explicit control flow
 
-#### Input/Output
-| Function | Returns | Description                                                                                 |
-|----------|---------|---------------------------------------------------------------------------------------------|
-| `read`   | `void`  | Writes the raw byte or bytes represented by a value.                                        |
-| `write`  | `void`  | Writes the raw byte or bytes represented by a value.                                        |
-| `print`  | `void`  | Writes a string or integer in decimal notation. Supports unsigned and signed integer types. |
+| Function | Returns | Description |
+|---|---|---|
+| `label(name)` | `void` | Begins a labeled block. If a current block exists, it falls through to this label. |
+| `jump(label)` | `void` | Ends the current block and transfers control unconditionally. |
+| `jumpIf(condition, trueLabel, falseLabel)` | `void` | Ends the current block and selects one of two labels according to an integer condition. |
+| `unreachable()` | `void` | Marks the current block as intentionally unreachable, suppressing the unreachable-block validation error. |
 
+#### Input and output
+
+| Function | Returns | Description |
+|---|---|---|
+| `read(destination)` | `void` | Reads one Brainfuck input byte into an addressable value whose storage size is one slot. |
+| `write(value)` | `void` | Emits the raw encoded byte fields of a value rather than formatting it. |
+| `print(value)` | `void` | Prints an integer in decimal notation or a null-terminated Acus string. |
+
+### Builder objects
+
+All builders are move-only and are intended to be finalized exactly once using the method shown below. Destroying an unfinished builder reports `BuilderNotFinalized`; checked configuration methods reject use after finalization with `BuilderUsedAfterFinalize`. Configuration methods support both stored builders and fluent chaining by returning an lvalue or rvalue reference to the same builder.
+
+| Factory | Builder | Configuration methods | Finalizer | Result/effect |
+|---|---|---|---|---|
+| `Assembler::program(name, entry)` | `Assembler::ProgramBuilder` | — | `begin()` | Begins a program. |
+| `Assembler::function(name)` | `Assembler::FunctionBuilder` | `param(name, type)`, `ret(type)` | `begin()` | Defines and enters a function. |
+| `Assembler::scope()` | `Assembler::ScopeBuilder` | — | `begin()` | Enters a lexical scope. |
+| `Assembler::callFunction(name)` | `Assembler::FunctionCallBuilder` | `arg(value)`, `into(destination)` | `done()` | Emits a direct call. |
+| `Assembler::callFunctionPointer(ptr)` | `Assembler::FunctionCallBuilder` | `arg(value)`, `into(destination)` | `done()` | Emits an indirect call. |
+| `ts::function()` | `ts::FunctionTypeBuilder` | `param(type)`, `ret(type)` | `done()` | Returns `types::FunctionType const *`. |
+| `ts::defineStruct(name)` | `ts::StructTypeBuilder` | `field(name, type)` | `done()` | Returns `types::StructType const *`. |
+| `literal::struct_t(type)` | `literal::StructLiteralBuilder` | `init(field, literal)` | `done()` | Returns a completed `Literal`. |
+| `literal::array(type)` | `literal::ArrayLiteralBuilder` | `push(literal)` | `done()` | Returns a completed `Literal`. |
 
 #### `Assembler::ProgramBuilder`
 
-Constructor: `Assembler::program(std::string program_name, std::string entry_function)`.
+| Method | Returns | Description |
+|---|---|---|
+| `begin()` | `void` | Finalizes the builder and begins construction of the named program. |
 
-| Function | Returns | Description                  |
-|----------|---------|------------------------------|
-| `begin`  | `void`  | Starts program construction. |
-
-Corresponding end-statement: `Assembler::endProgram()`.
+Close the corresponding program with `Assembler::endProgram()`.
 
 #### `Assembler::FunctionBuilder`
 
-Constructor: `Assembler::function(std::string function_name)`.
+| Method | Returns | Description |
+|---|---|---|
+| `param(name, type)` | same builder | Appends a named parameter in declaration order. |
+| `ret(type)` | same builder | Sets the return type. It may be specified at most once; omission means `void`. |
+| `begin()` | `void` | Finalizes the signature, defines the function, and enters its initial block. |
 
-| Function | Returns           | Description                                                     |
-|----------|-------------------|-----------------------------------------------------------------|
-| `ret`    | `FunctionBuilder` | Sets the function return type. Defaults to `void` when omitted. |
-| `param`  | `FunctionBuilder` | Adds a named parameter to the function.                         |
-| `begin`  | `void`            | Defines the function and starts its entry block.                |
-
-Corresponding end-statement: `Assembler::endFunction()`.
+Close the function with `Assembler::endFunction()`.
 
 #### `Assembler::ScopeBuilder`
 
-Constructor: `Assembler::scope()`.
+| Method | Returns | Description |
+|---|---|---|
+| `begin()` | `void` | Finalizes the builder and enters a nested lexical scope. |
 
-| Function | Returns | Description                    |
-|----------|---------|--------------------------------|
-| `begin`  | `void`  | Starts a nested lexical scope. |
-
-Corresponding end-statement: `Assembler::endScope()`.
+Close the scope with `Assembler::endScope()`.
 
 #### `Assembler::FunctionCallBuilder`
 
-Constructor: `Assembler::callFunction(std::string function_name)`.
-
-| Function | Returns               | Description                                                |
-|----------|-----------------------|------------------------------------------------------------|
-| `into`   | `FunctionCallBuilder` | Sets the destination for a non-void function return value. |
-| `arg`    | `FunctionCallBuilder` | Adds an argument to the call.                              |
-| `done`   | `void`                | Finalizes and emits the call.                              |
-
-### Type system API
-
-All type factories live in `acus::ts`.
-
-| Function           | Returns               | Description                                                   |
-|--------------------|-----------------------|---------------------------------------------------------------|
-| `void_t`           | `ts::TypeHandle`      | Returns the `void` type.                                      |
-| `u8`               | `ts::TypeHandle`      | Returns the unsigned 8-bit integer type.                      |
-| `s8`               | `ts::TypeHandle`      | Returns the signed 8-bit integer type.                        |
-| `u16`              | `ts::TypeHandle`      | Returns the unsigned 16-bit integer type.                     |
-| `s16`              | `ts::TypeHandle`      | Returns the signed 16-bit integer type.                       |
-| `array`            | `ts::TypeHandle`      | Returns a fixed-length array type.                            |
-| `string`           | `ts::TypeHandle`      | Returns a string type with space for a terminating zero byte. |
-| `raw`              | `ts::TypeHandle`      | Returns an internal raw storage type of a given slot size.    |
-| `struct_t`         | `ts::TypeHandle`      | Looks up an already-defined struct type by name.              |
-| `pointer`          | `ts::TypeHandle`      | Returns a runtime pointer type for a pointee type.            |
-| `function_pointer` | `ts::TypeHandle`      | Returns a function pointer type for a function type.          |
-| `void_function`    | `ts::TypeHandle`      | Returns the `void()` function type.                           |
-| `function`         | `FunctionTypeBuilder` | Starts building a function type.                              |
-| `defineStruct`     | `StructTypeBuilder`   | Starts defining a named struct type.                          |
+| Method | Returns | Description |
+|---|---|---|
+| `arg(value)` | same builder | Appends one argument in parameter order. |
+| `into(destination)` | same builder | Selects an addressable destination for a non-void return value. |
+| `done()` | `void` | Validates/finalizes the builder and emits the call. |
 
 #### `ts::FunctionTypeBuilder`
 
-Constructor: `ts::function()`
-
-| Function | Returns                | Description                                            |
-|----------|------------------------|--------------------------------------------------------|
-| `ret`    | `FunctionTypeBuilder`  | Sets the return type. Defaults to `void` when omitted. |
-| `param`  | `FunctionTypeBuilder`  | Adds one parameter type.                               |
-| `done`   | `FunctionType const *` | Finalizes and returns the function type.               |
+| Method | Returns | Description |
+|---|---|---|
+| `param(type)` | same builder | Appends one parameter type. |
+| `ret(type)` | same builder | Sets the return type at most once; omission means `void`. |
+| `done()` | `types::FunctionType const *` | Interns and returns the completed function type. |
 
 #### `ts::StructTypeBuilder`
 
-Constructor: `ts::defineStruct(std::string struct_name)`
-
-| Function | Returns              | Description                            |
-|----------|----------------------|----------------------------------------|
-| `field`  | `StructTypeBuilder`  | Adds a named field to the struct type. |
-| `done`   | `StructType const *` | Finalizes and returns the struct type. |
-
-### Literal factory API
-
-All literal factories live in `acus::literal`.
-
-| Function           | Returns                | Description                                                                |
-|--------------------|------------------------|----------------------------------------------------------------------------|
-| `u8`               | `Literal`              | Creates an unsigned 8-bit integer literal.                                 |
-| `s8`               | `Literal`              | Creates a signed 8-bit integer literal.                                    |
-| `u16`              | `Literal`              | Creates an unsigned 16-bit integer literal.                                |
-| `s16`              | `Literal`              | Creates a signed 16-bit integer literal.                                   |
-| `string`           | `Literal`              | Creates a string literal.                                                  |
-| `function_pointer` | `Literal`              | Creates a function pointer literal referring to a named function.          |
-| `struct_t`         | `StructLiteralBuilder` | Starts building a struct literal.                                          |
-| `array`            | `ArrayLiteralBuilder`  | Starts building an array literal.                                          |
+| Method | Returns | Description |
+|---|---|---|
+| `field(name, type)` | same builder | Appends a named field in layout order. |
+| `done()` | `types::StructType const *` | Defines and returns the struct type. Returns `nullptr` if that struct name already exists. |
 
 #### `literal::StructLiteralBuilder`
 
-Constructor: `literal::struct_t(TypeHandle struct_type)`
-
-| Function | Returns                | Description                               |
-|----------|------------------------|-------------------------------------------|
-| `init`   | `StructLiteralBuilder` | Initializes a named field in the literal. |
-| `done`   | `Literal`              | Finalizes and returns the struct literal. |
+| Method | Returns | Description |
+|---|---|---|
+| `init(field, literal)` | same builder | Initializes one named field. Each field may be initialized only once. |
+| `done()` | `Literal` | Validates field coverage/types and returns the completed struct literal. |
 
 #### `literal::ArrayLiteralBuilder`
 
-Constructor: `literal::array(TypeHandle array_type)`
+| Method | Returns | Description |
+|---|---|---|
+| `push(literal)` | same builder | Appends one element and checks its exact element type. |
+| `done()` | `Literal` | Requires exactly the array type's declared number of elements and returns the completed literal. |
 
-| Function | Returns               | Description                              |
-|----------|-----------------------|------------------------------------------|
-| `push`   | `ArrayLiteralBuilder` | Appends an element literal.              |
-| `done`   | `Literal`             | Finalizes and returns the array literal. |
+### `acus::Expression`
 
-### Operator enums
+`Expression` objects are normally obtained from `Assembler` operations rather than constructed directly.
 
-Generic unary and binary operators use these enums.
+| Method | Returns | Description |
+|---|---|---|
+| `hasSlot()` | `bool` | Reports whether the expression refers to runtime/addressable storage. |
+| `isLiteral()` | `bool` | Reports whether the expression contains a compile-time literal. |
+| `slot()` | `SlotProxy const &` | Returns the underlying storage proxy; valid only when `hasSlot()` is true. This is a lower-level interface. |
+| `literal()` | `Literal` | Returns the contained literal; valid only when `isLiteral()` is true. |
+| `type()` | `types::TypeHandle` | Returns the expression's static type. |
+| `str()` | `std::string` | Returns a diagnostic representation of the expression. |
 
-| Enum    | Values                                                                                                            | Description                                          |
-|---------|-------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|
-| `UnOp`  | `Not`, `Bool`, `Neg`, `Abs`, `SignBit`                                                                            | Unary operations used by `unOp` and `unOpAssign`.    |
-| `BinOp` | `Add`, `Sub`, `Mul`, `Div`, `Mod`, `And`, `Or`, `Nand`, `Nor`, `Xor`, `Xnor`, `Eq`, `Neq`, `Lt`, `Le`, `Gt`, `Ge` | Binary operations used by `binOp` and `binOpAssign`. |
+Public explicit constructors also exist for `Slot`, `SlotProxy`, and `Literal`, primarily for backend/library implementation.
+
+### Type system API
+
+All type factories live in `acus::ts`. Returned objects are interned and remain valid for the lifetime of the process.
+
+#### Type factories
+
+| Function | Returns | Description |
+|---|---|---|
+| `void_t()` | `types::VoidType const *` | Returns the `void` type. |
+| `u8()` | `types::IntegerType const *` | Returns unsigned 8-bit integer type. |
+| `s8()` | `types::IntegerType const *` | Returns signed 8-bit integer type. |
+| `u16()` | `types::IntegerType const *` | Returns unsigned 16-bit integer type. |
+| `s16()` | `types::IntegerType const *` | Returns signed 16-bit integer type. |
+| `array(elementType, length)` | `types::ArrayType const *` | Returns a fixed-length array type. |
+| `string(maxLength)` | `types::StringType const *` | Returns a string with `maxLength` usable characters plus its terminating zero element. |
+| `raw(slotCount)` | `types::RawType const *` | Returns an untyped raw-storage type. This is chiefly useful to backend/library code. |
+| `struct_t(name)` | `types::StructType const *` | Looks up a previously defined struct, returning `nullptr` when absent. |
+| `pointer(pointeeType)` | `types::PointerType const *` | Returns a runtime pointer type. |
+| `function_pointer(functionType)` | `types::FunctionPointerType const *` | Returns a pointer type for the supplied function signature. |
+| `void_function()` | `types::FunctionType const *` | Returns the canonical `void()` function type. |
+| `function()` | `FunctionTypeBuilder` | Starts building a function type. |
+| `defineStruct(name)` | `StructTypeBuilder` | Starts defining a named struct type. |
+
+`ts::TypeHandle` is an alias for `types::Type const *`. `types::null` is the null type handle used internally and by builders before a type is selected.
+
+#### Common type inspection
+
+| Type | Public methods | Description |
+|---|---|---|
+| `types::Type` | `tag()`, `str()`, `size()`, `usesValue1()` | Base interface: category tag, printable name, number of macrocells, and whether a second value byte is used. |
+| `types::IntegerType` | `bits()`, `isSigned()`, `signedness()` | Integer width and signedness. |
+| `types::ArrayLike` | `length()`, `elementType()` | Shared interface for arrays and strings. A string's reported length includes its terminating element. |
+| `types::StructType` | `fieldCount()`, `fieldIndex(name)`, `fieldType(index/name)`, `fieldOffset(index/name)`, `fieldName(index)` | Struct field metadata and layout. |
+| `types::PointerType` | `pointeeType()` | Returns the pointed-to type. |
+| `types::FunctionType` | `returnType()`, `paramTypes()` | Returns the function result and ordered parameter types. |
+| `types::FunctionPointerType` | `functionType()` | Returns the pointed-to function signature. |
+
+#### Type helpers and enums
+
+| API | Values / result | Description |
+|---|---|---|
+| `types::cast<T>(handle)` | `T const *` | Downcasts a type handle; an invalid cast triggers an assertion. |
+| `types::isU8`, `isS8`, `isU16`, `isS16` | `bool` | Tests a concrete integer type. |
+| `types::isInteger` | `bool` | Tests any supported integer type. |
+| `types::isSignedInteger`, `isUnsignedInteger` | `bool` | Tests integer signedness category. |
+| `types::isArray`, `isString`, `isArrayLike` | `bool` | Tests aggregate sequence categories. |
+| `types::isStruct`, `isPointer`, `isFunction`, `isFunctionPointer`, `isRaw` | `bool` | Tests the remaining type categories. |
+| `types::TypeTag` | `VOID`, `RAW`, `U8`, `S8`, `U16`, `S16`, `ARRAY`, `STRING`, `STRUCT`, `POINTER`, `FUNCTION`, `FUNCTION_POINTER` | Values returned by `Type::tag()`. |
+| `types::Signedness` | `SIGNED`, `UNSIGNED` | Values returned by `IntegerType::signedness()`. |
+
+### Literal API
+
+All literal factories live in `acus::literal`.
+
+#### Literal factories
+
+| Function | Returns | Description |
+|---|---|---|
+| `u8(value)` | `Literal` | Creates an unsigned 8-bit integer literal. |
+| `s8(value)` | `Literal` | Creates a signed 8-bit integer literal. |
+| `u16(value)` | `Literal` | Creates an unsigned 16-bit integer literal. |
+| `s16(value)` | `Literal` | Creates a signed 16-bit integer literal. |
+| `string(value)` | `Literal` | Creates a null-terminated string literal. |
+| `function_pointer(functionType, functionName)` | `Literal` | Creates a function-pointer literal naming a function with the supplied signature. |
+| `struct_t(structType)` | `StructLiteralBuilder` | Starts building a struct literal. |
+| `array(arrayType)` | `ArrayLiteralBuilder` | Starts building an array literal. |
+| `cast<T>(literal)` | implementation view | Retrieves typed literal data for supported type categories. An invalid cast triggers an assertion. |
+
+#### `literal::Literal`
+
+| Method | Returns | Description |
+|---|---|---|
+| `clone()` | `Literal` | Deep-clones the literal value. |
+| `str()` | `std::string` | Returns a diagnostic/source-like representation. |
+| `type()` | `types::TypeHandle` | Returns the literal's static type. |
+| `get()` | shared implementation pointer | Exposes the underlying literal object; generally prefer `literal::cast<T>()`. |
+
+Supported `literal::cast<T>()` categories expose these useful methods:
+
+| Cast category | Available data |
+|---|---|
+| `types::IntegerType` | `semanticValue()`, `encodedValue()` |
+| `types::ArrayLike` / `types::ArrayType` | `element(index)` |
+| `types::StringType` | `element(index)`, `stdstr()` |
+| `types::StructType` | `field(name)`, `field(index)` |
+| `types::FunctionPointerType` | `functionName()` |
+
+### Operator API
+
+| API | Values / return | Description |
+|---|---|---|
+| `acus::UnOp` | `Not`, `Bool`, `Neg`, `Abs`, `SignBit` | Unary operators accepted by `unOp()` and `unOpAssign()`. |
+| `acus::BinOp` | `Add`, `Sub`, `Mul`, `Div`, `Mod`, `And`, `Or`, `Nand`, `Nor`, `Xor`, `Xnor`, `Eq`, `Neq`, `Lt`, `Le`, `Gt`, `Ge` | Binary operators accepted by `binOp()` and `binOpAssign()`. |
+| `acus::unOpStr(op)` | `std::string` | Returns the diagnostic name/symbol for a unary operator. |
+| `acus::binOpStr(op)` | `std::string` | Returns the diagnostic name/symbol for a binary operator. |
+
+### Error API
+
+Acus reports invalid API use and invalid generated programs by throwing `acus::error::Error`, which derives from `std::exception`. Most public API calls capture their call site using a defaulted `std::source_location`, so diagnostics normally point to the frontend statement that requested the operation.
+
+#### `acus::error::Error`
+
+| Member | Type / return | Description |
+|---|---|---|
+| `errorCode` | `ErrorCode` | Public stored error code. Prefer `code()` when only reading it. |
+| `filename` | `std::string` | Source filename associated with the error. |
+| `line` | `int` | One-based source line. |
+| `column` | `int` | One-based source column when available. |
+| `msg` | `std::string` | Error message without the location prefix. |
+| `code()` | `ErrorCode` | Returns the error code. |
+| `relocate(file, line, column)` | `Error &` | Replaces the source location and returns the same exception object. Useful for frontends translating locations. |
+| `what()` | `char const *` | Returns `file:line:column: message`. |
+
+`error::throw_if(condition, code, file, line, column, ...)` is also public and throws an `Error` assembled from the remaining streamable arguments when `condition` is true.
+
+#### `acus::error::ErrorCode`
+
+##### API sequencing and generated-program structure
+
+| Code | Meaning |
+|---|---|
+| `UnexpectedApiCall` | An API method was called out of the sequence expected by the backend. |
+| `EmptyProgram` | A program was finalized without any functions. |
+| `EntryFunctionNotDefined` | The named entry function was never defined. |
+| `WrongEntryFunctionType` | The entry function does not have the required `void()` signature. |
+| `ExecutionPathWithoutReturn` | A reachable function path ends without returning or aborting. |
+| `UnreachableCodeSection` | A block is unreachable but was not explicitly marked with `unreachable()`. |
+| `ExpectedOutsideProgramBlock` | An operation requiring no active program was called inside one. |
+| `ExpectedInsideProgramBlock` | An operation requiring an active program was called outside one. |
+| `ExpectedOutsideFunctionBlock` | An operation requiring no active function was called inside one. |
+| `ExpectedInsideFunctionBlock` | An operation requiring an active function was called outside one. |
+| `ExpectedNoScope` | An operation was called while nested scopes were still active. |
+| `GlobalDeclarationNotAllowed` | A global was declared after the program had entered a phase where globals are no longer accepted. |
+| `NoSuchProgram` | `brainfuck()` or `primitives()` was asked for an unknown/completely unfinalized program. |
+
+##### Names, functions, labels, and control-flow targets
+
+| Code | Meaning |
+|---|---|
+| `DuplicateFunctionParameters` | A function signature contains repeated parameter names. |
+| `DuplicateGlobalReferences` | Duplicate global references were requested. This code remains declared although the current direct API no longer exposes `referGlobals()`. |
+| `FunctionDoesNotExist` | A direct call or validation references a function that was never defined. |
+| `LabelDoesNotExist` | A jump references a label that was never defined in the function. |
+| `GlobalNameUnavailable` | A global name is already in use. |
+| `ExpectedGlobal` | An operation expected the supplied name to identify a global. |
+| `NameNotInScope` | A variable name cannot be resolved in the current local/global scope. |
+| `NameAlreadyInScope` | A declaration conflicts with a visible name. |
+| `NameAlreadyInCurrentScope` | A declaration duplicates a name in the current lexical scope. |
+
+##### Expressions, operands, and type requirements
+
+| Code | Meaning |
+|---|---|
+| `TakingAddressOfTemporary` | `addressOf()` was applied to temporary storage. |
+| `ReadOnlyExpression` | An operation requiring an lvalue received a literal/read-only expression. |
+| `IncompatibleOperands` | An operator or cast is not defined for the supplied types/order. |
+| `NotPrintable` | `print()` does not support the supplied type. |
+| `ExpectedInteger` | An integer type was required. |
+| `ExpectedSignedInteger` | A signed integer type was required. |
+| `ExpectedUnsignedInteger` | An unsigned integer type was required. |
+| `ExpectedArray` | An array type was required. |
+| `ExpectedString` | A string type was required. |
+| `ExpectedArrayOrString` | An array-like type was required. |
+| `ExpectedStruct` | A struct type was required. |
+| `ExpectedPointer` | A runtime pointer type was required. |
+| `ExpectedFunctionType` | A function signature type was required. |
+| `ExpectedFunctionPointer` | A function-pointer type was required. |
+| `AssignmentTypeMismatch` | A value cannot be assigned to the destination type. |
+| `UnexpectedType` | A value/literal has a different exact type than required. |
+
+##### Aggregates, fields, and indexing
+
+| Code | Meaning |
+|---|---|
+| `FieldIndexOutOfBounds` | A struct field index is outside the valid range. |
+| `FieldCountMismatch` | A struct literal has the wrong number of initialized fields. |
+| `MissingField` | A required struct-literal field was not initialized. |
+| `MultipleInitializationsOfSameField` | A struct-literal builder initializes one field more than once. |
+| `FieldNotFound` | A field name does not exist in the struct type. |
+| `IndexOutOfBounds` | A compile-time array/string index is outside the valid range. |
+| `NegativeIndex` | An index literal is negative. |
+| `TooManyElementsInArrayInitialization` | An array-literal builder received more elements than its type permits. |
+| `TooFewElementsInArrayInitialization` | An array-literal builder was finalized before all elements were supplied. |
+
+##### Calls, input, and builders
+
+| Code | Meaning |
+|---|---|
+| `FunctionParameterCountMismatch` | A function type or call has the wrong number of parameters/arguments. |
+| `InvalidFunctionPointerCall` | An indirect call has an invalid argument count or argument types. |
+| `InvalidReadType` | `read()` was given a destination whose storage size is not one slot. |
+| `BuilderNotFinalized` | A builder was destroyed without its required `begin()` or `done()`. |
+| `BuilderUsedAfterFinalize` | A finalized builder was used again. |
+| `ReturnTypeSpecifiedMultipleTimes` | `ret()` was called more than once on a function or function-type builder. |
+
+</details>
+
+
+## Building
+
+Acus has no external dependencies beyond a C++23 compiler, GNU Make, and the C++ standard library.
+
+```sh
+git clone https://github.com/jorenheit/acus.git
+cd acus
+make
+make check
+```
+
+The static library is written to `lib/libacus.a`.
+
+To build the included examples:
+
+```sh
+make examples
+```
+
+Installation is optional:
+
+```sh
+sudo make install
+```
+
+The default prefix is `/usr/local`. A custom prefix can be selected with, for example:
+
+```sh
+make install PREFIX="$HOME/.local"
+```
+
+## Project status
+
+Acus is under active development. The backend is already capable of producing substantial programs, but the public API and internal representations may still evolve.
+
+Current design constraints include:
+
+- 8- and 16-bit integer types only;
+- fixed-capacity arrays and strings;
+- potentially large and slow generated Brainfuck programs;
+- a single-threaded program-construction model;
+- no promise of stable API compatibility between early versions.
+
+These are not all permanent limitations, but they are useful expectations when building on the project today.
+
+## Related interfaces
+
+### Acus Sugar
+
+[Acus Sugar](include/acus/sugar/README.md) is a C++23 embedded language layered on top of Acus. It provides operator syntax, variables, functions, loops, conditionals, arrays, structs, pointers, and a small standard library. It is the better starting point for writing programs directly.
+
+The core Acus API remains focused on backend construction and on giving frontends explicit control over generated program structure.
+
+## Contributing
+
+Bug reports, focused tests, documentation improvements, new backend algorithms, and experimental frontends are welcome.
+
+Particularly useful reports include:
+
+- a minimal Acus program that reproduces the problem;
+- the generated Brainfuck or primitive sequence when relevant;
+- expected and actual runtime output;
+- measurements showing changes in generated size or instruction count.
+
+If you build a language or unusual tool on top of Acus, please share it. Exploring those frontends is one of the main reasons the project exists.
 
 ## License
 
-Acus is licensed under the GNU General Public License v3.0 or later.
-
-See [LICENSE](LICENSE) for the full license text.
+Acus is licensed under the GNU General Public License v3.0 or later. See [LICENSE](LICENSE) for the full license text.
