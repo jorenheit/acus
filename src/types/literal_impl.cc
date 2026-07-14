@@ -237,7 +237,7 @@ namespace acus::literal::impl {
   }
 
   // FunctionPointer      
-  FunctionPointer::FunctionPointer(types::FunctionType const *functionType, std::string const &fname, API_CTX_IGNORE):
+  FunctionPointer::FunctionPointer(types::TypeHandle functionType, std::string const &fname, API_CTX_IGNORE):
     Base(ts::function_pointer(functionType)),
     _functionName(fname)
   {}

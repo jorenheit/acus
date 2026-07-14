@@ -8,6 +8,7 @@
 #include "acus/types/typesystem.h"
 #include "acus/types/literal.h"
 #include "acus/assembler/assembler.h"
+#include "acus/api/error.h"
 
 namespace acus::api {
   using acus::Assembler;
@@ -16,5 +17,6 @@ namespace acus::api {
   using acus::literal::Literal;
   
   namespace literal { using namespace acus::literal; }
-  namespace ts { using namespace acus::ts; }
+  namespace ts      { using namespace acus::ts; }
+  namespace error   { using namespace acus::error; }
 }

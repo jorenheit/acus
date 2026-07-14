@@ -144,4 +144,58 @@ namespace acus::sugar {
       return ts::pointer(impl::getTypeHandle<T>());
     }
   };
+
+  //Traits
+  template <typename T> requires impl::IsSugarType<T>
+  struct IsInteger_: std::false_type {};
+
+  template <typename T>
+  static constexpr bool IsInteger = IsInteger_<T>::value;
+  
+  template <typename T> requires impl::IsSugarType<T>
+  struct IsSignedInteger_: std::false_type {};
+
+  template <typename T>
+  static constexpr bool IsSignedInteger = IsSignedInteger_<T>::value;
+
+  template <typename T> requires impl::IsSugarType<T>
+  struct IsUnsignedInteger_: std::false_type {};
+
+  template <typename T>
+  static constexpr bool IsUnsignedInteger = IsUnsignedInteger_<T>::value;
+  
+  template <typename T> requires impl::IsSugarType<T>
+  struct IsArray_: std::false_type {};
+
+  template <typename T>
+  static constexpr bool IsArray = IsArray_<T>::value;
+  
+  template <typename T> requires impl::IsSugarType<T>
+  struct IsString_: std::false_type {};
+
+  template <typename T>
+  static constexpr bool IsString = IsString_<T>::value;
+  
+  template <typename T> requires impl::IsSugarType<T>
+  struct IsPointer_: std::false_type {};
+  
+  template <typename T>
+  static constexpr bool IsPointer = IsPointer_<T>::value;
+  
+  template <> struct IsInteger_<u8>: std::true_type {};
+  template <> struct IsInteger_<u16>: std::true_type {};
+  template <> struct IsInteger_<s8>: std::true_type {};
+  template <> struct IsInteger_<s16>: std::true_type {};
+
+  template <> struct IsUnsignedInteger_<u8>: std::true_type {};
+  template <> struct IsUnsignedInteger_<u16>: std::true_type {};
+  
+  template <> struct IsSignedInteger_<s8>: std::true_type {};
+  template <> struct IsSignedInteger_<s16>: std::true_type {};
+
+  template <typename T, size_t N>  struct IsArray_<Array<T, N>>: std::true_type {};
+  template <size_t N>  struct IsString_<string<N>>: std::true_type {};
+  template <typename T>  struct IsPointer_<ptr<T>>: std::true_type {};
+
+
 }

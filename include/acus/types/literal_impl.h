@@ -125,7 +125,7 @@ namespace acus::literal::impl {
   struct FunctionPointer: Base {
     std::string _functionName;
       
-    FunctionPointer(types::FunctionType const *functionType, std::string const &fname, API_CTX_IGNORE);
+    FunctionPointer(types::TypeHandle functionType, std::string const &fname, API_CTX_IGNORE);
     FunctionPointer(FunctionPointer const &other) = default;
       
     virtual BasePtr clone() const override;      

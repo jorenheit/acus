@@ -79,11 +79,10 @@ namespace {
     }
     if (i1->bits() == i2->bits()) {
       // Same width, different signedness
-      return types::null; // TODO: allow implicit conversion to signed
+      return ts::s16();
     }
     // different width, different signedness
-    // TODO: allow implicit conversion to s16
-    return types::null;
+    return ts::s16();
   }
 
 

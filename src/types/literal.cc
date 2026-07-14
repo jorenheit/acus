@@ -38,6 +38,7 @@ namespace acus::literal {
 
   StructLiteralBuilder struct_t(types::TypeHandle structType, API_FUNC) {
     API_FUNC_BEGIN_FREE();
+    API_REQUIRE_IS_STRUCT(structType);
     return StructLiteralBuilder { structType, API_FWD };
   }
 
@@ -46,8 +47,9 @@ namespace acus::literal {
     return ArrayLiteralBuilder { elementType, API_FWD };
   }
   
-  Literal function_pointer(types::FunctionType const *fType, std::string const &fName, API_FUNC) {
+  Literal function_pointer(types::TypeHandle fType, std::string const &fName, API_FUNC) {
     API_FUNC_BEGIN_FREE();
+    API_REQUIRE_IS_FUNCTION(fType);
     return Literal { std::make_shared<impl::FunctionPointer>(fType, fName, API_FWD) };
   }
 

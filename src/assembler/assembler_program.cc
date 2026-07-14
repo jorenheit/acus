@@ -19,7 +19,12 @@ void Assembler::beginProgramImpl(std::string const &name, std::string const &ent
   _program.entryFunctionName = entry;  
   _state.begun = true;
   _state.allowGlobalDeclarations = true;
-
+  _counters.tmpID = 0;
+  _counters.cacheID = 0;
+  _counters.scopeID = 0;
+  _dp.set(0, MacroCell::Value0);
+  
+  
   // Globals should start at same frame offset as locals for consistency -> pad with raw
   declareGlobal("__pad__", ts::raw(FrameLayout::ReturnValueStart));
 }

@@ -6,7 +6,7 @@
 #include <iostream>
 #include "acus/assembler/assembler.h"
 #include "acus/sugar/sugar.h"
-#include "acus/sugar/std.h"
+#include "acus/sugar/sugar_std.h"
 using namespace acus;
 using namespace sugar;
 using namespace sugar::io;
@@ -275,17 +275,35 @@ int main() try {
   program("echo");
   {
     auto readLine = io::readLine<20>.outline();
-    auto strlen = io::strlen<u8>.outline();
+    auto strlen = io::strlen<u8, 20>.outline();
     
     function_<void()>("main") | define {
-      for (int i = 0; i != 10; ++i) {
-	//auto line = readLine();
-		auto line = io::readLine<20>();
+    //      for (int i = 0; i != 10; ++i) {
+      println("Hello?");
+      //auto line = readLine();
+      auto line = io::readLine<20>();
 	println(line);
-	//println(strlen(line));
-	println(io::strlen<>(line));
-      }
+	println(strlen(line));
+	//println(io::strlen<>(line));
+	//      }
       
+      return_;
+    };
+    
+  }
+  endProgram();
+
+
+  program("string to int");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto str2int = io::stringToInt<s16, 20>.outline();
+    
+    function_<void()>("main") | define {
+      print("Enter a number: ");
+      auto line = readLine();
+      let<s16>("val") = str2int(line);
+      println(2 * var("val"));
       return_;
     };
     
@@ -293,7 +311,7 @@ int main() try {
   endProgram();
   
   
-  std::cout << generateBrainfuck("echo");
+  std::cout << generateBrainfuck("string to int");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

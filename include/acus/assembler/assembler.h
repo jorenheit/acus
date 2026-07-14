@@ -26,8 +26,6 @@
 #define API_HEADER
 #include "acus/api/api.h"
 
-// TODO: Slot const & -> Slot
-
 namespace acus {
 
   // ============================================================
@@ -208,14 +206,6 @@ namespace acus {
     };
     std::vector<LabelCheck> _deferredLabelChecks;
 
-    // struct MoveGuard {
-    //   std::optional<Slot> _guardedSlot;
-    //   bool _oldConsumableStatus;
-    
-    //   MoveGuard(Assembler &a, SlotProxy proxy, bool const forceMove);
-    //   ~MoveGuard();
-    // };
-    
     class Cache {
       struct Entry;
       using EntryPtr = std::unique_ptr<Entry>;
@@ -487,8 +477,6 @@ namespace acus {
     void inc16(Cell high, Temps<2>);
     void dec16(Cell high, Temps<2>);
   
-    // TODO: constructive versions should accept "other" before result and carry
-    
     void signBitDestructive(Temps<3>);
     void signBitConstructive(Cell result, Temps<4>);
     

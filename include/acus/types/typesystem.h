@@ -28,7 +28,7 @@ namespace acus::ts {
   types::RawType const *raw(int n, API_FUNC);
   types::StructType const *struct_t(std::string const &name, API_FUNC);
   types::PointerType const *pointer(types::TypeHandle pointee, API_FUNC);
-  types::FunctionPointerType const *function_pointer(types::FunctionType const *functionType, API_FUNC);
+  types::FunctionPointerType const *function_pointer(types::TypeHandle functionType, API_FUNC);
   types::FunctionType const *void_function(API_FUNC);
 
   FunctionTypeBuilder function(API_FUNC);

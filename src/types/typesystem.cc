@@ -114,15 +114,19 @@ namespace acus::ts {
     return impl::_pointerTypes.back().get();
   }
 
-  types::FunctionPointerType const *function_pointer(types::FunctionType const *functionType, API_FUNC) {
+  types::FunctionPointerType const *function_pointer(types::TypeHandle functionType, API_FUNC) {
     API_FUNC_BEGIN_FREE();
+    API_REQUIRE_IS_FUNCTION(functionType);
     
     for (auto const &ptr: impl::_functionPointerTypes) {
       if (ptr->functionType() == functionType) {
 	return ptr.get();
       }
     }
-    impl::_functionPointerTypes.emplace_back(std::make_unique<types::FunctionPointerType>(functionType));
+
+    auto type = dynamic_cast<types::FunctionType const *>(functionType);
+    assert(type);
+    impl::_functionPointerTypes.emplace_back(std::make_unique<types::FunctionPointerType>(type));
     return impl::_functionPointerTypes.back().get();
   }
 
