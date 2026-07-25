@@ -10,16 +10,11 @@ namespace acus::sugar {
 
   Assembler __assembler;
 
-  namespace io {
-    
-  }
-  
-
   std::string generateBrainfuck(std::string const &programName, SUGAR_LOC) {
     return __assembler.brainfuck(programName);
   }
   
-  void program(std::string const &name, std::string const &entry, SUGAR_LOC) {
+  void program_(std::string const &name, std::string const &entry, SUGAR_LOC) {
     __assembler.program(name, entry).begin();
   }
 
@@ -49,7 +44,7 @@ namespace acus::sugar {
     __assembler.returnFromFunction(expr.get(), LOC_FWD);
   }
     
-  Expr var(std::string const &varName, SUGAR_LOC) {
+  Expr var_(std::string const &varName, SUGAR_LOC) {
     return Expr{ __assembler.expr(varName), LOC_FWD };
   }
 

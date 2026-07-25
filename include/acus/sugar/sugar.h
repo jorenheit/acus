@@ -71,14 +71,14 @@ namespace acus::sugar {
   Expr operator||(Expr const &lhs, Expr const &rhs);
 
   template <typename T> requires impl::IsSugarType<T>
-  Expr let(std::string const &varName, SUGAR_FUNC);
+  Expr let_(std::string const &varName, SUGAR_FUNC);
 
   template <typename T> requires impl::IsSugarType<T>
-  void global(std::string const &varName, SUGAR_FUNC);
+  void global_(std::string const &varName, SUGAR_FUNC);
   
-  Expr var(std::string const &varName, SUGAR_FUNC);
+  Expr var_(std::string const &varName, SUGAR_FUNC);
   
-  void program(std::string const &name, std::string const &entry = "main", SUGAR_FUNC);
+  void program_(std::string const &name, std::string const &entry = "main", SUGAR_FUNC);
   void endProgram(SUGAR_FUNC);
   void endFunction(SUGAR_FUNC);
   void break__(SUGAR_FUNC);

@@ -14,7 +14,7 @@ using namespace sugar::io;
 
 int main() try {
 
-  program("test");
+  program_("test");
   {
     using Point = Struct<"Point",
       Field<"x", u8>,
@@ -28,41 +28,43 @@ int main() try {
     auto foo = function_<void(s8)>("foo") | declare;
     
     function_<void()>("main") | define {
-      for_(let<u8>("i") = 0, var("i") < 10, ++var("i")) {
+      for_(let_<u8>("i") = 0, var_("i") < 10, ++var_("i")) {
 	hello("you");
       };
       
-      let<u8>("x") = 5;
-      println(-var("x"));
-      if_(var("x") < 10) {
+      let_<u8>("x") = 5;
+      println(-var_("x"));
+      if_(var_("x") < 10) {
 	println("small");
       } else_ {
 	println("big");
       };
 
-      var("x") += 30;
-      println(var("x"));
-      if_(var("x") < 10) {
+      var_("x") += 30;
+      println(var_("x"));
+      if_(var_("x") < 10) {
 	println("small");
       };
 
-      let<Point>("p") = Point{'Q','Z'};
-      var("p").field("x") = 'X';
-      var("p").field("y") = 'Y';
-      println(var("p"));
+      let_<Point>("p") = Point{'Q','Z'};
+      var_("p").field("x") = 'X';
+      var_("p").field("y") = 'Y';
+      println(var_("p"));
 
       foo(s8{-200});
 
-      let<Vec2>("v") = Vec2{'X', s8{'Y'}};
-      println(var("v"));
+      let_<s8>("z") = -1;
+      //      let_<Vec2>("v") = Vec2{'X', var_("z")};
+      let_<Vec2>("v") = Vec2{'X', 'Y'};
+      println(var_("v"));
 
-      let<u8>("i") = 0;
-      while_(var("i") < 10) {
-	println(var("i"));
-	if_(var("i") == 7) {
+      let_<u8>("i") = 0;
+      while_(var_("i") < 10) {
+	println(var_("i"));
+	if_(var_("i") == 7) {
 	  break_;
 	};
-	++var("i");
+	++var_("i");
       };
       
       return_;
@@ -70,12 +72,12 @@ int main() try {
 
     function_< void(string<10>) >("hello", "str") | define {
       print("Hello, ");
-      println(var("str"));
+      println(var_("str"));
       return_;
     };
 
     function_< void(s8) >("foo", "x") | define {
-      println(var("x"));
+      println(var_("x"));
       return_;
     };
     
@@ -83,21 +85,21 @@ int main() try {
   endProgram();
 
 
-  program("fibonacci");
+  program_("fibonacci");
   {
     function_<void()>("main") | define {
 
-      let<u8>("N") = 10;
+      let_<u8>("N") = 10;
 
-      let<u16>("a") = 0;
-      let<u16>("b") = 1;
+      let_<u16>("a") = 0;
+      let_<u16>("b") = 1;
 
-      for_(let<u8>("i") = 0, var("i") < var("N"), ++var("i")) {
-	println(var("a"));
+      for_(let_<u8>("i") = 0, var_("i") < var_("N"), ++var_("i")) {
+	println(var_("a"));
 
-	let<u16>("next") = var("a") + var("b");
-	var("a") = var("b");
-	var("b") = var("next");
+	let_<u16>("next") = var_("a") + var_("b");
+	var_("a") = var_("b");
+	var_("b") = var_("next");
       };
 
       return_;
@@ -106,54 +108,54 @@ int main() try {
   endProgram();
 
 
-  program("fibonacci_recursive");
+  program_("fibonacci_recursive");
   {
     auto fib = function_<void(u16, u16, u16)>("fib") | declare;
 
     function_<void()>("main") | define {
-      let<u8>("N") = 20;
-      fib(var("N"), 0, 1);
+      let_<u8>("N") = 20;
+      fib(var_("N"), 0, 1);
       return_;
     };
 
     function_<void(u16, u16, u16)>("fib", "n", "a", "b") | define {
-      if_(var("n") < 1) {
+      if_(var_("n") < 1) {
 	return_;
       } else_ {
-	println(var("a"));
-	fib(var("n") - 1, var("b"), var("a") + var("b"));
+	println(var_("a"));
+	fib(var_("n") - 1, var_("b"), var_("a") + var_("b"));
 	return_;
       };
     };
   }
   endProgram();
  
-  program("fibonacci_recursive2");
+  program_("fibonacci_recursive2");
   {
     auto fib = function_<u16(u16)>("fib") | declare;
 
     function_<void()>("main") | define {
-      let<u16>("N") = 20;
+      let_<u16>("N") = 20;
 
-      for_(let<u8>("i") = 0, var("i") < var("N"), ++var("i")) {
-	println(fib(var("i")));
+      for_(let_<u8>("i") = 0, var_("i") < var_("N"), ++var_("i")) {
+	println(fib(var_("i")));
       };
 
       return_;
     };
 
     function_<u16(u16)>("fib", "n") | define {
-      if_(var("n") < 2) {
-	return_(var("n"));
+      if_(var_("n") < 2) {
+	return_(var_("n"));
       } else_ {
-	return_(fib(var("n") - 1) + fib(var("n") - 2));
+	return_(fib(var_("n") - 1) + fib(var_("n") - 2));
       };
     };
   }
   endProgram();
 
 
-  program("break_continue_demo");
+  program_("break_continue_demo");
   {
     function_<void()>("main") | define {
       println("Numbers from 1 to 20");
@@ -161,19 +163,19 @@ int main() try {
       println("stop at 17");
       println("");
 
-      for_(let<u8>("i") = 1, var("i") <= 20, ++var("i")) {
+      for_(let_<u8>("i") = 1, var_("i") <= 20, ++var_("i")) {
         // Stop the loop entirely once i == 17.
-        if_(var("i") == 17) {
+        if_(var_("i") == 17) {
           println("Reached 17, stopping.");
           break_;
         };
 
         // Skip multiples of 3.
-        if_(var("i") % 3 == 0) {
+        if_(var_("i") % 3 == 0) {
           continue_;
         };
 
-        println(var("i"));
+        println(var_("i"));
       };
 
       println("");
@@ -184,18 +186,18 @@ int main() try {
   }
   endProgram();
 
-  program("nested_loops");
+  program_("nested_loops");
   {
     function_<void()>("main") | define {
-      for_(let<u8>("i") = 1, var("i") <= 10, ++var("i")) {
-	for_(let<u8>("j") = var("i"), var("j") <= 10, ++var("j")) {
-	  if_(var("i") * var("j") > 50) {
+      for_(let_<u8>("i") = 1, var_("i") <= 10, ++var_("i")) {
+	for_(let_<u8>("j") = var_("i"), var_("j") <= 10, ++var_("j")) {
+	  if_(var_("i") * var_("j") > 50) {
 	    continue_;
 	  };
 	  print('(');
-	  print(var("i"));
+	  print(var_("i"));
 	  print(',');
-	  print(var("j"));
+	  print(var_("j"));
 	  println(')');
 	};
       };
@@ -206,47 +208,47 @@ int main() try {
 
 
   
-  program("pointers");
+  program_("pointers");
   {
     using Arr5 = Array<u8, 5>;
     auto foo = function_<void(ptr<u8>)>("foo") | declare;
     
     function_<void()>("main") | define {
-      let<Arr5>("arr") = Arr5{1, 2, 3, 4, 5};
-      foo(&var("arr")[0]);
+      let_<Arr5>("arr") = Arr5{1, 2, 3, 4, 5};
+      foo(&var_("arr")[0]);
       
       
-      let<ptr<u8>>("p") = &var("arr")[0];
-      for_(let<u8>("i") = 0, var("i") < 5, ++var("i")) {
-	println(*var("p"));
-	++var("p");
+      let_<ptr<u8>>("p") = &var_("arr")[0];
+      for_(let_<u8>("i") = 0, var_("i") < 5, ++var_("i")) {
+	println(*var_("p"));
+	++var_("p");
       };
 
       return_;
     };
 
     function_<void(ptr<u8>)>("foo", "p") | define {
-      *var("p") = 69;
+      *var_("p") = 69;
       return_;
     };
   }
   endProgram();
 
-  program("globals");
+  program_("globals");
   {
-    global<string<10>>("g");
+    global_<string<10>>("g");
 
     auto foo = function_<void(string<10>)>("foo", "str") | define {
-      var("g") = var("str");
+      var_("g") = var_("str");
       return_;
     };
     
     function_<void()>("main") | define {      
-      var("g") = "Hello, ";
+      var_("g") = "Hello, ";
 
-      print(var("g"));
+      print(var_("g"));
       foo("World!");
-      println(var("g"));
+      println(var_("g"));
 
       return_;
     };
@@ -254,13 +256,13 @@ int main() try {
   }
   endProgram();
 
-  program("io");
+  program_("io");
   {
 
     function_<void()>("main") | define {
       print("Enter your name: ");
 
-      auto name = let<string<20>>("name") = io::readLine<10>();
+      auto name = let_<string<20>>("name") = io::readLine<10>();
 		      
       print("Hello, ");
       print(name);
@@ -272,20 +274,137 @@ int main() try {
   }
   endProgram();
 
-  program("echo");
+  program_("echo");
   {
     auto readLine = io::readLine<20>.outline();
     auto strlen = io::strlen<u8, 20>.outline();
     
     function_<void()>("main") | define {
-    //      for (int i = 0; i != 10; ++i) {
       println("Hello?");
-      //auto line = readLine();
       auto line = io::readLine<20>();
-	println(line);
-	println(strlen(line));
-	//println(io::strlen<>(line));
-	//      }
+      println(line);
+      println(strlen(line));
+      return_;
+    };
+    
+  }
+  endProgram();
+
+
+  program_("str2int");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto str2int = io::parseInt<s16, 20>.outline();
+    //    auto str2int = io::parseInt<s16, 20>;
+    
+    function_<void()>("main") | define {
+      print("Enter a number: ");
+      auto line = readLine();
+      let_<s16>("val") = str2int(line);
+      println(2 * var_("val"));
+      return_;
+    };
+    
+  }
+  endProgram();
+
+  program_("sqrt");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto str2int = io::parseInt<s16, 20>.outline();
+    auto sqrt = math::sqrt<s16>;
+    
+    function_<void()>("main") | define {
+      print("Enter a number: ");
+      auto line = readLine();
+      let_<s16>("val") = str2int(line);
+      println(sqrt(var_("val")));
+      return_;
+    };
+    
+  }
+  endProgram();
+
+
+  program_("log");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto str2int = io::parseInt<u16, 20>.outline();
+    auto log = math::log<2, u16>;
+    
+    function_<void()>("main") | define {
+      print("Enter a number: ");
+      auto line = readLine();
+      let_<u16>("val") = str2int(line);
+      println(log(var_("val")));
+      return_;
+    };
+    
+  }
+  endProgram();
+
+  program_("minmax");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto str2int = io::parseInt<u16, 20>.outline();
+    auto min = math::min<u16>;
+    auto max = math::max<u16>;
+    
+    function_<void()>("main") | define {
+      print("x = ");
+      auto line1 = readLine();
+      let_<u16>("val1") = str2int(line1);
+
+      print("y = ");
+      auto line2 = readLine();
+      let_<u16>("val2") = str2int(line2);
+
+      print("Min: ");
+      println(min(var_("val1"), var_("val2")));
+      print("Max: ");
+      println(max(var_("val1"), var_("val2")));
+      return_;
+    };
+    
+  }
+  endProgram();
+
+
+  program_("isDigit");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto isDigit = ascii::isDigit;
+    
+    function_<void()>("main") | define {
+      print("Enter a character: ");
+      auto line1 = readLine();
+
+      if_(isDigit(line1[0])) {
+	println("This is a digit.");
+      } else_ {
+	println("This is not a digit.");
+      };
+      
+      return_;
+    };
+    
+  }
+  endProgram();
+
+  program_("isAlpha");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto isAlpha = ascii::isAlpha;
+    
+    function_<void()>("main") | define {
+      print("Enter a character: ");
+      auto line1 = readLine();
+
+      if_(isAlpha(line1[0])) {
+	println("This is a letter.");
+      } else_ {
+	println("This is not a letter.");
+      };
       
       return_;
     };
@@ -294,16 +413,21 @@ int main() try {
   endProgram();
 
 
-  program("string to int");
+  program_("isAlnum");
   {
     auto readLine = io::readLine<20>.outline();
-    auto str2int = io::stringToInt<s16, 20>.outline();
+    auto isAlnum = ascii::isAlphanumeric.outline();
     
     function_<void()>("main") | define {
-      print("Enter a number: ");
-      auto line = readLine();
-      let<s16>("val") = str2int(line);
-      println(2 * var("val"));
+      print("Enter a character: ");
+      auto line1 = readLine();
+
+      if_(isAlnum(line1[0])) {
+	println("This is alnum.");
+      } else_ {
+	println("This is not alnum.");
+      };
+      
       return_;
     };
     
@@ -311,7 +435,7 @@ int main() try {
   endProgram();
   
   
-  std::cout << generateBrainfuck("string to int");
+  std::cout << generateBrainfuck("isAlnum");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

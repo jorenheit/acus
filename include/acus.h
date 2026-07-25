@@ -15,6 +15,9 @@ namespace acus::api {
   using acus::Expression;
   using acus::ts::TypeHandle;
   using acus::literal::Literal;
+
+  // using enum acus::BinOp;
+  // using enum acus::UnOp;
   
   namespace literal { using namespace acus::literal; }
   namespace ts      { using namespace acus::ts; }

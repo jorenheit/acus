@@ -1,10 +1,9 @@
 #include <iostream>
-#include "acus/acus.h"
+#include "../include/acus/acus.h"
 
 using namespace acus::api;
 
 #define CAT(c1, c2) (((int)c1) | ((int)(c2 << 8)))
-
 
 int main() try {
   Assembler c;

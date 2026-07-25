@@ -16,6 +16,15 @@ namespace acus::sugar::impl {
     constexpr FixedString(char const (&str)[N]) {
       std::copy_n(str, N, data);
     }
+
+    std::string str() const {
+      return std::string(data, N - 1);
+    }
+
+    operator std::string() const {
+      return str();
+    }
+    
   };
 
 }

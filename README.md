@@ -173,7 +173,7 @@ The typesystem `acus::ts` is used to acquire `TypeHandle` objects representing t
 | `array(T, N)` | Array of N elements of type T | `ts::array(T, N)` |
 | `pointer(T)`  | Pointer to data of type T     | `ts::pointer(T)`  |
 
-In these calls, `T` must be a `TypeHandle`. For example, to define a type for an array of 10 `u8` integers, one could do:
+	In these calls, `T` must be a `TypeHandle`. For example, to define a type for an array of 10 `u8` integers, one could define it like so:
 
 ```cpp
 TypeHandle arrT = ts::array(ts::u8(), 10);
