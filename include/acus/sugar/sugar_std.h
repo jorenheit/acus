@@ -26,6 +26,7 @@ namespace acus::sugar::io {
   }
   
   void read(Expr const &expr, SUGAR_FUNC);
+  void write(Expr const &expr, SUGAR_FUNC);
 
 } // sugar::acus::io
 
@@ -33,6 +34,7 @@ namespace acus::sugar::io {
 #include "acus/sugar/sugar_io.h"
 #include "acus/sugar/sugar_ascii.h"
 #include "acus/sugar/sugar_math.h"
+#include "acus/sugar/sugar_ansi.h"
 
 namespace acus::sugar {
 
@@ -87,7 +89,12 @@ namespace acus::sugar {
     log10 {};
     
   } // math
-  
+
+
+  namespace ansi {
+    template <size_t Width, size_t Height, size_t Left = 1, size_t Top = 1>
+    using Screen = impl::Screen<Width, Height, Left, Top>;
+  }
   
 } // acus::sugar
 

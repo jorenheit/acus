@@ -34,7 +34,7 @@ struct Program {
   std::vector<Function::Block*> globalBlockOrder;
 
   inline Function& createFunction(std::string name, types::FunctionType const *type, size_t scopeID) {
-    assert(!functionByName.contains(name));
+    assert(!functionByName.contains(name)); // TODO: ERROR
     size_t idx = functions.size();
     functionByName[name] = idx;
     functions.push_back(Function{

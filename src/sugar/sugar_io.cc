@@ -31,6 +31,10 @@ namespace acus::sugar::io {
     print('\n', LOC_FWD);
   }
 
+  void write(Expr const &expr, SUGAR_LOC) {
+    __assembler.write(expr.get(), LOC_FWD);
+  }
+  
   void read(Expr const &expr, SUGAR_LOC) {
     __assembler.read(expr.get(), LOC_FWD);
   }

@@ -344,12 +344,12 @@ int main() try {
   endProgram();
 
   program_("minmax");
+  
   {
     auto readLine = io::readLine<20>.outline();
     auto str2int = io::parseInt<u16, 20>.outline();
     auto min = math::min<u16>;
-    auto max = math::max<u16>.outline();
-    auto max2 = math::max<u16>.outline();
+    auto max = math::max<u16>;
     
     function_<void()>("main") | define {
       print("x = ");
@@ -449,9 +449,44 @@ int main() try {
     
   }
   endProgram();
+
+
+  program_("screen");
+  {
+    using Screen = ansi::Screen<50, 50>;
+    
+    function_<void()>("main") | define {
+
+      auto x = let_<u8>("x");
+      auto y = let_<u8>("y");
+
+      y = 2;
+      while_(y < 30) {
+	x = 5;
+	while_(x < 30) {
+	  Screen::put(x, y, '@');
+	  ++x;
+	};
+	++y;
+      };
+
+      println();
+	
+
+      
+      // Screen::begin();
+      // Screen::moveTo(5, 2);
+      // Screen::put(5, 2, '@');
+      // Screen::write<14>(3, 5, "Hello, world!");
+      // Screen::end();      
+      return_;
+    };
+    
+  }
+  endProgram();
   
   
-  std::cout << generateBrainfuck("minmax");
+  std::cout << generateBrainfuck("screen");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';
