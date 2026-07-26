@@ -46,6 +46,11 @@ namespace acus::sugar {
 
     template <typename IntType = u8, size_t MaxSize = 10> impl::ParseInt<IntType, MaxSize>
     parseInt {};
+
+    // Function returning void (test)
+    template <size_t MaxSize = 10> impl::Hello<MaxSize>
+    hello {};
+    
   } // io
 
   namespace ascii {

@@ -2,41 +2,38 @@
 
 namespace acus::sugar::impl {
 
-  struct IsDigit: LibraryFunction<"__isDigit",
-				  IsDigit,
+  struct IsDigit: LibraryFunction<IsDigit,
 				  u8(u8)> {
-    static Expr emit(Expr const &val) {
+    static void emit(Expr &result, Expr const &val, SUGAR_LOC) {
       // TODO: exception
       assert(types::isU8(val.get().type()));
-      return (val <= '9' && val >= '0');
+      result = (val <= '9' && val >= '0');
     };
     
   }; // IsDigit
 
 
-  struct IsAlpha: LibraryFunction<"__isAlpha",
-				  IsAlpha,
+  struct IsAlpha: LibraryFunction<IsAlpha,
 				  u8(u8)> {
 
-    static Expr emit(Expr const &val) {
+    static void emit(Expr &result, Expr const &val, SUGAR_LOC) {
       // TODO: exception
       assert(types::isU8(val.get().type()));
-      return (val <= 'z' && val >= 'A');
+      result = (val <= 'z' && val >= 'A');
     };
     
   }; // IsAlpha
 
 
-  struct IsAlphanumeric: LibraryFunction<"__isAlphanumeric",
-					 IsAlphanumeric,
+  struct IsAlphanumeric: LibraryFunction<IsAlphanumeric,
 					 u8(u8)> {
 
-    static Expr emit(Expr const &val) {
+    static void emit(Expr &result, Expr const &val, SUGAR_LOC) {
       // TODO: exception
       assert(types::isU8(val.get().type()));
-      return (val <= '9' && val >= '0') || (val <= 'z' && val >= 'A');
+      result = (val <= '9' && val >= '0') || (val <= 'z' && val >= 'A');
     }
     
-  };
+  }; // IsAlphanumeric
   
 } // acus::sugar::impl

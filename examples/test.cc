@@ -280,6 +280,7 @@ int main() try {
     auto strlen = io::strlen<u8, 20>.outline();
     
     function_<void()>("main") | define {
+      let_<u8>("x") = 1;
       println("Hello?");
       auto line = io::readLine<20>();
       println(line);
@@ -295,7 +296,6 @@ int main() try {
   {
     auto readLine = io::readLine<20>.outline();
     auto str2int = io::parseInt<s16, 20>.outline();
-    //    auto str2int = io::parseInt<s16, 20>;
     
     function_<void()>("main") | define {
       print("Enter a number: ");
@@ -330,13 +330,13 @@ int main() try {
   {
     auto readLine = io::readLine<20>.outline();
     auto str2int = io::parseInt<u16, 20>.outline();
-    auto log = math::log<2, u16>;
+    auto log2 = math::log2<u16>;
     
     function_<void()>("main") | define {
       print("Enter a number: ");
       auto line = readLine();
       let_<u16>("val") = str2int(line);
-      println(log(var_("val")));
+      println(log2(var_("val")));
       return_;
     };
     
@@ -348,7 +348,8 @@ int main() try {
     auto readLine = io::readLine<20>.outline();
     auto str2int = io::parseInt<u16, 20>.outline();
     auto min = math::min<u16>;
-    auto max = math::max<u16>;
+    auto max = math::max<u16>.outline();
+    auto max2 = math::max<u16>.outline();
     
     function_<void()>("main") | define {
       print("x = ");
@@ -433,9 +434,24 @@ int main() try {
     
   }
   endProgram();
+
+  program_("hello");
+  {
+    auto readLine = io::readLine<20>;
+    auto hello = io::hello<20>;
+    
+    function_<void()>("main") | define {
+      print("Who are you? ");
+      auto line = readLine();
+      hello(line);
+      return_;
+    };
+    
+  }
+  endProgram();
   
   
-  std::cout << generateBrainfuck("isAlnum");
+  std::cout << generateBrainfuck("minmax");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

@@ -1,98 +1,50 @@
 #pragma once
 
 namespace acus::sugar::impl {
-
-  template <typename T> requires impl::IsSugarType<T>
-  std::string toString() {
-    return T::type()->str();
-  }
-
-  template <typename T>
-  std::string toString(T&& val) {
-    return std::to_string(std::forward<T>(val));
-  }
-
-
   
-  template <typename FunctionType>
-  struct GetReturnType_;
+  template <typename Derived, typename FunctionType>
+  struct LibraryFunction;
 
-  template <typename FunctionType>
-  struct MakeParamTypeTuple_;
+  template <typename Derived, typename ReturnType, typename ... SignatureArgs>
+  struct LibraryFunction<Derived, ReturnType(SignatureArgs...)> {
 
-
-  template <typename ReturnType, typename ... Args>
-  struct GetReturnType_<ReturnType(Args...)> {
-    using Type = ReturnType;
-  };
-
-  template <typename ReturnType, typename ... Args>
-  struct MakeParamTypeTuple_<ReturnType(Args...)> {
-    using Type = std::tuple<Args...>;
-  };
-
-  template <typename T>
-  using GetReturnType = typename GetReturnType_<T>::Type;
-
-  template <typename T>
-  using MakeParamTypeTuple = typename MakeParamTypeTuple_<T>::Type;
-  
-
-  template <typename FunctionType>
-  struct BuildFunctionName;
-
-  
-  template <typename ReturnType, typename ... Args>
-  struct BuildFunctionName<ReturnType(Args...)>  {
-    static std::string build(std::string const &base) {
-
-      std::ostringstream oss;
-      std::string_view separator;
-      
-      oss << base << "<" << ReturnType::type()->str() + "(";
-      ((oss << std::exchange(separator, ", ") << Args::type()->str()), ...);      
-      oss << ")>";
-
-      return oss.str();
-    }
-  };
-
-  template <impl::FixedString Name, typename Derived, typename FunctionType>
-  struct LibraryFunction {
-
-    using ReturnType = GetReturnType<FunctionType>;
-    using ParamTypeTuple = MakeParamTypeTuple<FunctionType>;
-    static constexpr size_t ArgCount = std::tuple_size_v<ParamTypeTuple>;
-
-    // TODO: how should I pass SUGAR_LOC here?! emit should check if runtime types match the
-    // compiletime types
-    template <typename ... Args> 
-    static auto operator()(Args&& ... args) {
-      static_assert(sizeof ... (args) ==  ArgCount);
-      return Derived::emit(std::forward<Args>(args) ...);
-    }
-
+    template <typename T> using ExprArg = Expr const &;
     
+    static auto operator()(ExprArg<SignatureArgs> ... args, SUGAR_FUNC) {
+      if constexpr (std::is_void_v<ReturnType>) {
+	Derived::emit(args ..., LOC_FWD);
+	return;
+      } else {
+	auto result = let_<ReturnType>(impl::nextVarName());
+	__assembler.scope().begin();
+	Derived::emit(result, args ..., LOC_FWD);
+	__assembler.endScope();
+	return result;
+      }
+      std::unreachable();
+    }
+
+
+    static std::string functionName() {
+      static std::string const name = std::string("__sugar_") + typeid(Derived).name();
+      return name;
+    }
+
     static auto outline(SUGAR_FUNC) {
-      static constexpr size_t N = std::tuple_size_v<ParamTypeTuple>;
-
-      auto makeVarNames = [&]<size_t ... Indices>(std::index_sequence<Indices...>) {
-	return std::tuple{
-	  ((void)Indices, impl::nextVarName())...
-	};
-      };
-
+      
       return std::apply([&](auto const & ... varNames) {
-	std::string const functionName = BuildFunctionName<FunctionType>::build(Name);
-	return function_<FunctionType>(functionName, varNames ...) | define {
+	return function_<ReturnType(SignatureArgs...)>(functionName(), varNames ...) | define {
 	  if constexpr (std::is_void_v<ReturnType>) {
-	    Derived::emit(var_(varNames)...);
+	    Derived::emit(var_(varNames)..., LOC_FWD);
 	    return_;
 	  } else {
-	    return__(Derived::emit(var_(varNames)...), LOC_FWD);
+	    auto result = let_<ReturnType>(impl::nextVarName());
+	    Derived::emit(result, var_(varNames)..., LOC_FWD);
+	    return__(result, LOC_FWD);
 	  }
 	};
-      }, makeVarNames(std::make_index_sequence<N>{}));
+      }, std::tuple{((void)std::type_identity<SignatureArgs>{}, impl::nextVarName()) ... });
+
     }
 
   }; // LibraryFunction

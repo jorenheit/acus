@@ -56,6 +56,16 @@ namespace acus::sugar {
   struct s8:  impl::Int<ts::s8,  literal::s8>  {};
   struct s16: impl::Int<ts::s16, literal::s16> {};
 
+
+  namespace impl {
+    template <typename T, typename ... U>
+    inline constexpr bool IsOneOf = (std::is_same_v<std::remove_cvref_t<T>, U> || ...);
+    
+    template <typename T>
+    inline constexpr bool IsIntegerSugarType = IsOneOf<T, u8, u16, s8, s16>;
+  }
+
+  
   // String
   template <size_t N>
   class string: public impl::SugarType {
