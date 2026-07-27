@@ -35,58 +35,104 @@ namespace acus::sugar::io {
 #include "acus/sugar/sugar_ascii.h"
 #include "acus/sugar/sugar_math.h"
 #include "acus/sugar/sugar_ansi.h"
+#include "acus/sugar/sugar_string.h"
 
 namespace acus::sugar {
 
 
   namespace io {
     template <size_t MaxSize> impl::ReadLine<MaxSize>
-    readLine {};
+    readLine /* string<MaxSize> () */ {};
 
-    template <typename IntType = u8, size_t MaxSize = 10> impl::StrLen<IntType, MaxSize>
-    strlen {};
-
-    template <typename IntType = u8, size_t MaxSize = 10> impl::ParseInt<IntType, MaxSize>
-    parseInt {};
-
-    // Function returning void (test)
-    template <size_t MaxSize = 10> impl::Hello<MaxSize>
-    hello {};
+    template <typename Int, size_t MaxSize = 10> impl::ParseInt<Int, MaxSize>
+    parseInt /* Int (string<MaxSize>) */ {};
     
   } // io
 
   namespace ascii {
 
     inline impl::IsDigit
-    isDigit {};
+    isDigit /* u8 (u8) */ {};
 
     inline impl::IsAlpha
-    isAlpha {};
+    isAlpha /* u8 (u8) */ {};
 
     inline impl::IsAlphanumeric
-    isAlphanumeric {};
+    isAlphanumeric /* u8 (u8) */ {};
+
+    inline impl::IsLower
+    isLower /* u8 (u8) */ {};
+
+    inline impl::IsUpper
+    isUpper /* u8 (u8) */ {};
+
+    inline impl::IsWhitespace
+    isWhitespace /* u8 (u8) */ {};
+
+    inline impl::ToLower
+    toLower /* u8 (u8) */ {};
+
+    inline impl::ToUpper
+    toUpper /* u8 (u8) */ {};
     
   } // ascii
+
+  // TODO: capitalize string type (also Ptr) and rename namespace to simply string
+  namespace strings {
+
+    template <size_t MaxSize> impl::ClearString<MaxSize>
+    clear /* void (string<MaxSize>) */ {};
+
+    template <size_t DestSize, size_t SrcSize> impl::AppendString<DestSize, SrcSize>
+    append /* void (string<DestSize>, string<SrcSize>) */ {};
+
+    template <size_t DestSize, size_t SrcSize> impl::AppendStringCopy<DestSize, SrcSize>
+    append_to_copy /* string<DestSize> (string<DestSize>, string<SrcSize>) */ {};
+
+    template <typename Int, size_t MaxSize = 10> impl::StrLen<Int, MaxSize>
+    strlen /* Int (string<MaxSize>) */  {};
+    
+    template <size_t LhsSize, size_t RhsSize> impl::StringCompare<LhsSize, RhsSize>
+    strcmp /* s8 (string<LhsSize>, string<RhsSize>) */ {};
+
+    template <size_t StringSize, size_t PrefixSize> impl::StartsWith<StringSize, PrefixSize>
+    starts_with /* u8 (string<StringSize>, string<PrefixSize>) */ {};
+
+    template <size_t StringSize, size_t SuffixSize> impl::EndsWith<StringSize, SuffixSize>
+    ends_with /* u8 (string<StringSize>, string<SuffixSize>) */ {};
+    
+    template <size_t StringSize> impl::FindChar<StringSize>
+    find_char /* u16 (string<StringSize>, u8) */ {};
+
+    template <size_t StringSize, size_t NeedleSize> impl::FindString<StringSize, NeedleSize>
+    find_str /* u16 (string<StringSize>, string<NeedleSize>) */ {};
+
+    template <size_t StringSize, size_t NeedleSize> impl::ContainsString<StringSize, NeedleSize>
+    contains_str /* u16 (string<StringSize>, string<NeedleSize>) */ {};
+  }
   
   namespace math {
 
-    template <typename IntType> impl::Min<IntType>
-    min {};
+    template <typename Int> impl::Min<Int>
+    min /* Int (Int, Int) */ {};
 
-    template <typename IntType> impl::Max<IntType>
-    max {};
+    template <typename Int> impl::Max<Int>
+    max /* Int (Int, Int) */ {};
+
+    template <typename Int> impl::Pow<Int>
+    pow /* Int (Int, Int) */ {};
     
-    template <typename IntType> impl::Sqrt<IntType>
-    sqrt {};
+    template <typename Int> impl::Sqrt<Int>
+    sqrt /* Int (Int) */ {};
 
-    template <size_t Base, typename IntType = u16> impl::Log<Base, IntType>
-    log {};
+    template <size_t Base, typename Int> impl::Log<Base, Int>
+    log /* u8 (Int) */ {};
 
-    template <typename IntType = u16> impl::Log<2, IntType>
-    log2 {};
+    template <typename Int = u16> impl::Log<2, Int>
+    log2 /* u8 (Int) */ {};
 
-    template <typename IntType = u16> impl::Log<10, IntType>
-    log10 {};
+    template <typename Int = u16> impl::Log<10, Int>
+    log10 /* u8 (Int) */ {};
     
   } // math
 

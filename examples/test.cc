@@ -277,7 +277,7 @@ int main() try {
   program_("echo");
   {
     auto readLine = io::readLine<20>.outline();
-    auto strlen = io::strlen<u8, 20>.outline();
+    auto strlen = strings::strlen<u8, 20>.outline();
     
     function_<void()>("main") | define {
       let_<u8>("x") = 1;
@@ -308,6 +308,29 @@ int main() try {
   }
   endProgram();
 
+  program_("pow");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto str2int = io::parseInt<s16, 20>.outline();
+    auto pow = math::pow<s16>;
+    
+    function_<void()>("main") | define {
+      print("x = ");
+      auto line1 = readLine();
+      let_<s16>("x") = str2int(line1);
+
+      print("p = ");
+      auto line2 = readLine();
+      let_<s16>("p") = str2int(line2);
+      
+      println(pow(var_("x"), var_("p")));
+      return_;
+    };
+    
+  }
+  endProgram();
+
+  
   program_("sqrt");
   {
     auto readLine = io::readLine<20>.outline();
@@ -399,9 +422,9 @@ int main() try {
     
     function_<void()>("main") | define {
       print("Enter a character: ");
-      auto line1 = readLine();
+      auto line = readLine();
 
-      if_(isAlpha(line1[0])) {
+      if_(isAlpha(line[0])) {
 	println("This is a letter.");
       } else_ {
 	println("This is not a letter.");
@@ -414,12 +437,57 @@ int main() try {
   endProgram();
 
 
+  program_("upperlower");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto toUpper = ascii::toUpper.outline();
+    auto toLower = ascii::toLower.outline();
+    auto strlen = strings::strlen<u8, 20>.outline();
+    
+    main_() {
+      print("> ");
+
+      auto line = (let_<string<20>>("line") = readLine());
+      auto len = let_<u8>("len") = strlen(line);
+      for_(let_<u8>("i") = 0, var_("i") != len, ++var_("i")) {
+	write(toLower(line[var_("i")]));
+      };
+      
+      println();
+      return_;
+    };
+    
+  }
+  endProgram();
+
+
+  program_("strings");
+  {
+    auto readLine = io::readLine<20>.outline();
+    auto clear = strings::clear<20>;
+    auto fun = strings::find_char<20>;
+    
+    main_() {
+      print("String 1: ");
+      auto str1 = (let_<string<20>>("str1") = readLine());
+
+      print("String 2: ");
+      auto str2 = (let_<string<20>>("str2") = readLine());
+
+      io::println(fun(str1, str2));
+      return_;
+    };
+    
+  }
+  endProgram();
+  
+  
   program_("isAlnum");
   {
     auto readLine = io::readLine<20>.outline();
     auto isAlnum = ascii::isAlphanumeric.outline();
     
-    function_<void()>("main") | define {
+    main_() {
       print("Enter a character: ");
       auto line1 = readLine();
 
@@ -434,22 +502,6 @@ int main() try {
     
   }
   endProgram();
-
-  program_("hello");
-  {
-    auto readLine = io::readLine<20>;
-    auto hello = io::hello<20>;
-    
-    function_<void()>("main") | define {
-      print("Who are you? ");
-      auto line = readLine();
-      hello(line);
-      return_;
-    };
-    
-  }
-  endProgram();
-
 
   program_("screen");
   {
@@ -480,13 +532,6 @@ int main() try {
       
       println();
 	
-
-      
-      // Screen::begin();
-      // Screen::moveTo(5, 2);
-      // Screen::put(5, 2, '@');
-      // Screen::write<14>(3, 5, "Hello, world!");
-      // Screen::end();      
       return_;
     };
     
@@ -494,7 +539,7 @@ int main() try {
   endProgram();
   
   
-  std::cout << generateBrainfuck("screen");
+  std::cout << generateBrainfuck("strings");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

@@ -19,7 +19,7 @@ namespace acus::sugar::impl {
 
     struct MoveTo: LibraryFunction<MoveTo, void(Coord, Coord)> {
 
-      static void emit(Expr const &x, Expr const &y, SUGAR_LOC) {
+      static void emit(Expr const &x, Expr const &y) {
 	io::print("\x1b[");
 	io::print(y + Coord{Top});
 	io::print(';');
@@ -37,8 +37,8 @@ namespace acus::sugar::impl {
     
     struct Put: LibraryFunction<Put, void(Coord, Coord, Char)> {
 
-      static void emit(Expr const &x, Expr const &y, Expr const &character, SUGAR_LOC) {
-        MoveTo::emit(x, y, LOC_FWD);
+      static void emit(Expr const &x, Expr const &y, Expr const &character) {
+        MoveTo::emit(x, y);
 	io::write(character);
       }
     };
@@ -52,8 +52,8 @@ namespace acus::sugar::impl {
     template <size_t N>
     struct Write: LibraryFunction<  Write<N>, void(Coord, Coord, string<N>)> {
 
-      static void emit(Expr const &x, Expr const &y, Expr const &text, SUGAR_LOC) {
-        MoveTo::emit(x, y, LOC_FWD);
+      static void emit(Expr const &x, Expr const &y, Expr const &text) {
+        MoveTo::emit(x, y);
 	io::print(text);
       }
       
@@ -70,15 +70,15 @@ namespace acus::sugar::impl {
      */
     struct Clear: LibraryFunction<Clear, void()> {
 
-      static void emit(SUGAR_LOC) {
+      static void emit() {
         static std::string const blankLine(Width, ' ');
 
         for (size_t y = 0; y < Height; ++y) {
-          MoveTo::emit(Coord{0}, Coord{y}, LOC_FWD);
+          MoveTo::emit(Coord{0}, Coord{y});
 	  io::print(blankLine);
         }
 
-        MoveTo::emit(Coord{0}, Coord{0}, LOC_FWD);
+        MoveTo::emit(Coord{0}, Coord{0});
       }
     };
 
@@ -89,7 +89,7 @@ namespace acus::sugar::impl {
      * Hide the terminal cursor while drawing.
      */
     struct Begin: LibraryFunction<Begin, void()> {
-      static void emit(SUGAR_LOC) {
+      static void emit() {
 	io::print("\x1b[?25l");
       }
     };
@@ -102,8 +102,8 @@ namespace acus::sugar::impl {
      */
     struct End: LibraryFunction<End, void()> {
       
-      static void emit(SUGAR_LOC) {
-        MoveTo::emit(Coord{0}, Coord{Height}, LOC_FWD);
+      static void emit() {
+        MoveTo::emit(Coord{0}, Coord{Height});
 	io::print("\x1b[?25h");
       }
     };

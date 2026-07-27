@@ -113,7 +113,20 @@ namespace acus::sugar {
 	return__(std::forward<decltype(arg)>(arg)..., _loc);
       }
     };
+
+    template <typename T>
+    void errorIfIncompatibleType(Expr const &expr, SUGAR_LOC) {
+      types::TypeHandle const dest = getTypeHandle<T>();
+      types::TypeHandle const src = expr.get().type();
+
+      auto result = types::rules::assignResult((dest), (src));
+      error::throw_if(not result,
+		      error::ErrorCode::AssignmentTypeMismatch,
+		      (LOC).file_name(), (LOC).line(), (LOC).column(),
+		      result.errorMsg);
+    }    
   }
+
 
   
 #define for_(init, condition, increment)			\
@@ -136,6 +149,13 @@ namespace acus::sugar {
 #define break_ break__()
 #define continue_ continue__()
 #define return_ impl::Return{}
+
+
+#define FIRST__(first, ...) first
+#define MAIN_NAME__(...) FIRST__(__VA_OPT__(__VA_ARGS__,) "main")
+#define main_(...) \
+  function_<void()>(MAIN_NAME__(__VA_ARGS__)) | define  
+  
   
 #include "sugar_public.tpp"
   

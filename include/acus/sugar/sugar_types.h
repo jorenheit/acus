@@ -31,7 +31,7 @@ namespace acus::sugar {
       if constexpr (std::is_same_v<T, void>) return ts::void_t();
       else return T::type();
     }
-    
+
     template <auto typeFactory, auto literalFactory>
     class Int: public SugarType {
       int x;
@@ -142,6 +142,8 @@ namespace acus::sugar {
     }
   };
 
+
+  
   //Concepts
   namespace impl::concepts {
     // Helpers

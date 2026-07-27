@@ -134,7 +134,6 @@ namespace acus::Algorithm {
       std::ostringstream oss;
       oss << zero()
 	  << movePtr(tmp, current)
-	//	  << zero()
 	  << increment(a)
 	  << "["
 	  <<   decrement()
@@ -148,8 +147,6 @@ namespace acus::Algorithm {
       return oss.str();
     };
 
-    //    return naive();
-    
     std::string const smartResult = smart();
     std::string const naiveResult = naive();
     return smartResult.length() < naiveResult.length()

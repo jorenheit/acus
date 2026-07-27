@@ -1,20 +1,11 @@
 #pragma once
 
 namespace acus::sugar::impl {
-
-  template <size_t MaxSize>
-  struct Hello: LibraryFunction<Hello<MaxSize>, void(string<MaxSize>)> {
-    static void emit(Expr const &str, SUGAR_LOC) {
-      io::print("Hello, ");
-      io::print(str);
-      io::println("!");
-    }
-  };
   
   template <size_t MaxSize>
   struct ReadLine: LibraryFunction<ReadLine<MaxSize>,
 				   string<MaxSize>()> {
-    static void emit(Expr &result, SUGAR_LOC) {
+    static void emit(Expr &result) {
       auto i = (let_<u8>("i") = 0);
       while_(i < MaxSize) {
 	io::read(result[i]);
@@ -24,29 +15,12 @@ namespace acus::sugar::impl {
     }
   }; // ReadLine
 
-
-  template <concepts::Integer IntType, size_t MaxSize>
-  struct StrLen: LibraryFunction<StrLen<IntType, MaxSize>,
-				 IntType(string<MaxSize>)> {
-
-    static void emit(Expr &result, Expr const &str, SUGAR_LOC) {
-      // TODO: exception
-      assert(types::isString(str.get().type()));
-      result = IntType{0};
-      while_(str[result++] != 0) { };
-      --result;
-    }
-
-  }; // StrLen
   
   template <concepts::Integer IntType, size_t MaxSize>
   struct ParseInt: LibraryFunction<ParseInt<IntType, MaxSize>,
 				   IntType(string<MaxSize>)>{
 
-    static void emit(Expr &result, Expr const &str, SUGAR_LOC) {
-      // TODO: exception
-      assert(types::isString(str.get().type()));
-
+    static void emit(Expr &result, Expr const &str) {
       result = IntType{0};
       auto index  = (let_<u8>(impl::nextVarName()) = 0);
       auto isNegative = (let_<u8>(impl::nextVarName()) = 0);
