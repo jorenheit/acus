@@ -86,6 +86,11 @@ namespace acus::sugar {
   void return__(SUGAR_FUNC);
   void return__(Expr const &expr, SUGAR_FUNC);
 
+  template <impl::concepts::SugarType T>
+  Expr sugar_cast(Expr const &expr) {
+    return expr.cast<T>();
+  }
+  
   std::string generateBrainfuck(std::string const &programName, SUGAR_FUNC);
 
   template <typename Signature> class FunctionHandle;

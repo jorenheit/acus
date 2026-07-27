@@ -4,11 +4,11 @@ namespace acus::sugar::impl {
   
   template <size_t MaxSize>
   struct ReadLine: LibraryFunction<ReadLine<MaxSize>,
-				   string<MaxSize>()> {
+				   String<MaxSize>()> {
     static void emit(Expr &result) {
       auto i = (let_<u8>("i") = 0);
       while_(i < MaxSize) {
-	io::read(result[i]);
+	read(result[i]);
 	if_(result[i++] == '\n') { break_; };
       };
       result[i - 1] = 0;
@@ -16,42 +16,7 @@ namespace acus::sugar::impl {
   }; // ReadLine
 
   
-  template <concepts::Integer IntType, size_t MaxSize>
-  struct ParseInt: LibraryFunction<ParseInt<IntType, MaxSize>,
-				   IntType(string<MaxSize>)>{
-
-    static void emit(Expr &result, Expr const &str) {
-      result = IntType{0};
-      auto index  = (let_<u8>(impl::nextVarName()) = 0);
-      auto isNegative = (let_<u8>(impl::nextVarName()) = 0);
-
-      if constexpr (concepts::SignedInteger<IntType>) {
-	if_(str[0] == '-') {
-	  isNegative = 1;
-	  ++index;
-	} else_ {
-	  if_(str[0] == '+') {
-	    ++index;
-	  };
-	};
-      } else {
-	if_(str[index] == '+') {
-	  ++index;
-	};
-      }
-
-      while_(str[index] >= '0' && str[index] <= '9') {
-	result *= 10;
-	result += str[index] - '0';
-	++index;
-      };
-
-      if constexpr (concepts::SignedInteger<IntType>) {
-	if_(isNegative) {
-	  result *= -1;
-	};
-      }
-    }
-  }; // ParseInt
   
 } // acus::sugar::impl
+
+

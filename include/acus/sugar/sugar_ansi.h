@@ -20,15 +20,15 @@ namespace acus::sugar::impl {
     struct MoveTo: LibraryFunction<MoveTo, void(Coord, Coord)> {
 
       static void emit(Expr const &x, Expr const &y) {
-	io::print("\x1b[");
-	io::print(y + Coord{Top});
-	io::print(';');
-	io::print(x + Coord{Left});
-	io::print('H');
+	print("\x1b[");
+	print(y + Coord{Top});
+	print(';');
+	print(x + Coord{Left});
+	print('H');
       }
     };
 
-    inline static constexpr MoveTo moveTo{};
+    inline static constexpr MoveTo move_to{};
 
 
     /*
@@ -39,7 +39,7 @@ namespace acus::sugar::impl {
 
       static void emit(Expr const &x, Expr const &y, Expr const &character) {
         MoveTo::emit(x, y);
-	io::write(character);
+	sugar::put(character);
       }
     };
 
@@ -50,11 +50,11 @@ namespace acus::sugar::impl {
      * Write a fixed-size string starting at x, y.
      */
     template <size_t N>
-    struct Write: LibraryFunction<  Write<N>, void(Coord, Coord, string<N>)> {
+    struct Write: LibraryFunction<  Write<N>, void(Coord, Coord, String<N>)> {
 
       static void emit(Expr const &x, Expr const &y, Expr const &text) {
         MoveTo::emit(x, y);
-	io::print(text);
+	print(text);
       }
       
     };
@@ -75,7 +75,7 @@ namespace acus::sugar::impl {
 
         for (size_t y = 0; y < Height; ++y) {
           MoveTo::emit(Coord{0}, Coord{y});
-	  io::print(blankLine);
+	  print(blankLine);
         }
 
         MoveTo::emit(Coord{0}, Coord{0});
@@ -90,7 +90,7 @@ namespace acus::sugar::impl {
      */
     struct Begin: LibraryFunction<Begin, void()> {
       static void emit() {
-	io::print("\x1b[?25l");
+	print("\x1b[?25l");
       }
     };
 
@@ -104,7 +104,7 @@ namespace acus::sugar::impl {
       
       static void emit() {
         MoveTo::emit(Coord{0}, Coord{Height});
-	io::print("\x1b[?25h");
+	print("\x1b[?25h");
       }
     };
 

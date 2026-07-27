@@ -32,14 +32,16 @@ namespace acus::sugar {
       else return T::type();
     }
 
-    template <auto typeFactory, auto literalFactory>
+    template <auto typeFactory, auto literalFactory, size_t Bits_>
     class Int: public SugarType {
       int x;
     public:
+      static constexpr size_t Bits = Bits_;
+      
       Int(int val): x(val) {};
 
-      template <auto tf, auto lf>
-      Int(Int<tf, lf> const &other):
+      template <auto tf, auto lf, size_t Bits>
+      Int(Int<tf, lf, Bits> const &other):
 	x(other.getInt())
       {}
       
@@ -51,18 +53,18 @@ namespace acus::sugar {
   }
 
   // Integer types
-  struct u8:  impl::Int<ts::u8,  literal::u8>  {};
-  struct u16: impl::Int<ts::u16, literal::u16> {};
-  struct s8:  impl::Int<ts::s8,  literal::s8>  {};
-  struct s16: impl::Int<ts::s16, literal::s16> {};
+  struct u8:  impl::Int<ts::u8,  literal::u8,  8>  {};
+  struct u16: impl::Int<ts::u16, literal::u16, 16> {};
+  struct s8:  impl::Int<ts::s8,  literal::s8,  8>  {};
+  struct s16: impl::Int<ts::s16, literal::s16, 16> {};
 
-
+  
   // String
   template <size_t N>
-  class string: public impl::SugarType {
+  class String: public impl::SugarType {
     std::string _str;
   public:
-    string(std::string const &str): _str(str) {}
+    String(std::string const &str): _str(str) {}
     static types::StringType const *type() { return ts::string(N); }
     literal::Literal toLiteral() const { return literal::string(_str); }
   };
@@ -136,7 +138,7 @@ namespace acus::sugar {
 
 
   template <impl::concepts::SugarType T>
-  struct ptr: impl::SugarType {
+  struct Ptr: impl::SugarType {
     static types::TypeHandle type() {
       return ts::pointer(impl::getTypeHandle<T>());
     }
@@ -160,14 +162,14 @@ namespace acus::sugar {
     struct IsString: std::false_type {};
     
     template <size_t N>
-    struct IsString<string<N>>: std::true_type {};
+    struct IsString<String<N>>: std::true_type {};
 
 
     template <typename T>
     struct IsPointer: std::false_type {};
 
     template <typename T>
-    struct IsPointer<ptr<T>>: std::true_type {};
+    struct IsPointer<Ptr<T>>: std::true_type {};
 
     // Concepts
     template <typename T>

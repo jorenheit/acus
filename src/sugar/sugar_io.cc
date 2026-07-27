@@ -6,7 +6,7 @@
 #include "acus/sugar/sugar.h"
 #include "acus/sugar/sugar_std.h"
 
-namespace acus::sugar::io {
+namespace acus::sugar {
 
   void print(char c, SUGAR_LOC) {
     __assembler.write(literal::u8(c));
@@ -31,10 +31,10 @@ namespace acus::sugar::io {
     print('\n', LOC_FWD);
   }
 
-  void write(Expr const &expr, SUGAR_LOC) {
+  void put(Expr const &expr, SUGAR_LOC) {
     __assembler.write(expr.get(), LOC_FWD);
   }
-  
+
   void read(Expr const &expr, SUGAR_LOC) {
     __assembler.read(expr.get(), LOC_FWD);
   }

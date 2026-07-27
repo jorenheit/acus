@@ -3,6 +3,69 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+
+/*
+ * Acus Sugar standard library
+ * ---------------------------
+ *
+ * Library functions are exposed as stateless callable objects grouped into
+ * namespaces such as io, ascii, string, math and ansi.
+ *
+ * A library function can be called directly, e.g.
+ *
+ *   let<u8>("c") = ascii::to_lower(var_("x"));
+ *
+ * Template arguments configure the function's types or capacities. The
+ * expected Acus signature is documented beside each public object. For
+ * example, the sqrt-function needs to know its expected type
+ *
+ *   template <typename Int> impl::Sqrt<Int>
+ *   sqrt {}; 
+ *
+ * This means that `math::sqrt<u16>` behaves as a function with signature
+ *
+ *   u16 (u16)
+ *
+ * The signatures for each of the functions are visible in comments below.
+ *
+ * The returned Expr may be stored in a C++ variable. This variable is only a
+ * handle to the generated Acus expression or storage:
+ *
+ *   auto length = string::strlen<u16, 20>(text);
+ *   println(length);
+ *
+ *
+ * Inline and outlined use
+ * -----------------------
+ *
+ * By default, a library function is emitted inline at the call site.
+ * Inline calls avoid Acus function-call overhead, but repeated calls duplicate
+ * the generated implementation.
+ *
+ * Outlinable functions can instead be emitted once as ordinary Acus functions:
+ *
+ *   auto parse_int = string::string_to_int<s16, 10, 20>.outline();
+ *   auto square_root = math::sqrt<u16>.outline();
+ *
+ * The returned handles can then be called like regular function handles:
+ *
+ *   let<u16>("x") = parse_int(text);
+ *
+ * Outlining can substantially reduce generated program size when a function is
+ * used repeatedly, but introduces function-call and argument-copying overhead.
+ * Whether inline or outlined code is preferable therefore depends on the
+ * function and its usage.
+ *
+ * Functions marked "not outlinable" modify storage supplied by the caller:
+ *
+ *   string::clear
+ *   string::append
+ *
+ * Such functions must be used inline and do not provide outline().
+ *
+ */
+
+
 #pragma once
 #include <tuple>
 #include "acus/assembler/assembler.h"
@@ -10,10 +73,8 @@
 
 
   // Builtin functions
-namespace acus::sugar::io {
+namespace acus::sugar {
 
-  // TODO: underscores to indicate builtins
-  
   void print(char c, SUGAR_FUNC);
   void print(int x, SUGAR_FUNC);
   void print(Expr const &expr, SUGAR_FUNC);
@@ -26,13 +87,13 @@ namespace acus::sugar::io {
   }
   
   void read(Expr const &expr, SUGAR_FUNC);
-  void write(Expr const &expr, SUGAR_FUNC);
+  void put(Expr const &expr, SUGAR_FUNC);
 
 } // sugar::acus::io
 
 #include "acus/sugar/sugar_libraryfunction.h"
-#include "acus/sugar/sugar_io.h"
 #include "acus/sugar/sugar_ascii.h"
+#include "acus/sugar/sugar_io.h"
 #include "acus/sugar/sugar_math.h"
 #include "acus/sugar/sugar_ansi.h"
 #include "acus/sugar/sugar_string.h"
@@ -42,52 +103,41 @@ namespace acus::sugar {
 
   namespace io {
     template <size_t MaxSize> impl::ReadLine<MaxSize>
-    readLine /* string<MaxSize> () */ {};
+    read_line /* string<MaxSize> () */ {};
 
-    template <typename Int, size_t MaxSize = 10> impl::ParseInt<Int, MaxSize>
-    parseInt /* Int (string<MaxSize>) */ {};
     
   } // io
 
   namespace ascii {
 
     inline impl::IsDigit
-    isDigit /* u8 (u8) */ {};
+    is_digit /* u8 (u8) */ {};
 
     inline impl::IsAlpha
-    isAlpha /* u8 (u8) */ {};
+    is_alpha /* u8 (u8) */ {};
 
     inline impl::IsAlphanumeric
-    isAlphanumeric /* u8 (u8) */ {};
+    is_alphanumeric /* u8 (u8) */ {};
 
     inline impl::IsLower
-    isLower /* u8 (u8) */ {};
+    is_lower /* u8 (u8) */ {};
 
     inline impl::IsUpper
-    isUpper /* u8 (u8) */ {};
+    is_upper /* u8 (u8) */ {};
 
     inline impl::IsWhitespace
-    isWhitespace /* u8 (u8) */ {};
+    is_whitespace /* u8 (u8) */ {};
 
     inline impl::ToLower
-    toLower /* u8 (u8) */ {};
+    to_lower /* u8 (u8) */ {};
 
     inline impl::ToUpper
-    toUpper /* u8 (u8) */ {};
+    to_upper /* u8 (u8) */ {};
     
   } // ascii
 
-  // TODO: capitalize string type (also Ptr) and rename namespace to simply string
-  namespace strings {
+  namespace string {
 
-    template <size_t MaxSize> impl::ClearString<MaxSize>
-    clear /* void (string<MaxSize>) */ {};
-
-    template <size_t DestSize, size_t SrcSize> impl::AppendString<DestSize, SrcSize>
-    append /* void (string<DestSize>, string<SrcSize>) */ {};
-
-    template <size_t DestSize, size_t SrcSize> impl::AppendStringCopy<DestSize, SrcSize>
-    append_to_copy /* string<DestSize> (string<DestSize>, string<SrcSize>) */ {};
 
     template <typename Int, size_t MaxSize = 10> impl::StrLen<Int, MaxSize>
     strlen /* Int (string<MaxSize>) */  {};
@@ -109,6 +159,25 @@ namespace acus::sugar {
 
     template <size_t StringSize, size_t NeedleSize> impl::ContainsString<StringSize, NeedleSize>
     contains_str /* u16 (string<StringSize>, string<NeedleSize>) */ {};
+
+    template <size_t DestSize, size_t SrcSize> impl::AppendStringCopy<DestSize, SrcSize>
+    append_to_copy /* string<DestSize> (string<DestSize>, string<SrcSize>) */ {};
+
+    template <typename Int, size_t Base = 10> impl::IntToString<Int, Base>
+    int_to_string /* string<#bits{Int}> (Int) */ {};
+    
+    template <typename Int, size_t Base = 10, size_t MaxSize = 16> impl::StringToInt<Int, Base, MaxSize>
+    string_to_int /* Int (string<MaxSize>) */ {};
+
+    // String modifiers ----- not outlinable!
+    
+    template <size_t MaxSize> impl::ClearString<MaxSize>
+    clear /* void (string<MaxSize>) */ {};
+
+    template <size_t DestSize, size_t SrcSize> impl::AppendString<DestSize, SrcSize>
+    append /* void (string<DestSize>, string<SrcSize>) */ {};
+
+    
   }
   
   namespace math {
@@ -141,7 +210,64 @@ namespace acus::sugar {
     template <size_t Width, size_t Height, size_t Left = 1, size_t Top = 1>
     using Screen = impl::Screen<Width, Height, Left, Top>;
 
-    // TODO: document interface
+    /*
+     * ANSI terminal screen
+     * --------------------
+     *
+     * Screen defines a rectangular drawing region inside the terminal.
+     * Width and Height specify the dimensions of the region. Left and Top
+     * specify its position in the terminal using ANSI's one-based column and
+     * row coordinates.
+     *
+     * To start, Define a new screen region:
+     *   using Screen = ansi::Screen<40, 40, 10, 10>;
+     *
+     * Now draw to the screen using its interface:
+     *
+     *   Screen::begin()
+     *     Signature:   void ()
+     *     Description: Prepare the terminal for drawing and hide the cursor.
+     *
+     *   Screen::move_to(x, y)
+     *     Signature:   void (u8, u8)
+     *     Description: Move the terminal cursor to coordinate (x, y).
+     *
+     *   Screen::put(x, y, character)
+     *     Signature:   void (u8, u8, u8)
+     *     Description: Move to coordinate (x, y) and write one character.
+     *
+     *   Screen::write<N>(x, y, text)
+     *     Signature:   void (u8, u8, string<N>)
+     *     Description: Move to coordinate (x, y) and write a string horizontally.
+     *
+     *   Screen::clear()
+     *     Signature:   void ()
+     *     Description: Clear the screen region and return the cursor to coordinate (0, 0).
+     *
+     *   Screen::end()
+     *     Signature:   void ()
+     *     Description: Restore the cursor and move it below the screen region.
+     *
+     * Example:
+     *
+     *   using Screen = ansi::Screen<40, 20>;
+     *
+     *   Screen::begin();
+     *   Screen::clear();
+     *   Screen::put(5, 2, '@');
+     *   Screen::write<13>(3, 5, "Hello, world!");
+     *   Screen::end();
+     *
+     * Notes:
+     *
+     * Screen writes directly to the terminal using ANSI escape sequences; it
+     * does not maintain a separate framebuffer.
+     *
+     * Dynamic Acus expressions may be used for coordinates and characters.
+     * The caller is responsible for keeping coordinates within the configured
+     * screen dimensions.
+     *
+     */    
   }
   
 } // acus::sugar
