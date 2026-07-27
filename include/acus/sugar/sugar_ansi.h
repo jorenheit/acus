@@ -5,7 +5,8 @@ namespace acus::sugar::impl {
   template <size_t Width, size_t Height, size_t Left, size_t Top>
   struct Screen {
 
-    using CoordType = u8;
+    using Coord = u8;
+    using Char  = u8;
     static_assert(Width  > 0);
     static_assert(Height > 0);
 
@@ -16,13 +17,13 @@ namespace acus::sugar::impl {
      * ANSI:  ESC[Top+y;Left+xH
      */
 
-    struct MoveTo: LibraryFunction<MoveTo, void(CoordType, CoordType)> {
+    struct MoveTo: LibraryFunction<MoveTo, void(Coord, Coord)> {
 
       static void emit(Expr const &x, Expr const &y, SUGAR_LOC) {
 	io::print("\x1b[");
-	io::print(y + CoordType{Top});
+	io::print(y + Coord{Top});
 	io::print(';');
-	io::print(x + CoordType{Left});
+	io::print(x + Coord{Left});
 	io::print('H');
       }
     };
@@ -34,7 +35,7 @@ namespace acus::sugar::impl {
      * Place one character without moving back afterward.
      */
     
-    struct Put: LibraryFunction<Put, void(CoordType, CoordType, u8)> {
+    struct Put: LibraryFunction<Put, void(Coord, Coord, Char)> {
 
       static void emit(Expr const &x, Expr const &y, Expr const &character, SUGAR_LOC) {
         MoveTo::emit(x, y, LOC_FWD);
@@ -49,7 +50,7 @@ namespace acus::sugar::impl {
      * Write a fixed-size string starting at x, y.
      */
     template <size_t N>
-    struct Write: LibraryFunction<  Write<N>, void(CoordType, CoordType, string<N>)> {
+    struct Write: LibraryFunction<  Write<N>, void(Coord, Coord, string<N>)> {
 
       static void emit(Expr const &x, Expr const &y, Expr const &text, SUGAR_LOC) {
         MoveTo::emit(x, y, LOC_FWD);
@@ -73,11 +74,11 @@ namespace acus::sugar::impl {
         static std::string const blankLine(Width, ' ');
 
         for (size_t y = 0; y < Height; ++y) {
-          MoveTo::emit(CoordType{0}, CoordType{y}, LOC_FWD);
+          MoveTo::emit(Coord{0}, Coord{y}, LOC_FWD);
 	  io::print(blankLine);
         }
 
-        MoveTo::emit(CoordType{0}, CoordType{0}, LOC_FWD);
+        MoveTo::emit(Coord{0}, Coord{0}, LOC_FWD);
       }
     };
 
@@ -102,12 +103,7 @@ namespace acus::sugar::impl {
     struct End: LibraryFunction<End, void()> {
       
       static void emit(SUGAR_LOC) {
-        MoveTo::emit(
-          CoordType{0},
-          CoordType{Height},
-          LOC_FWD
-        );
-
+        MoveTo::emit(Coord{0}, Coord{Height}, LOC_FWD);
 	io::print("\x1b[?25h");
       }
     };

@@ -1,0 +1,261 @@
+#include <iostream>
+
+#include <acus/sugar/sugar.h>
+#include <acus/sugar/sugar_std.h>
+
+using namespace acus::sugar;
+using namespace acus::sugar::io;
+
+namespace {
+
+constexpr size_t ScreenWidth  = 40;
+constexpr size_t ScreenHeight = 20;
+constexpr size_t PaddleHeight = 4;
+
+constexpr size_t LeftPaddleX  = 2;
+constexpr size_t RightPaddleX = ScreenWidth - 3;
+
+constexpr size_t MinPaddleY = 1;
+constexpr size_t MaxPaddleY = ScreenHeight - PaddleHeight - 1;
+
+constexpr size_t InitialPaddleY = ScreenHeight / 2 - PaddleHeight / 2;
+constexpr size_t InitialBallX   = ScreenWidth / 2;
+constexpr size_t InitialBallY   = ScreenHeight / 2;
+
+constexpr size_t BallDelay = 16;
+
+using Screen = ansi::Screen<ScreenWidth, ScreenHeight>;
+
+} // namespace
+
+
+int main() try {
+  program_("pong");
+  {
+    global_<u8>("leftY");
+    global_<u8>("rightY");
+
+    global_<u8>("ballX");
+    global_<u8>("ballY");
+    global_<u8>("ballRight");
+    global_<u8>("ballDown");
+
+    global_<u8>("running");
+    global_<u8>("tick");
+
+
+    auto drawPaddle =
+      function_<void(u8, u8, u8)>("drawPaddle", "x", "y", "glyph") | define {
+        auto x     = var_("x");
+        auto y     = var_("y");
+        auto glyph = var_("glyph");
+
+        Screen::put(x, y, glyph);
+        Screen::put(x, y + 1, glyph);
+        Screen::put(x, y + 2, glyph);
+        Screen::put(x, y + 3, glyph);
+
+        return_;
+      };
+
+
+    auto drawBorder =
+      function_<void()>("drawBorder") | define {
+        for (size_t x = 0; x < ScreenWidth; ++x) {
+          Screen::put(x, 0, '-');
+          Screen::put(x, ScreenHeight - 1, '-');
+        }
+
+        for (size_t y = 1; y < ScreenHeight - 1; ++y) {
+          Screen::put(0, y, '|');
+          Screen::put(ScreenWidth - 1, y, '|');
+        }
+
+        Screen::put(0, 0, '+');
+        Screen::put(ScreenWidth - 1, 0, '+');
+        Screen::put(0, ScreenHeight - 1, '+');
+        Screen::put(ScreenWidth - 1, ScreenHeight - 1, '+');
+
+        return_;
+      };
+
+
+    auto resetBall =
+      function_<void(u8, u8)>("resetBall", "right", "down") | define {
+        auto ballX     = var_("ballX");
+        auto ballY     = var_("ballY");
+        auto ballRight = var_("ballRight");
+        auto ballDown  = var_("ballDown");
+
+        ballX     = InitialBallX;
+        ballY     = InitialBallY;
+        ballRight = var_("right");
+        ballDown  = var_("down");
+
+        return_;
+      };
+
+
+    auto handleInput =
+      function_<void(u8)>("handleInput", "key") | define {
+        auto key     = var_("key");
+        auto leftY   = var_("leftY");
+        auto rightY  = var_("rightY");
+        auto running = var_("running");
+
+        if_(key == 'q') {
+          running = 0;
+        };
+
+        if_(key == 'w') {
+          if_(leftY > MinPaddleY) {
+            drawPaddle(LeftPaddleX, leftY, ' ');
+            --leftY;
+            drawPaddle(LeftPaddleX, leftY, '#');
+          };
+        };
+
+        if_(key == 's') {
+          if_(leftY < MaxPaddleY) {
+            drawPaddle(LeftPaddleX, leftY, ' ');
+            ++leftY;
+            drawPaddle(LeftPaddleX, leftY, '#');
+          };
+        };
+
+        if_(key == 'o') {
+          if_(rightY > MinPaddleY) {
+            drawPaddle(RightPaddleX, rightY, ' ');
+            --rightY;
+            drawPaddle(RightPaddleX, rightY, '#');
+          };
+        };
+
+        if_(key == 'l') {
+          if_(rightY < MaxPaddleY) {
+            drawPaddle(RightPaddleX, rightY, ' ');
+            ++rightY;
+            drawPaddle(RightPaddleX, rightY, '#');
+          };
+        };
+
+        return_;
+      };
+
+
+    auto stepBall =
+      function_<void()>("stepBall") | define {
+        auto leftY    = var_("leftY");
+        auto rightY   = var_("rightY");
+        auto ballX    = var_("ballX");
+        auto ballY    = var_("ballY");
+        auto movingRight = var_("ballRight");
+        auto movingDown  = var_("ballDown");
+
+        Screen::put(ballX, ballY, ' ');
+
+        /*
+         * Vertical movement
+         */
+        if_(movingDown) {
+          if_(ballY == ScreenHeight - 2) {
+            movingDown = 0;
+            --ballY;
+          }
+          else_ {
+            ++ballY;
+          };
+        }
+        else_ {
+          if_(ballY == 1) {
+            movingDown = 1;
+            ++ballY;
+          }
+          else_ {
+            --ballY;
+          };
+        };
+
+        /*
+         * Horizontal movement and paddle collisions
+         */
+        if_(movingRight) {
+          if_(ballX == RightPaddleX - 1) {
+            if_(ballY >= rightY && ballY < rightY + PaddleHeight) {
+              movingRight = 0;
+              --ballX;
+            }
+            else_ {
+              resetBall(0, 1);
+            };
+          }
+          else_ {
+            ++ballX;
+          };
+        }
+        else_ {
+          if_(ballX == LeftPaddleX + 1) {
+            if_(ballY >= leftY && ballY < leftY + PaddleHeight) {
+              movingRight = 1;
+              ++ballX;
+            }
+            else_ {
+              resetBall(1, 0);
+            };
+          }
+          else_ {
+            --ballX;
+          };
+        };
+
+        Screen::put(ballX, ballY, 'O');
+        return_;
+      };
+
+
+    function_<void()>("main") | define {
+      auto leftY  = var_("leftY");
+      auto rightY = var_("rightY");
+      auto running = var_("running");
+      auto tick    = var_("tick");
+
+      leftY  = InitialPaddleY;
+      rightY = InitialPaddleY;
+      running = 1;
+      tick    = 0;
+
+      resetBall(1, 1);
+
+      Screen::clear();
+      drawBorder();
+
+      drawPaddle(LeftPaddleX, leftY, '#');
+      drawPaddle(RightPaddleX, rightY, '#');
+      Screen::put(var_("ballX"), var_("ballY"), 'O');
+
+      auto key = let_<u8>("key");
+
+      while_(running) {
+        read(key);
+        handleInput(key);
+
+        ++tick;
+
+        if_(tick == BallDelay) {
+          tick = 0;
+          stepBall();
+        };
+      };
+
+      Screen::clear();
+      return_;
+    };
+  }
+  endProgram();
+
+  std::cout << generateBrainfuck("pong");
+}
+catch (std::exception const &e) {
+  std::cerr << e.what() << '\n';
+  return 1;
+}

@@ -12,21 +12,21 @@ namespace acus::sugar {
   namespace impl {
     struct SugarType {};
 
-    template <typename T>
-    inline constexpr bool IsSugarType = std::is_same_v<T, void> || std::is_base_of_v<SugarType, std::remove_cvref_t<T>>;
+    namespace concepts {
 
-    template <typename Tuple>
-    struct IsTupleOfSugarTypesImpl: std::false_type {};
+      template <typename T>
+      inline constexpr bool IsSugarType =
+	std::is_same_v<T, void> ||
+	std::is_base_of_v<impl::SugarType, std::remove_cvref_t<T>>;
 
-    template <typename ... Types>
-    struct IsTupleOfSugarTypesImpl<std::tuple<Types ...>> {
-      static constexpr bool value = (IsSugarType<Types> && ...);
-    };
-  
-    template <typename Tuple>
-    inline constexpr bool IsTupleOfSugarTypes = IsTupleOfSugarTypesImpl<std::remove_cvref_t<Tuple>>::value;
+      template <typename T>
+      concept SugarType = IsSugarType<T>;
 
-    template <typename T> requires IsSugarType<T>
+    } // concepts
+      
+
+    
+    template <concepts::SugarType T>
     types::TypeHandle getTypeHandle() {
       if constexpr (std::is_same_v<T, void>) return ts::void_t();
       else return T::type();
@@ -57,15 +57,6 @@ namespace acus::sugar {
   struct s16: impl::Int<ts::s16, literal::s16> {};
 
 
-  namespace impl {
-    template <typename T, typename ... U>
-    inline constexpr bool IsOneOf = (std::is_same_v<std::remove_cvref_t<T>, U> || ...);
-    
-    template <typename T>
-    inline constexpr bool IsIntegerSugarType = IsOneOf<T, u8, u16, s8, s16>;
-  }
-
-  
   // String
   template <size_t N>
   class string: public impl::SugarType {
@@ -77,7 +68,7 @@ namespace acus::sugar {
   };
 
   // Struct
-  template <impl::FixedString Name, typename T>
+  template <impl::FixedString Name, typename T> // TODO: concept sugartype
   struct Field {
     static_assert(std::is_base_of_v<impl::SugarType, T>,
 		  "Struct-fields can only contain types from the sugar API");
@@ -115,10 +106,8 @@ namespace acus::sugar {
     
   };
 
-  template <typename T, size_t N>
+  template <impl::concepts::SugarType T, size_t N>
   struct Array: impl::SugarType, std::array<T, N> {
-    static_assert(impl::IsSugarType<T>, "Arrays can only contain types from the sugar API");
-    
     using Base = std::array<T, N>;
     using Base::Base;
 
@@ -146,66 +135,58 @@ namespace acus::sugar {
   };
 
 
-  template <typename T>
+  template <impl::concepts::SugarType T>
   struct ptr: impl::SugarType {
-    static_assert(impl::IsSugarType<T>, "Pointers can only point to types from the sugar API");
-
     static types::TypeHandle type() {
       return ts::pointer(impl::getTypeHandle<T>());
     }
   };
 
-  //Traits
-  template <typename T> requires impl::IsSugarType<T>
-  struct IsInteger_: std::false_type {};
+  //Concepts
+  namespace impl::concepts {
+    // Helpers
+    template <typename T, typename ... U>
+    inline constexpr bool IsOneOf = (std::is_same_v<std::remove_cvref_t<T>, U> || ...);
 
-  template <typename T>
-  static constexpr bool IsInteger = IsInteger_<T>::value;
+    template <typename T>
+    struct IsArray: std::false_type {};
+
+    template <typename T, size_t N>
+    struct IsArray<sugar::Array<T, N>>: std::true_type {};
+    
+    template <typename T>
+    struct IsString: std::false_type {};
+    
+    template <size_t N>
+    struct IsString<string<N>>: std::true_type {};
+
+
+    template <typename T>
+    struct IsPointer: std::false_type {};
+
+    template <typename T>
+    struct IsPointer<ptr<T>>: std::true_type {};
+
+    // Concepts
+    template <typename T>
+    concept Integer = IsOneOf<T, u8, u16, s8, s16>;
+
+    template <typename T>
+    concept UnsignedInteger = IsOneOf<T, s8, s16>;
+      
+    template <typename T>
+    concept SignedInteger = IsOneOf<T, s8, s16>;
+    
+    template <typename T>
+    concept Pointer = IsPointer<std::remove_cvref_t<T>>::value;
+
+    template <typename T>
+    concept Array = IsArray<std::remove_cvref_t<T>>::value;
+
+    template <typename T>
+    concept String = IsString<std::remove_cvref_t<T>>::value;
+  } // concepts
+
+} // sugar
+
   
-  template <typename T> requires impl::IsSugarType<T>
-  struct IsSignedInteger_: std::false_type {};
-
-  template <typename T>
-  static constexpr bool IsSignedInteger = IsSignedInteger_<T>::value;
-
-  template <typename T> requires impl::IsSugarType<T>
-  struct IsUnsignedInteger_: std::false_type {};
-
-  template <typename T>
-  static constexpr bool IsUnsignedInteger = IsUnsignedInteger_<T>::value;
-  
-  template <typename T> requires impl::IsSugarType<T>
-  struct IsArray_: std::false_type {};
-
-  template <typename T>
-  static constexpr bool IsArray = IsArray_<T>::value;
-  
-  template <typename T> requires impl::IsSugarType<T>
-  struct IsString_: std::false_type {};
-
-  template <typename T>
-  static constexpr bool IsString = IsString_<T>::value;
-  
-  template <typename T> requires impl::IsSugarType<T>
-  struct IsPointer_: std::false_type {};
-  
-  template <typename T>
-  static constexpr bool IsPointer = IsPointer_<T>::value;
-  
-  template <> struct IsInteger_<u8>: std::true_type {};
-  template <> struct IsInteger_<u16>: std::true_type {};
-  template <> struct IsInteger_<s8>: std::true_type {};
-  template <> struct IsInteger_<s16>: std::true_type {};
-
-  template <> struct IsUnsignedInteger_<u8>: std::true_type {};
-  template <> struct IsUnsignedInteger_<u16>: std::true_type {};
-  
-  template <> struct IsSignedInteger_<s8>: std::true_type {};
-  template <> struct IsSignedInteger_<s16>: std::true_type {};
-
-  template <typename T, size_t N>  struct IsArray_<Array<T, N>>: std::true_type {};
-  template <size_t N>  struct IsString_<string<N>>: std::true_type {};
-  template <typename T>  struct IsPointer_<ptr<T>>: std::true_type {};
-
-
-}

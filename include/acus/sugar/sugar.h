@@ -27,14 +27,14 @@ namespace acus::sugar {
     template <typename T> requires std::convertible_to<T, std::string>
     Expr(T const &str, SUGAR_FUNC);
 
-    template <typename T> requires impl::IsSugarType<T>
+    template <impl::concepts::SugarType T> 
     Expr(T const &val, SUGAR_FUNC);
     
     Expression const &get() const;
     Expression &get();
     std::source_location const &loc() const { return _loc; }
 
-    template <typename T>
+    template <impl::concepts::SugarType T>
     Expr cast(SUGAR_FUNC) const;
     
     Expr field(std::string const &name, SUGAR_FUNC) const;
@@ -70,10 +70,10 @@ namespace acus::sugar {
   Expr operator&&(Expr const &lhs, Expr const &rhs);
   Expr operator||(Expr const &lhs, Expr const &rhs);
 
-  template <typename T> requires impl::IsSugarType<T>
+  template <impl::concepts::SugarType T>
   Expr let_(std::string const &varName, SUGAR_FUNC);
 
-  template <typename T> requires impl::IsSugarType<T>
+  template <impl::concepts::SugarType>
   void global_(std::string const &varName, SUGAR_FUNC);
   
   Expr var_(std::string const &varName, SUGAR_FUNC);

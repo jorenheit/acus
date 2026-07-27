@@ -3,7 +3,7 @@
 namespace acus::sugar::impl {
 
   
-  template <typename IntType> requires impl::IsIntegerSugarType<IntType>
+  template <concepts::Integer IntType>
   struct Min: LibraryFunction<Min<IntType>,
 			      IntType(IntType, IntType)> {
 
@@ -18,7 +18,7 @@ namespace acus::sugar::impl {
     
   }; // Min
 
-  template <typename IntType> requires impl::IsIntegerSugarType<IntType>
+  template <concepts::Integer IntType> 
   struct Max: LibraryFunction<Max<IntType>,
 			      IntType(IntType, IntType)> {
 
@@ -32,8 +32,11 @@ namespace acus::sugar::impl {
     };
     
   }; // Min
+
   
-  template <typename IntType> requires impl::IsIntegerSugarType<IntType>
+
+  
+  template <concepts::Integer IntType>
   struct Sqrt: LibraryFunction<Sqrt<IntType>,
 			       IntType(IntType)> {
 
@@ -54,7 +57,7 @@ namespace acus::sugar::impl {
   }; // Sqrt
 
 
-  template <size_t Base, typename IntType> requires impl::IsIntegerSugarType<IntType>
+  template <size_t Base, concepts::Integer IntType> 
   struct Log: LibraryFunction<Log<Base, IntType>,
 			      u8(IntType)>{
     static_assert(Base >= 2);

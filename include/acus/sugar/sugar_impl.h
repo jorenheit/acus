@@ -36,7 +36,7 @@ namespace acus::sugar::impl {
     return lit;
   }
   
-  template <typename T> requires IsSugarType<T>
+  template <concepts::SugarType T>
   literal::Literal toLiteral(T const &val) {
     return val.toLiteral();
   }

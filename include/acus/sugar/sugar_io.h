@@ -25,7 +25,7 @@ namespace acus::sugar::impl {
   }; // ReadLine
 
 
-  template <typename IntType, size_t MaxSize> requires impl::IsIntegerSugarType<IntType>
+  template <concepts::Integer IntType, size_t MaxSize>
   struct StrLen: LibraryFunction<StrLen<IntType, MaxSize>,
 				 IntType(string<MaxSize>)> {
 
@@ -39,7 +39,7 @@ namespace acus::sugar::impl {
 
   }; // StrLen
   
-  template <typename IntType, size_t MaxSize> requires impl::IsIntegerSugarType<IntType>
+  template <concepts::Integer IntType, size_t MaxSize>
   struct ParseInt: LibraryFunction<ParseInt<IntType, MaxSize>,
 				   IntType(string<MaxSize>)>{
 
@@ -51,7 +51,7 @@ namespace acus::sugar::impl {
       auto index  = (let_<u8>(impl::nextVarName()) = 0);
       auto isNegative = (let_<u8>(impl::nextVarName()) = 0);
 
-      if constexpr (IsSignedInteger<IntType>) {
+      if constexpr (concepts::SignedInteger<IntType>) {
 	if_(str[0] == '-') {
 	  isNegative = 1;
 	  ++index;
@@ -72,7 +72,7 @@ namespace acus::sugar::impl {
 	++index;
       };
 
-      if constexpr (IsSignedInteger<IntType>) {
+      if constexpr (concepts::SignedInteger<IntType>) {
 	if_(isNegative) {
 	  result *= -1;
 	};

@@ -94,6 +94,8 @@ namespace acus::sugar {
   namespace ansi {
     template <size_t Width, size_t Height, size_t Left = 1, size_t Top = 1>
     using Screen = impl::Screen<Width, Height, Left, Top>;
+
+    // TODO: document interface
   }
   
 } // acus::sugar

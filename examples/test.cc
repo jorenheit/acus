@@ -454,22 +454,30 @@ int main() try {
   program_("screen");
   {
     using Screen = ansi::Screen<50, 50>;
+    auto readLine = io::readLine<5>;
     
     function_<void()>("main") | define {
 
+      print("Enter a char: ");
+      let_<u8>("ch") = readLine()[0];
+      
       auto x = let_<u8>("x");
       auto y = let_<u8>("y");
 
-      y = 2;
-      while_(y < 30) {
-	x = 5;
-	while_(x < 30) {
-	  Screen::put(x, y, '@');
-	  ++x;
+      while_(1) {
+	y = 2;
+	while_(y < 30) {
+	  x = 5;
+	  while_(x < 30) {
+	    Screen::put(x, y, var_("ch"));
+	    ++x;
+	  };
+	  ++y;
 	};
-	++y;
+	
+	Screen::clear();
       };
-
+      
       println();
 	
 

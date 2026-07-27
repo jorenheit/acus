@@ -11,28 +11,25 @@ Expr::Expr(T const &str, SUGAR_LOC):
   _loc(LOC_FWD)
 {}
 
-template <typename T> requires impl::IsSugarType<T>
+template <impl::concepts::SugarType T>
 Expr::Expr(T const &val, SUGAR_LOC):
   _expr(val.toLiteral()),
   _loc(LOC_FWD)
 {}
 
-template <typename T> requires impl::IsSugarType<T>
+template <impl::concepts::SugarType T>
 Expr let_(std::string const &varName, SUGAR_LOC) {
   return Expr{__assembler.declareLocal(varName, impl::getTypeHandle<T>(), LOC_FWD), LOC_FWD};
 }
 
-template <typename T> requires impl::IsSugarType<T>
+template <impl::concepts::SugarType T>
 void global_(std::string const &varName, SUGAR_LOC) {
   __assembler.declareGlobal(varName, impl::getTypeHandle<T>(), LOC_FWD);
 }
 
 
-template <typename T>
+template <impl::concepts::SugarType T>
 Expr Expr::cast(SUGAR_LOC) const {
-  static_assert(std::is_base_of_v<impl::SugarType, T>,
-		"Expression can only be cast to types from the sugar API");
-
   return Expr{__assembler.cast(get(), impl::getTypeHandle<T>(), LOC_FWD), LOC_FWD};
 }
 
@@ -40,7 +37,7 @@ Expr Expr::cast(SUGAR_LOC) const {
 template <typename Signature>
 class FunctionHandle;
 
-template <typename Ret, typename ... Args>
+template <impl::concepts::SugarType Ret, impl::concepts::SugarType ... Args>
 class FunctionHandle<Ret(Args...)> {
   std::string _functionName;
 
@@ -52,9 +49,6 @@ public:
   using ArgumentTypes = std::tuple<Args...>;
   static constexpr size_t ArgCount = sizeof...(Args);
 
-  static_assert(impl::IsSugarType<ReturnType>, "Return value must be void or a type from the sugar API");
-  static_assert(impl::IsTupleOfSugarTypes<ArgumentTypes>, "Argument types must all be types from the sugar API");
-  
   FunctionHandle(std::string const &name);
 
 
@@ -69,12 +63,13 @@ private:
 };
 
 
-template <typename Ret, typename ... Args>
+// FunctionHandle implementation
+template <impl::concepts::SugarType Ret, impl::concepts::SugarType ... Args>
 FunctionHandle<Ret(Args...)>::FunctionHandle(std::string const &name):
   _functionName(name)
 {}
 
-template <typename Ret, typename ... Args>
+template <impl::concepts::SugarType Ret, impl::concepts::SugarType ... Args>
 auto FunctionHandle<Ret(Args...)>::operator()(ExprConstRef<Args>... args, SUGAR_LOC) const {
 
   if constexpr (std::is_same_v<Ret, void>) {
@@ -84,13 +79,13 @@ auto FunctionHandle<Ret(Args...)>::operator()(ExprConstRef<Args>... args, SUGAR_
   }
 }
 
-template <typename Ret, typename ... Args>
+template <impl::concepts::SugarType Ret, impl::concepts::SugarType ... Args>
 std::string const &FunctionHandle<Ret(Args...)>::functionName() const { return _functionName; }
 
-template <typename Ret, typename ... Args>
+template <impl::concepts::SugarType Ret, impl::concepts::SugarType ... Args>
 types::TypeHandle FunctionHandle<Ret(Args...)>::returnType() const { return impl::getTypeHandle<Ret>(); }
 
-template <typename Ret, typename ... Args>
+template <impl::concepts::SugarType Ret, impl::concepts::SugarType ... Args>
 Expr FunctionHandle<Ret(Args...)>::callWithReturn(SUGAR_LOC, auto&& ... args) const {
   static_assert(std::tuple_size_v<ArgumentTypes> == sizeof ... (args),
 		"Function signature does not match number of arguments.");
@@ -103,7 +98,7 @@ Expr FunctionHandle<Ret(Args...)>::callWithReturn(SUGAR_LOC, auto&& ... args) co
   return Expr{ret, LOC_FWD};
 }
 
-template <typename Ret, typename ... Args>
+template <impl::concepts::SugarType Ret, impl::concepts::SugarType ... Args>
 void FunctionHandle<Ret(Args...)>::callWithoutReturn(SUGAR_LOC, auto&& ... args) const {
   static_assert(std::tuple_size_v<ArgumentTypes> == sizeof ... (args),
 		"Function signature does not match number of arguments.");      
@@ -119,7 +114,7 @@ auto function_(std::string const &functionName, auto&& ... argNames) {
   return FunctionBuilder<Signature>{functionName, std::forward<decltype(argNames)>(argNames) ...};
 }
 
-template <typename Ret, typename ... Args>
+template <impl::concepts::SugarType Ret, impl::concepts::SugarType ... Args>
 class FunctionBuilder<Ret(Args...)> {
 
   template <typename>
