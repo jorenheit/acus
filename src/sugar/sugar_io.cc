@@ -17,14 +17,7 @@ namespace acus::sugar {
   }
   
   void print(Expr const &expr, SUGAR_LOC) {
-    try {
-      __assembler.print(expr.get());
-    } catch (error::Error &err) {
-      if (err.errorCode == error::ErrorCode::NotPrintable) {
-	__assembler.write(expr.get());
-      }
-      else throw;
-    }
+    __assembler.print(expr.get(), LOC_FWD);
   }
 
   void println(SUGAR_LOC) {

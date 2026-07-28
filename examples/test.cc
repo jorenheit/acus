@@ -6,6 +6,8 @@
 #include <iostream>
 #include "acus/assembler/assembler.h"
 #include "acus/sugar/sugar.h"
+
+#define ACUS_SUGAR_LOOP_UNROLL_LIMIT 10
 #include "acus/sugar/sugar_std.h"
 using namespace acus;
 using namespace sugar;
@@ -49,14 +51,15 @@ int main() try {
       let_<Point>("p") = Point{'Q','Z'};
       var_("p").field("x") = 'X';
       var_("p").field("y") = 'Y';
-      println(var_("p"));
+      put(var_("p"));
+      println();
 
       foo(s8{-200});
 
       let_<s8>("z") = -1;
-      //      let_<Vec2>("v") = Vec2{'X', var_("z")};
       let_<Vec2>("v") = Vec2{'X', 'Y'};
-      println(var_("v"));
+      put(var_("v"));
+      println();
 
       let_<u8>("i") = 0;
       while_(var_("i") < 10) {
@@ -349,6 +352,23 @@ int main() try {
   }
   endProgram();
 
+
+  program_("abs");
+  {
+    auto read_line = io::read_line<16>.outline();
+    auto str2int = string::string_to_int<s16>.outline();
+    auto abs = math::abs<s16>;
+    
+    function_<void()>("main") | define {
+      print("Enter a number: ");
+      auto line = read_line();
+      let_<s16>("val") = str2int(line);
+      println(abs(var_("val")));
+      return_;
+    };
+    
+  }
+  endProgram();
   
   program_("sqrt");
   {
@@ -412,6 +432,54 @@ int main() try {
   }
   endProgram();
 
+  program_("clamp");
+  {
+    auto read_line = io::read_line<16>.outline();
+    auto str2int = string::string_to_int<u16>.outline();
+    auto clamp = math::clamp<u16>;
+    
+    function_<void()>("main") | define {
+      print("x = ");
+      let_<u16>("x") = str2int(read_line());
+
+      print("min = ");
+      let_<u16>("min") = str2int(read_line());
+
+      print("max = ");
+      let_<u16>("max") = str2int(read_line());
+      
+      print("Result:  ");
+      println(clamp(var_("x"), var_("min"), var_("max")));
+      return_;
+    };
+    
+  }
+  endProgram();
+  
+
+  program_("gcd");
+  {
+    auto read_line = io::read_line<16>.outline();
+    auto str2int = string::string_to_int<u16>.outline();
+    auto gcd = math::gcd<u16>;
+    
+    function_<void()>("main") | define {
+      print("a = ");
+      auto line1 = read_line();
+      let_<u16>("a") = str2int(line1);
+
+      print("b = ");
+      auto line2 = read_line();
+      let_<u16>("b") = str2int(line2);
+
+      print("gcd =  ");
+      println(gcd(var_("a"), var_("b")));
+      return_;
+    };
+    
+  }
+  endProgram();
+  
 
   program_("isDigit");
   {
@@ -557,8 +625,48 @@ int main() try {
   }
   endProgram();
   
+
+  program_("arrays");
+  {
+    using Vec = Array<u16, 10>;
+    
+    auto read_line = io::read_line<16>.outline();
+    auto str2int = string::string_to_int<u16>.outline();
+    auto fill = array::fill<u16, Vec::Size>;
+    auto clear = array::clear<u16, Vec::Size>;
+    auto find = array::find<u16, Vec::Size>;
+    auto sort = array::sort<u16, Vec::Size>;
+
+    auto print_array = function_<void(Vec)>("print_array", "arr")  | define {
+      print('[');
+      for (size_t i = 0; i != Vec::Size; ++i) {
+	print(var_("arr")[i]);
+	if (i < Vec::Size - 1) {
+	  print(", ");
+	}
+      }
+      println(']');
+      return_;
+    };
+
+    main_() {
+      print("x = ");
+      let_<u16>("x") = str2int(read_line());
+
+      let_<Vec>("vec");
+      fill(var_("vec"), var_("x"));
+      var_("vec")[3] = 69;
+
+      print_array(var_("vec"));
+      println(find(var_("vec"), 69));
+      sort(var_("vec"));
+      print_array(var_("vec"));      
+      return_;
+    };
+  }
+  endProgram();
   
-  std::cout << generateBrainfuck("int2str");
+  std::cout << generateBrainfuck("arrays");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

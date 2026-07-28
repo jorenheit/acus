@@ -71,40 +71,32 @@
 #include "acus/assembler/assembler.h"
 #include "acus/sugar/sugar.h"
 
-
-  // Builtin functions
-namespace acus::sugar {
-
-  void print(char c, SUGAR_FUNC);
-  void print(int x, SUGAR_FUNC);
-  void print(Expr const &expr, SUGAR_FUNC);
-
-  void println(SUGAR_FUNC);
-
-  void println(auto&& arg, SUGAR_FUNC) {
-    print(std::forward<decltype(arg)>(arg), LOC_FWD);
-    print('\n', LOC_FWD);
-  }
-  
-  void read(Expr const &expr, SUGAR_FUNC);
-  void put(Expr const &expr, SUGAR_FUNC);
-
-} // sugar::acus::io
-
 #include "acus/sugar/sugar_libraryfunction.h"
 #include "acus/sugar/sugar_ascii.h"
 #include "acus/sugar/sugar_io.h"
 #include "acus/sugar/sugar_math.h"
 #include "acus/sugar/sugar_ansi.h"
 #include "acus/sugar/sugar_string.h"
+#include "acus/sugar/sugar_array.h"
+#include "acus/sugar/sugar_config.h"
+
 
 namespace acus::sugar {
 
+  // Builtin functions
+  void print(char c, SUGAR_FUNC);
+  void print(int x, SUGAR_FUNC);
+  void print(Expr const &expr, SUGAR_FUNC);
+  void println(auto&& arg, SUGAR_FUNC);  
+  void println(SUGAR_FUNC);
+  void read(Expr const &expr, SUGAR_FUNC);
+  void put(Expr const &expr, SUGAR_FUNC);
 
+  
+  // Library functions
   namespace io {
     template <size_t MaxSize> impl::ReadLine<MaxSize>
     read_line /* string<MaxSize> () */ {};
-
     
   } // io
 
@@ -158,7 +150,7 @@ namespace acus::sugar {
     find_str /* u16 (string<StringSize>, string<NeedleSize>) */ {};
 
     template <size_t StringSize, size_t NeedleSize> impl::ContainsString<StringSize, NeedleSize>
-    contains_str /* u16 (string<StringSize>, string<NeedleSize>) */ {};
+    contains /* u8 (string<StringSize>, string<NeedleSize>) */ {};
 
     template <size_t DestSize, size_t SrcSize> impl::AppendStringCopy<DestSize, SrcSize>
     append_to_copy /* string<DestSize> (string<DestSize>, string<SrcSize>) */ {};
@@ -169,16 +161,56 @@ namespace acus::sugar {
     template <typename Int, size_t Base = 10, size_t MaxSize = 16> impl::StringToInt<Int, Base, MaxSize>
     string_to_int /* Int (string<MaxSize>) */ {};
 
-    // String modifiers ----- not outlinable!
-    
     template <size_t MaxSize> impl::ClearString<MaxSize>
-    clear /* void (string<MaxSize>) */ {};
+    clear /* inline void (string<MaxSize>) */ {};
 
     template <size_t DestSize, size_t SrcSize> impl::AppendString<DestSize, SrcSize>
-    append /* void (string<DestSize>, string<SrcSize>) */ {};
+    append /* inline void (string<DestSize>, string<SrcSize>) */ {};
 
+  } // string
+
+  namespace array {
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollFill<T, N>> impl::FillArray<T, N, Unroll>
+    fill /* inline void (Array<T, N>, T) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollClear<T, N>> impl::ClearArray<T, N, Unroll>
+    clear /* inline void (Array<T, N>) */ {};
     
-  }
+    template <typename T, size_t N, bool Unroll = config::array::UnrollFind<T, N>> impl::FindArray<T, N, Unroll>
+    find /* u8/u16 (Array<T, N>, T) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollContains<T, N>> impl::ContainsArray<T, N, Unroll>
+    contains /* u8 (Array<T, N>, T) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollEqual<T, N>> impl::EqualArray<T, N, Unroll>
+    equal /* u8 (Array<T, N>, Array<T, N>) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollSum<T, N>> impl::SumArray<T, N, Unroll>
+    sum /* T (Array<T, N>) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollMinMax<T, N>> impl::MinArray<T, N, Unroll>
+    min /* T (Array<T, N>) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollMinMax<T, N>> impl::MaxArray<T, N, Unroll>
+    max /* T (Array<T, N>) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollMinMaxIndex<T, N>> impl::MinIndexArray<T, N, Unroll>
+    min_index /* u8/u16 (Array<T, N>) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollMinMaxIndex<T, N>> impl::MaxIndexArray<T, N, Unroll>
+    max_index /* u8/u16 (Array<T, N>) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollCount<T, N>> impl::CountArray<T, N, Unroll>
+    count /* u8/u16 (Array<T, N>, T) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollSort<T, N>> impl::SortArray<T, N, Unroll>
+    sort /* inline void (Array<T, N>) */ {};
+
+    template <typename T, size_t N, bool Unroll = config::array::UnrollIsSorted<T, N>> impl::IsSortedArray<T, N, Unroll>
+    is_sorted /* u8 (Array<T, N>) */ {};
+
+  } // array
   
   namespace math {
 
@@ -188,6 +220,12 @@ namespace acus::sugar {
     template <typename Int> impl::Max<Int>
     max /* Int (Int, Int) */ {};
 
+    template <typename Int> impl::Clamp<Int>
+    clamp /* Int (Int x, Int min, Int max) */ {};
+    
+    template <typename Int> impl::Abs<Int>
+    abs /* Int (Int) */ {};
+    
     template <typename Int> impl::Pow<Int>
     pow /* Int (Int, Int) */ {};
     
@@ -197,11 +235,14 @@ namespace acus::sugar {
     template <size_t Base, typename Int> impl::Log<Base, Int>
     log /* u8 (Int) */ {};
 
-    template <typename Int = u16> impl::Log<2, Int>
+    template <typename Int> impl::Log<2, Int>
     log2 /* u8 (Int) */ {};
 
-    template <typename Int = u16> impl::Log<10, Int>
+    template <typename Int> impl::Log<10, Int>
     log10 /* u8 (Int) */ {};
+
+    template <typename Int> impl::Gcd<Int>
+    gcd /* Int (Int, Int) */ {};
     
   } // math
 
@@ -267,8 +308,24 @@ namespace acus::sugar {
      * The caller is responsible for keeping coordinates within the configured
      * screen dimensions.
      *
+     * Functions may be outlined as usual:
+     *
+     *     auto put_screen = Screen::put.outline();
      */    
   }
   
 } // acus::sugar
 
+
+// Println implementation
+void acus::sugar::println(auto&& arg, SUGAR_LOC) {
+  print(std::forward<decltype(arg)>(arg), LOC_FWD);
+  print('\n', LOC_FWD);
+}
+
+#include "acus/sugar/sugar_ascii_impl.h"
+#include "acus/sugar/sugar_io_impl.h"
+#include "acus/sugar/sugar_math_impl.h"
+#include "acus/sugar/sugar_ansi_impl.h"
+#include "acus/sugar/sugar_string_impl.h"
+#include "acus/sugar/sugar_array_impl.h"

@@ -6,110 +6,54 @@ namespace acus::sugar::impl {
   struct Screen {
 
     using Coord = u8;
-    using Char  = u8;
-    static_assert(Width  > 0);
+    using Char = u8;
+
+    static_assert(Width > 0);
     static_assert(Height > 0);
 
-    /*
-     * Move to a zero-based coordinate inside the screen.
-     *
-     * Sugar: moveTo(x, y)
-     * ANSI:  ESC[Top+y;Left+xH
-     */
-
     struct MoveTo: LibraryFunction<MoveTo, void(Coord, Coord)> {
-
-      static void emit(Expr const &x, Expr const &y) {
-	print("\x1b[");
-	print(y + Coord{Top});
-	print(';');
-	print(x + Coord{Left});
-	print('H');
-      }
+      static void emit(Expr const &x, Expr const &y);
     };
 
     inline static constexpr MoveTo move_to{};
 
 
-    /*
-     * Place one character without moving back afterward.
-     */
-    
     struct Put: LibraryFunction<Put, void(Coord, Coord, Char)> {
-
-      static void emit(Expr const &x, Expr const &y, Expr const &character) {
-        MoveTo::emit(x, y);
-	sugar::put(character);
-      }
+      static void emit(Expr const &x, Expr const &y, Expr const &character);
     };
 
     inline static constexpr Put put{};
 
 
-    /*
-     * Write a fixed-size string starting at x, y.
-     */
     template <size_t N>
-    struct Write: LibraryFunction<  Write<N>, void(Coord, Coord, String<N>)> {
-
-      static void emit(Expr const &x, Expr const &y, Expr const &text) {
-        MoveTo::emit(x, y);
-	print(text);
-      }
-      
+    struct Write: LibraryFunction<Write<N>, void(Coord, Coord, String<N>)> {
+      static void emit(Expr const &x, Expr const &y, Expr const &text);
     };
 
     template <size_t N>
     inline static constexpr Write<N> write{};
 
 
-    /*
-     * Clear only this screen region, rather than the whole terminal.
-     *
-     * The C++ loops execute while constructing the Acus program.
-     */
     struct Clear: LibraryFunction<Clear, void()> {
-
-      static void emit() {
-        static std::string const blankLine(Width, ' ');
-
-        for (size_t y = 0; y < Height; ++y) {
-          MoveTo::emit(Coord{0}, Coord{y});
-	  print(blankLine);
-        }
-
-        MoveTo::emit(Coord{0}, Coord{0});
-      }
+      static void emit();
     };
 
     inline static constexpr Clear clear{};
 
 
-    /*
-     * Hide the terminal cursor while drawing.
-     */
     struct Begin: LibraryFunction<Begin, void()> {
-      static void emit() {
-	print("\x1b[?25l");
-      }
+      static void emit();
     };
 
     inline static constexpr Begin begin{};
 
 
-    /*
-     * Restore the cursor and place it below the screen.
-     */
     struct End: LibraryFunction<End, void()> {
-      
-      static void emit() {
-        MoveTo::emit(Coord{0}, Coord{Height});
-	print("\x1b[?25h");
-      }
+      static void emit();
     };
 
     inline static constexpr End end{};
 
   }; // Screen
 
-} // namespace impl
+} // namespace acus::sugar::impl

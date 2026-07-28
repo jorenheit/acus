@@ -112,7 +112,8 @@ namespace acus::sugar {
   struct Array: impl::SugarType, std::array<T, N> {
     using Base = std::array<T, N>;
     using Base::Base;
-
+    static constexpr size_t Size = N;
+    
     constexpr Array() = default;
 
     template <typename... Args> requires (sizeof...(Args) == N && (std::constructible_from<T, Args&&> && ...))
