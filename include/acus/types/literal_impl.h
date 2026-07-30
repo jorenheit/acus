@@ -73,7 +73,7 @@ namespace acus::literal::impl {
   struct string: ArrayLike {
     std::string const _str;
 
-    string(std::string const &s, API_CTX);      
+    string(std::string const &s, size_t capacity, API_CTX);      
     string(string const &other);
     virtual std::string str() const override;      
     virtual BasePtr clone() const override;

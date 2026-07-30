@@ -25,13 +25,13 @@ namespace acus::sugar::impl {
     inline static constexpr Put put{};
 
 
-    template <size_t N>
-    struct Write: LibraryFunction<Write<N>, void(Coord, Coord, String<N>)> {
+    template <concepts::String StringType>
+    struct Write: LibraryFunction<Write<StringType>, void(Coord, Coord, StringType)> {
       static void emit(Expr const &x, Expr const &y, Expr const &text);
     };
 
-    template <size_t N>
-    inline static constexpr Write<N> write{};
+    template <concepts::String StringType>
+    inline static constexpr Write<StringType> write{};
 
 
     struct Clear: LibraryFunction<Clear, void()> {

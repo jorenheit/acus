@@ -59,3 +59,21 @@ namespace acus::sugar::impl {
   }; // Clamp
 
 } // namespace acus::sugar::impl
+
+
+#define ACUS_MATH_IMPL_min   Min
+#define ACUS_MATH_IMPL_max   Max
+#define ACUS_MATH_IMPL_clamp Clamp
+#define ACUS_MATH_IMPL_abs   Abs
+#define ACUS_MATH_IMPL_pow   Pow
+#define ACUS_MATH_IMPL_sqrt  Sqrt
+#define ACUS_MATH_IMPL_log   Log
+#define ACUS_MATH_IMPL_log2  Log
+#define ACUS_MATH_IMPL_log10 Log
+#define ACUS_MATH_IMPL_gcd   Gcd
+
+#define ACUS_MATH_IMPL_EXPAND(name) ACUS_MATH_IMPL_##name
+
+#define MATH_FUNCTION(name, comment, ...)                          \
+  inline impl::ACUS_MATH_IMPL_EXPAND(name)                         \
+  __VA_OPT__(<__VA_ARGS__>) name

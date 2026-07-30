@@ -110,12 +110,23 @@ namespace acus::literal::impl {
   }
 
   // string
-  string::string(std::string const &s, API_CTX):
-    ArrayLike(ts::string(s.length())),
+  string::string(std::string const &s, size_t capacity, API_CTX):
+    ArrayLike(ts::string(capacity)),
     _str(s)
   {
-    for (char c: _str)  (ArrayLike::arr).emplace_back(std::make_shared<u8>(c, API_FWD));
-    (ArrayLike::arr).emplace_back(std::make_shared<u8>(0, API_FWD));
+    API_REQUIRE(s.size() <= capacity,
+		error::ErrorCode::TooManyElementsInArrayInitialization,
+		"string of length ", s.size(),
+		" does not fit in string<", capacity, ">");
+
+    arr.reserve(capacity + 1);
+    for (char c: _str) {
+      (ArrayLike::arr).emplace_back(std::make_shared<u8>(c, API_FWD));
+    }
+    
+    while (arr.size() < capacity + 1) {
+      (ArrayLike::arr).emplace_back(std::make_shared<u8>(0, API_FWD));
+    }
   }
       
   string::string(string const &other):
@@ -140,10 +151,10 @@ namespace acus::literal::impl {
   }
 
   Literal string::element(size_t idx) const {
-    assert(idx < _str.size() + 1);
+    assert(idx < arr.size());
     return arr[idx];
   }
-
+  
   // structT
   structT::structT(types::TypeHandle type, std::unordered_map<std::string, Literal> const &fields, API_CTX):
     Base(type)

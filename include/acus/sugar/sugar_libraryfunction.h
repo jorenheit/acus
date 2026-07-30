@@ -11,7 +11,7 @@ namespace acus::sugar::impl {
   template <typename Derived, typename ReturnType, typename ProvideOutlineVersion, typename ... SignatureArgs>
   struct LibraryFunction<Derived, ReturnType(SignatureArgs...), ProvideOutlineVersion> {
 
-    template <typename T> using ExprArg = Expr const &;
+    template <typename T> using ExprArg = Expr;
 
     static auto operator()(ExprArg<SignatureArgs> ... args, SUGAR_FUNC) {
 

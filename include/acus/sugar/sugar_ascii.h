@@ -42,3 +42,19 @@ namespace acus::sugar::impl {
   }; // ToUpper
 
 } // namespace acus::sugar::impl
+
+
+#define ACUS_ASCII_IMPL_is_digit        IsDigit
+#define ACUS_ASCII_IMPL_is_alpha        IsAlpha
+#define ACUS_ASCII_IMPL_is_alphanumeric IsAlphanumeric
+#define ACUS_ASCII_IMPL_is_lower        IsLower
+#define ACUS_ASCII_IMPL_is_upper        IsUpper
+#define ACUS_ASCII_IMPL_is_whitespace   IsWhitespace
+#define ACUS_ASCII_IMPL_to_lower        ToLower
+#define ACUS_ASCII_IMPL_to_upper        ToUpper
+
+#define ACUS_ASCII_IMPL_EXPAND(name) ACUS_ASCII_IMPL_##name
+
+#define ASCII_FUNCTION(name, comment, ...)                         \
+  inline impl::ACUS_ASCII_IMPL_EXPAND(name)                        \
+  __VA_OPT__(<__VA_ARGS__>) name

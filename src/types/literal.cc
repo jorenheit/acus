@@ -33,9 +33,21 @@ namespace acus::literal {
   
   Literal string(std::string const &str, API_FUNC) {
     API_FUNC_BEGIN_FREE();
-    return Literal { std::make_shared<impl::string>(str, API_FWD) };
+    return Literal { std::make_shared<impl::string>(str, str.size(), API_FWD) };
   }
 
+  Literal string(std::string const &str, size_t capacity, API_FUNC) {
+    API_FUNC_BEGIN_FREE();
+
+    API_REQUIRE(str.size() <= capacity,
+		error::ErrorCode::TooManyElementsInArrayInitialization,
+		"string of length ", str.size(),
+		" does not fit in string<", capacity, ">");
+    
+    
+    return Literal { std::make_shared<impl::string>(str, capacity, API_FWD) };
+  }
+  
   StructLiteralBuilder struct_t(types::TypeHandle structType, API_FUNC) {
     API_FUNC_BEGIN_FREE();
     API_REQUIRE_IS_STRUCT(structType);

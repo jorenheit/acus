@@ -3,22 +3,22 @@
 
 namespace acus::sugar::impl {
 
-  template <size_t MaxSize>
-  void ClearString<MaxSize>::emit(Expr const &str) {
-    str[0] = 0;
-  }
 
-
-  template <concepts::Integer IntType, size_t MaxSize>
-  void StrLen<IntType, MaxSize>::emit(Expr &result, Expr const &str) {
-    result = IntType{0};
+  template <concepts::String StringType>
+  void StrLen<StringType>::emit(Expr &result, Expr const &str) {
+    using SizeType = std::conditional_t<StringType::Size < 256, u8, u16>;
+    result = SizeType{0};
     while_(str[result++] != 0) { };
     --result;
   }
 
 
-  template <size_t DestSize, size_t SrcSize>
-  void AppendString<DestSize, SrcSize>::emit(Expr const &dest, Expr const &src) {
+  template <concepts::String DestString, concepts::String SrcString>
+  void AppendString<DestString, SrcString>::emit(Expr const &dest, Expr const &src) {
+
+    static constexpr size_t DestSize = DestString::Size;
+    static constexpr size_t SrcSize = SrcString::Size;    
+    
     // Find end of dest string
     auto i = let_<u16>(nextVarName()) = 0;
     while_(i <= DestSize) {
@@ -38,19 +38,19 @@ namespace acus::sugar::impl {
   }
 
 
-  template <size_t DestSize, size_t SrcSize>
-  void AppendStringCopy<DestSize, SrcSize>::emit(Expr &result, Expr const &dest,
-                                                 Expr const &src) {
+  template <concepts::String DestString, concepts::String SrcString>
+  void AppendStringCopy<DestString, SrcString>::emit(Expr &result, Expr const &dest,
+						     Expr const &src) {
     result = dest;
-    AppendString<DestSize, SrcSize>::emit(result, src);
+    AppendString<DestString, SrcString>::emit(result, src);
   }
 
 
-  template <size_t MaxSize>
+  template <concepts::String StringType>
   void emitStringLength(Expr &result, Expr const &str) {
     result = 0;
 
-    while_(result <= MaxSize) {
+    while_(result <= StringType::Size) {
       if_(str[result] == 0) {
         break_;
       };
@@ -60,13 +60,14 @@ namespace acus::sugar::impl {
   }
 
 
-  template <size_t LhsSize, size_t RhsSize>
-  void StringCompare<LhsSize, RhsSize>::emit(Expr &result, Expr const &lhs,
-                                             Expr const &rhs) {
+  template <concepts::String Lhs, concepts::String Rhs>
+  void StringCompare<Lhs, Rhs>::emit(Expr &result, Expr const &lhs,
+				     Expr const &rhs) {
+
     result = s8{0};
     auto i = let_<u16>(nextVarName()) = 0;
 
-    while_(i <= LhsSize && i <= RhsSize) {
+    while_(i <= Lhs::Size && i <= Rhs::Size) {
       auto lhsChar = lhs[i];
       auto rhsChar = rhs[i];
 
@@ -89,20 +90,20 @@ namespace acus::sugar::impl {
   }
 
 
-  template <size_t StringSize, size_t PrefixSize>
-  void StartsWith<StringSize, PrefixSize>::emit(Expr &result, Expr const &str,
-                                                Expr const &prefix) {
+  template <concepts::String StringType, concepts::String PrefixStringType>
+  void StartsWith<StringType, PrefixStringType>::emit(Expr &result, Expr const &str,
+						      Expr const &prefix) {
     result = 1;
     auto i = let_<u16>(nextVarName()) = 0;
 
-    while_(i <= PrefixSize) {
+    while_(i <= PrefixStringType::Size) {
       auto prefixChar = prefix[i];
 
       if_(prefixChar == 0) {
         break_;
       };
 
-      if_(i > StringSize) {
+      if_(i > StringType::Size) {
         result = 0;
         break_;
       }
@@ -118,14 +119,14 @@ namespace acus::sugar::impl {
   }
 
 
-  template <size_t StringSize, size_t SuffixSize>
-  void EndsWith<StringSize, SuffixSize>::emit(Expr &result, Expr const &str,
+  template <concepts::String StringType, concepts::String SuffixStringType>
+  void EndsWith<StringType, SuffixStringType>::emit(Expr &result, Expr const &str,
                                               Expr const &suffix) {
     auto strLength = let_<u16>(nextVarName());
     auto suffixLength = let_<u16>(nextVarName());
 
-    emitStringLength<StringSize>(strLength, str);
-    emitStringLength<SuffixSize>(suffixLength, suffix);
+    emitStringLength<StringType>(strLength, str);
+    emitStringLength<SuffixStringType>(suffixLength, suffix);
 
     result = 0;
 
@@ -147,12 +148,12 @@ namespace acus::sugar::impl {
   }
 
 
-  template <size_t StringSize>
-  void FindChar<StringSize>::emit(Expr &result, Expr const &str, Expr const &needle) {
-    result = u16{StringSize + 1};
+  template <concepts::String StringType>
+  void FindChar<StringType>::emit(Expr &result, Expr const &str, Expr const &needle) {
+    result = u16{StringType::Size + 1};
     auto i = let_<u16>(nextVarName()) = 0;
 
-    while_(i <= StringSize) {
+    while_(i <= StringType::Size) {
       auto current = (let_<u8>(nextVarName()) = str[i]);
 
       if_(current == needle) {
@@ -169,16 +170,16 @@ namespace acus::sugar::impl {
   }
 
 
-  template <size_t StringSize, size_t NeedleSize>
-  void FindString<StringSize, NeedleSize>::emit(Expr &result, Expr const &str,
-                                                Expr const &needle) {
+  template <concepts::String StringType, concepts::String NeedleStringType>
+  void FindString<StringType, NeedleStringType>::emit(Expr &result, Expr const &str,
+						      Expr const &needle) {
     auto strLength = let_<u16>(nextVarName());
     auto needleLength = let_<u16>(nextVarName());
 
-    emitStringLength<StringSize>(strLength, str);
-    emitStringLength<NeedleSize>(needleLength, needle);
+    emitStringLength<StringType::Size>(strLength, str);
+    emitStringLength<NeedleStringType::Size>(needleLength, needle);
 
-    result = u16{StringSize + 1};
+    result = u16{StringType::Size + 1};
 
     if_(needleLength == 0) {
       result = 0;
@@ -212,19 +213,19 @@ namespace acus::sugar::impl {
   }
 
 
-  template <size_t StringSize, size_t NeedleSize>
-  void ContainsString<StringSize, NeedleSize>::emit(Expr &result, Expr const &str,
-                                                    Expr const &needle) {
+  template <concepts::String StringType, concepts::String NeedleStringType>
+  void ContainsString<StringType, NeedleStringType>::emit(Expr &result, Expr const &str,
+							  Expr const &needle) {
     auto position = let_<u16>(nextVarName());
-    FindString<StringSize, NeedleSize>::emit(position, str, needle);
+    FindString<StringType, NeedleStringType>::emit(position, str, needle);
 
-    result = position < StringSize;
+    result = position < StringType::Size;
   }
 
 
-  template <concepts::Integer IntType, size_t Base>
+  template <concepts::String StringType, concepts::Integer IntType, size_t Base>
   requires (Base >= 2 && Base <= 36)
-  void IntToString<IntType, Base>::emit(Expr &result, Expr const &val) {
+  void IntToString<StringType, IntType, Base>::emit(Expr &result, Expr const &val) {
     auto bits = (let_<u16>(nextVarName()) = val);
     auto buffer = let_<String<IntType::Bits>>(nextVarName());
     auto count = (let_<u8>(nextVarName()) = 0);
@@ -264,9 +265,9 @@ namespace acus::sugar::impl {
   }
 
 
-  template <concepts::Integer IntType, size_t Base, size_t MaxSize>
+  template <concepts::String StringType, concepts::Integer IntType, size_t Base>
   requires (Base >= 2 && Base <= 36)
-  void StringToInt<IntType, Base, MaxSize>::emit(Expr &result, Expr const &str) {
+  void StringToInt<StringType, IntType, Base>::emit(Expr &result, Expr const &str) {
     result = IntType{0};
     auto index = (let_<u8>(impl::nextVarName()) = 0);
     auto isNegative = (let_<u8>(impl::nextVarName()) = 0);
@@ -288,14 +289,14 @@ namespace acus::sugar::impl {
     }
 
     if constexpr (Base <= 10) {
-      while_(index < MaxSize && ascii::is_digit(str[index])) {
+      while_(index < StringType::Size && ascii::is_digit(str[index])) {
         result *= Base;
         result += str[index] - '0';
         ++index;
       };
     }
     else {
-      while_(index < MaxSize && str[index]) {
+      while_(index < StringType::Size && str[index]) {
         if_(ascii::is_digit(str[index])) {
           result *= Base;
           result += str[index] - '0';

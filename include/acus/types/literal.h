@@ -23,6 +23,7 @@ namespace acus::literal {
   Literal u16(int val, API_FUNC);
   Literal s16(int val, API_FUNC);
   Literal string(std::string const &str, API_FUNC);
+  Literal string(std::string const &str, size_t capacity, API_FUNC);
   Literal function_pointer(types::TypeHandle fType, std::string const &fName, API_FUNC);
 
   StructLiteralBuilder struct_t(types::TypeHandle structType, API_FUNC);

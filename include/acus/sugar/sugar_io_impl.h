@@ -3,10 +3,10 @@
 
 namespace acus::sugar::impl {
 
-  template <size_t MaxSize>
-  void ReadLine<MaxSize>::emit(Expr &result) {
+  template <concepts::String StringType>
+  void ReadLine<StringType>::emit(Expr &result) {
     auto i = (let_<u8>("i") = 0);
-    while_(i < MaxSize) {
+    while_(i < StringType::Size) {
       read(result[i]);
       if_(result[i++] == '\n') { break_; };
     };

@@ -10,7 +10,13 @@
 namespace acus::sugar {
 
   namespace impl {
+
     struct SugarType {};
+    struct StringType: SugarType {};
+    struct ArrayType: SugarType {};
+    struct IntType: SugarType {};
+    struct StructType: SugarType {};
+    struct PointerType: SugarType{};
 
     namespace concepts {
 
@@ -33,7 +39,7 @@ namespace acus::sugar {
     }
 
     template <auto typeFactory, auto literalFactory, size_t Bits_>
-    class Int: public SugarType {
+    class Int: public IntType {
       int x;
     public:
       static constexpr size_t Bits = Bits_;
@@ -44,7 +50,7 @@ namespace acus::sugar {
       Int(Int<tf, lf, Bits> const &other):
 	x(other.getInt())
       {}
-      
+
       static types::IntegerType const *type() { return typeFactory({}); }
       literal::Literal toLiteral() const { return literalFactory(x, {}); }
 
@@ -58,28 +64,65 @@ namespace acus::sugar {
   struct s8:  impl::Int<ts::s8,  literal::s8,  8>  {};
   struct s16: impl::Int<ts::s16, literal::s16, 16> {};
 
-  
-  // String
-  template <size_t N>
-  class String: public impl::SugarType {
-    std::string _str;
-  public:
-    String(std::string const &str): _str(str) {}
-    static types::StringType const *type() { return ts::string(N); }
-    literal::Literal toLiteral() const { return literal::string(_str); }
-  };
 
+  namespace impl {
+
+    // String
+    template <size_t N>
+    class StringBase: public impl::StringType {
+      std::string _str;
+    public:
+      static constexpr size_t Size = N;
+      StringBase() = default;
+      StringBase(std::string const &str): _str(str) {}
+      static types::StringType const *type() { return ts::string(N); }
+      literal::Literal toLiteral() const { return literal::string(_str, N); }    
+    };
+
+    // Array
+    template <impl::concepts::SugarType T, size_t N>
+    class ArrayBase: public impl::ArrayType {
+
+      std::array<T, N> _arr;
+
+    public:
+      using ElementType = T;
+      static constexpr size_t Size = N;
+    
+      constexpr ArrayBase() = default;
+
+      template <typename... Args> requires (sizeof...(Args) == N && (std::constructible_from<T, Args&&> && ...))
+      constexpr ArrayBase(Args&&... args):
+	_arr{ T{std::forward<Args>(args)}... }
+      {}
+    
+      static types::TypeHandle type() {
+	return ts::array(impl::getTypeHandle<T>(), N);
+      }
+
+      literal::Literal toLiteral() const {
+	auto builder = literal::array(type());
+
+	// Initialize fields from the base array
+	[&]<size_t... Is>(std::index_sequence<Is...>) {
+	  (builder.push(_arr[Is].toLiteral()), ...);
+	}(std::make_index_sequence<N>{});
+
+	return builder.done();
+      }    
+    };
+    
+  } // impl
+  
   // Struct
-  template <impl::FixedString Name, typename T> // TODO: concept sugartype
+  template <impl::FixedString Name, impl::concepts::SugarType T>
   struct Field {
-    static_assert(std::is_base_of_v<impl::SugarType, T>,
-		  "Struct-fields can only contain types from the sugar API");
     using type = T;
     static constexpr std::string_view name{ Name.data, sizeof(Name.data) - 1 };
   };
 
   template <impl::FixedString Name, typename ... Fields>
-  struct Struct: impl::SugarType, std::tuple<typename Fields::type ...> {
+  struct Struct: impl::StructType, std::tuple<typename Fields::type ...> {
     using Base = std::tuple<typename Fields::type ...>;
     
     static constexpr std::string_view name{ Name.data, sizeof(Name.data) - 1 };
@@ -108,42 +151,19 @@ namespace acus::sugar {
     
   };
 
-  template <impl::concepts::SugarType T, size_t N>
-  struct Array: impl::SugarType, std::array<T, N> {
-    using Base = std::array<T, N>;
-    using Base::Base;
-    static constexpr size_t Size = N;
-    
-    constexpr Array() = default;
-
-    template <typename... Args> requires (sizeof...(Args) == N && (std::constructible_from<T, Args&&> && ...))
-    constexpr Array(Args&&... args):
-      Base{ T{std::forward<Args>(args)}... }
-    {}
-    
-    static types::TypeHandle type() {
-      return ts::array(impl::getTypeHandle<T>(), N);
-    }
-    
-    literal::Literal toLiteral() const {
-      auto builder = literal::array(type());
-
-      // Initialize fields from the base array
-      [&]<size_t... Is>(std::index_sequence<Is...>) {
-	(builder.push((*this)[Is].toLiteral()), ...);
-      }(std::make_index_sequence<N>{});
-      
-      return builder.done();
-    }
-  };
-
 
   template <impl::concepts::SugarType T>
-  struct Ptr: impl::SugarType {
+  struct Ptr: impl::PointerType {
     static types::TypeHandle type() {
       return ts::pointer(impl::getTypeHandle<T>());
     }
   };
+
+
+  struct Expr;
+
+  template <size_t N> struct String;
+  template <typename T, size_t N> struct Array;
 
 
   
@@ -154,23 +174,22 @@ namespace acus::sugar {
     inline constexpr bool IsOneOf = (std::is_same_v<std::remove_cvref_t<T>, U> || ...);
 
     template <typename T>
-    struct IsArray: std::false_type {};
+    struct IsStringType: std::false_type {};
+
+    template <size_t N>
+    struct IsStringType<sugar::String<N>>: std::true_type {};
+    
+    template <typename T>
+    struct IsArrayType: std::false_type {};
 
     template <typename T, size_t N>
-    struct IsArray<sugar::Array<T, N>>: std::true_type {};
+    struct IsArrayType<sugar::Array<T, N>>: std::true_type {};
     
     template <typename T>
-    struct IsString: std::false_type {};
-    
-    template <size_t N>
-    struct IsString<String<N>>: std::true_type {};
-
+    struct IsPointerType: std::false_type {};
 
     template <typename T>
-    struct IsPointer: std::false_type {};
-
-    template <typename T>
-    struct IsPointer<Ptr<T>>: std::true_type {};
+    struct IsPointerType<Ptr<T>>: std::true_type {};
 
     // Concepts
     template <typename T>
@@ -183,15 +202,53 @@ namespace acus::sugar {
     concept SignedInteger = IsOneOf<T, s8, s16>;
     
     template <typename T>
-    concept Pointer = IsPointer<std::remove_cvref_t<T>>::value;
+    concept Pointer = IsPointerType<std::remove_cvref_t<T>>::value;
 
     template <typename T>
-    concept Array = IsArray<std::remove_cvref_t<T>>::value;
+    concept Array = IsArrayType<std::remove_cvref_t<T>>::value;
 
     template <typename T>
-    concept String = IsString<std::remove_cvref_t<T>>::value;
+    concept String = IsStringType<std::remove_cvref_t<T>>::value;
+    
   } // concepts
 
-} // sugar
 
+  // Operators
+  namespace impl::operations {
+    template <typename T, typename U = T> struct Assign;    
+    template <typename T, typename U = T> struct Less;
+    template <typename T, typename U = T> struct Greater;
+    template <typename T, typename U = T> struct Equal;
+    template <typename T> struct Clear;
+  }
+
+  namespace impl::concepts {
+
+    template <template <typename, typename> typename Op, typename Ret, typename T, typename U>
+    concept SupportsBinaryOperation = requires(Expr lhs, Expr rhs) {
+      { Op<std::remove_cvref_t<T>, std::remove_cvref_t<U>>::apply(lhs, rhs) } -> std::convertible_to<Ret>;
+    };
+
+    template <template <typename> typename Op, typename Ret, typename T>
+    concept SupportsUnaryOperation = requires(Expr expr) {
+      { Op<std::remove_cvref_t<T>>::apply(expr) } -> std::convertible_to<Ret>;
+    };
+    
+    template <typename T, typename U = T>
+    concept EqualComparable = SupportsBinaryOperation<operations::Equal, Expr, T, U>;
+    
+    template <typename T, typename U = T>
+    concept LessComparable = SupportsBinaryOperation<operations::Less, Expr, T, U>;
+
+    template <typename T, typename U = T>
+    concept GreaterComparable = SupportsBinaryOperation<operations::Greater, Expr, T, U>;
+    
+    template <typename T, typename U = T>
+    concept Assignable = SupportsBinaryOperation<operations::Assign, Expr, T, U>;
+
+    template <typename T>
+    concept Clearable = SupportsUnaryOperation<operations::Clear, void, T>;
+        
+  } // concepts
   
+} // sugar

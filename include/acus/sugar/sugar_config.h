@@ -10,38 +10,38 @@ namespace config {
 
   namespace array {
 
-    template <typename T, size_t N>
-    inline constexpr bool UnrollFill = (N <= LoopUnrollLimit);
+    template <typename T>
+    inline constexpr bool UnrollFill = (T::Size <= LoopUnrollLimit);
 
-    template <typename T, size_t N>
-    inline constexpr bool UnrollFind = (N <= LoopUnrollLimit);
+    template <typename T>
+    inline constexpr bool UnrollFind = (T::Size <= LoopUnrollLimit);
 
-    template <typename T, size_t N>
-    inline constexpr bool UnrollContains = (N <= LoopUnrollLimit);
+    template <typename T>
+    inline constexpr bool UnrollContains = (T::Size <= LoopUnrollLimit);
       
-    template <typename T, size_t N>
-    inline constexpr bool UnrollEqual = (N <= LoopUnrollLimit);
+    template <typename T>
+    inline constexpr bool UnrollEqual = (T::Size <= LoopUnrollLimit);
 
-    template <typename T, size_t N>
-    inline constexpr bool UnrollClear = (N <= LoopUnrollLimit);
+    template <typename T>
+    inline constexpr bool UnrollClear = (T::Size <= LoopUnrollLimit);
 
-    template <typename T, size_t N>
-    inline constexpr bool UnrollSum = (N <= LoopUnrollLimit);
+    template <typename T>
+    inline constexpr bool UnrollSum = (T::Size <= LoopUnrollLimit);
 
-    template <typename T, size_t N>
-    inline constexpr bool UnrollMinMax = (N <= LoopUnrollLimit);
+    template <typename T>
+    inline constexpr bool UnrollMinMax = (T::Size <= LoopUnrollLimit);
 
-    template <typename T, size_t N>
-    inline constexpr bool UnrollMinMaxIndex = (N <= LoopUnrollLimit);
+    template <typename T>
+    inline constexpr bool UnrollMinMaxIndex = (T::Size <= LoopUnrollLimit);
 
-    template <typename T, size_t N>
-    inline constexpr bool UnrollCount = (N <= LoopUnrollLimit);
+    template <typename T>
+    inline constexpr bool UnrollCount = (T::Size <= LoopUnrollLimit);
 
-    template <typename T, size_t N>
-    inline constexpr bool UnrollSort = (N <= 5);
+    template <typename T>
+    inline constexpr bool UnrollSort = (T::Size <= 5);
 
-    template <typename T, size_t N>
-    inline constexpr bool UnrollIsSorted = (N <= LoopUnrollLimit);
+    template <typename T>
+    inline constexpr bool UnrollIsSorted = (T::Size <= LoopUnrollLimit);
 
     
   }

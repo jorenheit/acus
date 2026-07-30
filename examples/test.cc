@@ -5,10 +5,10 @@
 
 #include <iostream>
 #include "acus/assembler/assembler.h"
-#include "acus/sugar/sugar.h"
 
 #define ACUS_SUGAR_LOOP_UNROLL_LIMIT 10
-#include "acus/sugar/sugar_std.h"
+#include "acus/sugar/sugar.h"
+
 using namespace acus;
 using namespace sugar;
 using namespace sugar::io;
@@ -262,10 +262,11 @@ int main() try {
   program_("io");
   {
 
+    using MyString = String<10>;
     function_<void()>("main") | define {
       print("Enter your name: ");
 
-      auto name = let_<String<20>>("name") = io::read_line<10>();
+      auto name = let_<String<20>>("name") = io::read_line<MyString>();
 		      
       print("Hello, ");
       print(name);
@@ -279,13 +280,15 @@ int main() try {
 
   program_("echo");
   {
-    auto read_line = io::read_line<20>.outline();
-    auto strlen = string::strlen<u8, 20>.outline();
+    using MyString = String<20>;
+    
+    auto read_line = io::read_line<MyString>.outline();
+    auto strlen = MyString::length.outline();
     
     function_<void()>("main") | define {
       let_<u8>("x") = 1;
       println("Hello?");
-      auto line = io::read_line<20>();
+      auto line = read_line();
       println(line);
       println(strlen(line));
       return_;
@@ -297,14 +300,16 @@ int main() try {
 
   program_("str2int");
   {
-    auto read_line = io::read_line<16>.outline();
-    auto str2int = string::string_to_int<u16, 36>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<u16>.outline();
     
     main_() {
       print("Enter a number: ");
       auto line = read_line();
       let_<u16>("val") = str2int(line);
       println(var_("val"));
+      println(MyString::to_int<u8>("123"));      
       return_;
     };
     
@@ -313,16 +318,17 @@ int main() try {
 
   program_("int2str");
   {
-    auto read_line = io::read_line<16>.outline();
-    auto str2int = string::string_to_int<u16, 10>.outline();    
-    auto int_to_string = string::int_to_string<u16, 16>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto int2str   = string::from_int<u16>.outline();
+    auto str2int = MyString::to_int<u16>.outline();
     
     main_() {
       print("Enter a number: ");
       auto line = read_line();
       let_<u16>("val") = str2int(line);
       println(var_("val"));
-      println(int_to_string(var_("val")));
+      println(int2str(var_("val")));
       return_;
     };
     
@@ -332,8 +338,9 @@ int main() try {
   
   program_("pow");
   {
-    auto read_line = io::read_line<16>.outline();
-    auto str2int = string::string_to_int<s16>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<s16>.outline();
     auto pow = math::pow<s16>;
     
     function_<void()>("main") | define {
@@ -355,8 +362,9 @@ int main() try {
 
   program_("abs");
   {
-    auto read_line = io::read_line<16>.outline();
-    auto str2int = string::string_to_int<s16>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<s16>.outline();
     auto abs = math::abs<s16>;
     
     function_<void()>("main") | define {
@@ -372,8 +380,9 @@ int main() try {
   
   program_("sqrt");
   {
-    auto read_line = io::read_line<16>.outline();
-    auto str2int = string::string_to_int<s16>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<s16>.outline();
     auto sqrt = math::sqrt<s16>;
     
     function_<void()>("main") | define {
@@ -390,8 +399,9 @@ int main() try {
 
   program_("log");
   {
-    auto read_line = io::read_line<16>.outline();
-    auto str2int = string::string_to_int<u16>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<u16>.outline();
     auto log2 = math::log2<u16>;
     
     function_<void()>("main") | define {
@@ -408,8 +418,9 @@ int main() try {
   program_("minmax");
   
   {
-    auto read_line = io::read_line<16>.outline();
-    auto str2int = string::string_to_int<u16>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<u16>.outline();
     auto min = math::min<u16>;
     auto max = math::max<u16>;
     
@@ -434,8 +445,9 @@ int main() try {
 
   program_("clamp");
   {
-    auto read_line = io::read_line<16>.outline();
-    auto str2int = string::string_to_int<u16>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<u16>.outline();
     auto clamp = math::clamp<u16>;
     
     function_<void()>("main") | define {
@@ -459,8 +471,9 @@ int main() try {
 
   program_("gcd");
   {
-    auto read_line = io::read_line<16>.outline();
-    auto str2int = string::string_to_int<u16>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<u16>.outline();
     auto gcd = math::gcd<u16>;
     
     function_<void()>("main") | define {
@@ -483,7 +496,8 @@ int main() try {
 
   program_("isDigit");
   {
-    auto read_line = io::read_line<20>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
     auto is_digit = ascii::is_digit;
     
     function_<void()>("main") | define {
@@ -504,7 +518,8 @@ int main() try {
 
   program_("isAlpha");
   {
-    auto read_line = io::read_line<20>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
     auto isAlpha = ascii::is_alpha;
     
     function_<void()>("main") | define {
@@ -526,15 +541,17 @@ int main() try {
 
   program_("upperlower");
   {
-    auto read_line = io::read_line<20>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<u16>.outline();
     auto toUpper = ascii::to_upper.outline();
     auto toLower = ascii::to_lower.outline();
-    auto strlen = string::strlen<u8, 20>.outline();
+    auto strlen = MyString::length.outline();
     
     main_() {
       print("> ");
 
-      auto line = (let_<String<20>>("line") = read_line());
+      auto line = (let_<MyString>("line") = read_line());
       auto len = let_<u8>("len") = strlen(line);
       for_(let_<u8>("i") = 0, var_("i") != len, ++var_("i")) {
 	put(toLower(line[var_("i")]));
@@ -550,18 +567,20 @@ int main() try {
 
   program_("strings");
   {
-    auto read_line = io::read_line<20>.outline();
-    auto clear = string::clear<20>;
-    auto fun = string::find_char<20>;
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<u16>.outline();
+    auto clear = algorithm::clear<MyString>;
+    auto find_char = MyString::find_char.outline();
     
     main_() {
       print("String 1: ");
-      auto str1 = (let_<String<20>>("str1") = read_line());
+      auto str1 = (let_<MyString>("str1") = read_line());
 
       print("String 2: ");
-      auto str2 = (let_<String<20>>("str2") = read_line());
+      auto str2 = (let_<MyString>("str2") = read_line());
 
-      println(fun(str1, str2[0]));
+      println(find_char(str1, str2[0]));
       return_;
     };
     
@@ -571,7 +590,8 @@ int main() try {
   
   program_("isAlnum");
   {
-    auto read_line = io::read_line<20>.outline();
+    using MyString = String<20>;
+    auto read_line = io::read_line<MyString>.outline();
     auto isAlnum = ascii::is_alphanumeric.outline();
     
     main_() {
@@ -592,8 +612,9 @@ int main() try {
 
   program_("screen");
   {
+    using MyString = String<5>;
     using Screen = ansi::Screen<50, 50>;
-    auto read_line = io::read_line<5>;
+    auto read_line = io::read_line<MyString>.outline();    
     
     function_<void()>("main") | define {
 
@@ -628,14 +649,16 @@ int main() try {
 
   program_("arrays");
   {
-    using Vec = Array<u16, 10>;
+    using MyString = String<10>;
+    using Vec = Array<MyString, 5>;
+    using Mat = Array<Vec, 3>;
     
-    auto read_line = io::read_line<16>.outline();
-    auto str2int = string::string_to_int<u16>.outline();
-    auto fill = array::fill<u16, Vec::Size>;
-    auto clear = array::clear<u16, Vec::Size>;
-    auto find = array::find<u16, Vec::Size>;
-    auto sort = array::sort<u16, Vec::Size>;
+    auto read_line = io::read_line<MyString>.outline();
+    auto fill_vec = Vec::fill;
+    auto sort_vec = Vec::sort;
+    auto vec_contains = Vec::contains;
+    auto clear_vec = algorithm::clear<Vec>;
+    auto clear_mat = algorithm::clear<Mat>;
 
     auto print_array = function_<void(Vec)>("print_array", "arr")  | define {
       print('[');
@@ -649,24 +672,103 @@ int main() try {
       return_;
     };
 
+
+    auto print_array2 = function_<void(Mat)>("print_array2", "arr")  | define {
+      println('[');
+      for (size_t i = 0; i != Mat::Size; ++i) {
+	print("  ");
+	print_array(var_("arr")[i]);
+      }
+      println(']');
+      return_;
+    };
+
+    
     main_() {
-      print("x = ");
-      let_<u16>("x") = str2int(read_line());
-
+      print("Enter 5 strings: ");
       let_<Vec>("vec");
-      fill(var_("vec"), var_("x"));
-      var_("vec")[3] = 69;
+      for (size_t i = 0; i != Vec::Size; ++i) {
+	var_("vec")[i] = read_line();
+      }
 
-      print_array(var_("vec"));
-      println(find(var_("vec"), 69));
-      sort(var_("vec"));
-      print_array(var_("vec"));      
+      let_<Mat>("mat");
+      for (size_t i = 0; i != Mat::Size; ++i) {
+	var_("mat")[i] = var_("vec");
+      }
+
+      print("First string starts with 'al': ");
+      println(MyString::starts_with<MyString>(var_("vec")[0], "al"));
+      print_array2(var_("mat"));
+      sort_vec(var_("mat")[0]);
+      print_array2(var_("mat"));
+      clear_mat(var_("mat"));
+      print_array2(var_("mat"));
+      
       return_;
     };
   }
   endProgram();
+
+
+  program_("structs");
+  {
+    using MyString = String<10>;
+    using Person = Struct<"Person",
+      Field<"name", MyString>,
+      Field<"age", u8>
+      >;
+    using PersonArray = Array<Person, 5>;
   
-  std::cout << generateBrainfuck("arrays");
+    auto read_line = io::read_line<MyString>.outline();
+    auto str2int = MyString::to_int<u8>.outline();
+    auto clear = algorithm::clear<PersonArray>;
+    auto find = PersonArray::find.outline();
+
+    auto print_person = function_<void(Person)>("print_person", "person")  | define {
+      print('{');
+      print(var_("person").field("name"));
+      print(", ");
+      print(var_("person").field("age"));
+      println('}');
+      return_;
+    };
+    
+    auto print_array = function_<void(PersonArray)>("print_array", "arr")  | define {
+      println('[');
+      for (size_t i = 0; i != PersonArray::Size; ++i) {
+	print("  ");
+	print_person(var_("arr")[i]);
+      }
+      println(']');
+      return_;
+    };
+
+    
+    main_() {
+      let_<PersonArray>("arr");
+      let_<Person>("person");
+      print("Enter name: ");
+      var_("person").field("name") = read_line();
+      print("Enter age: ");
+      var_("person").field("age") = str2int(read_line());
+
+      for (int i = 0; i != PersonArray::Size; ++i) {
+	var_("arr")[i] = var_("person");
+      }
+
+      var_("arr")[0].field("name") = "pinda";
+
+      print_array(var_("arr"));
+      println(find(var_("arr"), var_("person")));
+      clear(var_("arr"));
+      print_array(var_("arr"));
+      return_;
+    };
+  }
+  endProgram();
+
+  
+  std::cout << generateBrainfuck("str2int");
   
  } catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

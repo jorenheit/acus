@@ -22,9 +22,9 @@ namespace acus::sugar::impl {
 
 
   template <size_t Width, size_t Height, size_t Left, size_t Top>
-  template <size_t N>
-  void Screen<Width, Height, Left, Top>::Write<N>::emit(Expr const &x, Expr const &y,
-                                                        Expr const &text) {
+  template <concepts::String StringType>
+  void Screen<Width, Height, Left, Top>::Write<StringType>::emit(Expr const &x, Expr const &y,
+								 Expr const &text) {
     MoveTo::emit(x, y);
     print(text);
   }
