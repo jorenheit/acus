@@ -1,0 +1,28 @@
+function_<void()>("main") | define {
+  let_<u8>("value") = 7;
+
+  if_(var_("value") < 10) {
+    println("value is small");
+  } else_ {
+    println("value is large");
+  };
+
+  // Print odd numbers below 10, but stop before 9.
+  for_(let_<u8>("i") = 0, var_("i") < 10, ++var_("i")) {
+    if_(var_("i") % 2 == 0) {
+      continue_;
+    };
+    if_(var_("i") == 9) {
+      break_;
+    };
+    println(var_("i"));
+  };
+
+  let_<u8>("countdown") = 3;
+  while_(var_("countdown") > 0) {
+    println(var_("countdown"));
+    --var_("countdown");
+  };
+
+  return_;
+};

@@ -1,0 +1,21 @@
+global_<u16>("calls");
+global_<String<16>>("message");
+
+auto greet = function_<void()>("greet") | declare;
+
+function_<void()>("main") | define {
+  var_("calls") = 0;
+  var_("message") = "Hello, world!";
+
+  greet();
+  greet();
+  println(var_("calls"));
+
+  return_;
+};
+
+function_<void()>("greet") | define {
+  ++var_("calls");
+  println(var_("message"));
+  return_;
+};

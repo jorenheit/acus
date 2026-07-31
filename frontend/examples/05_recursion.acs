@@ -1,0 +1,16 @@
+auto fibonacci = function_<u16(u8)>("fibonacci") | declare;
+
+function_<void()>("main") | define {
+  for_(let_<u8>("i") = 0, var_("i") < 10, ++var_("i")) {
+    println(fibonacci(var_("i")));
+  };
+  return_;
+};
+
+function_<u16(u8)>("fibonacci", "n") | define {
+  if_(var_("n") < 2) {
+    return_(var_("n"));
+  } else_ {
+    return_(fibonacci(var_("n") - 1) + fibonacci(var_("n") - 2));
+  };
+};

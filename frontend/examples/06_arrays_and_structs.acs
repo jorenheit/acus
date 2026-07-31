@@ -1,0 +1,48 @@
+// Define an array-type
+using Values = Array<u8, 5>;
+
+// Define a structure containing 2 fields
+using Point = Struct<"Point",
+  Field<"x", u8>,
+  Field<"y", u8>
+>;
+
+// Function that takes the array
+auto print_array = function_<void(Values)>("print_array", "arr") | define {
+  auto arr = var_("arr");
+  print('[');
+  for_(let_<u8>("i") = 0, var_("i") < 5, ++var_("i")) {
+    print(arr[var_("i")]);
+    if_(var_("i") < 4) { print(", "); };
+  };
+  println(']');
+  return_;
+};
+
+// Function that takes the Point-type
+auto print_point = function_<void(Point)>("print_point", "p") | define {
+  auto p = var_("p");
+  print('{');
+  print(p.field("x"));
+  print(", ");
+  print(p.field("y"));
+  println('}');
+  return_;
+};
+
+// Main
+function_<void()>("main") | define {
+  let_<Point>("point") = Point{3, 4};
+  let_<Values>("values") = Values{2, 4, 6, 8, 10};
+
+  auto p = var_("point");
+  p.field("x") += 10;
+  print_point(p);
+
+  auto arr = var_("values");
+  arr[2] = 42;
+  print_array(arr);
+
+  return_;
+};
+

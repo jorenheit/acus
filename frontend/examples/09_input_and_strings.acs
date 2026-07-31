@@ -1,0 +1,19 @@
+// outline() emits reusable Acus functions instead of inlining the algorithms
+// at every call site.
+
+auto readLine20 = io::read_line<20>.outline();
+auto strlen20 = string::strlen<u8, 20>.outline();
+
+function_<void()>("main") | define {
+  print("What is your name? ");
+  auto name = readLine20();
+
+  print("Hello, ");
+  println(name);
+
+  print("Your name has ");
+  print(strlen20(name));
+  println(" characters.");
+
+  return_;
+};

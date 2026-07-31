@@ -1,0 +1,5 @@
+// A .acs file normally contains the contents of the Acus program scope.
+function_<void()>("main") | define {
+  println("Hello from Acus sugar!");
+  return_;
+};

@@ -1,0 +1,97 @@
+// Sieve of Eratosthenes
+// Asks for N and prints all prime numbers up to and including N.
+
+constexpr size_t MinLimit = 2;
+constexpr size_t MaxLimit = 100;
+
+using Input = String<3>;
+using Flags = Array<u8, MaxLimit + 1>;
+
+auto read_line = io::read_line<Input>.outline();
+auto to_int = Input::to_int<u8>.outline();
+
+
+auto read_limit = function_<u8()>("read_limit") | define {
+  auto n = let_<u8>("n");
+  auto valid = (let_<u8>("valid") = 0);
+
+  while_(!valid) {
+    print("Find primes up to N (2-100): ");
+    n = to_int(read_line());
+
+    if_(n < MinLimit) {
+      println("N must be at least 2.");
+    }
+    else_ {
+      if_(n > MaxLimit) {
+        println("N must not exceed 100.");
+      }
+      else_ {
+        valid = 1;
+      };
+    };
+  };
+
+   return_(n);
+};
+
+
+auto make_sieve = function_<Flags(u8)>("make_sieve", "n") | define {
+  auto n = var_("n");
+  auto is_prime = let_<Flags>("is_prime");
+
+  // Initially assume that every number is prime.
+  Flags::fill(is_prime, 1);
+  is_prime[0] = 0;
+  is_prime[1] = 0;
+
+  // Strike out the multiples of every remaining prime.
+  auto prime = (let_<u8>("prime") = 2);
+
+  while_(prime * prime <= n) {
+    if_(is_prime[prime]) {
+      auto multiple = (let_<u8>("multiple") = prime * prime);
+
+      while_(multiple <= n) {
+        is_prime[multiple] = 0;
+        multiple += prime;
+      };
+    };
+
+    ++prime;
+  };
+
+  return_(is_prime);
+};
+
+
+auto print_primes =
+  function_<void(Flags, u8)>("print_primes", "is_prime", "n") | define {
+    auto is_prime = var_("is_prime");
+    auto n = var_("n");
+
+    println("Prime numbers:");
+
+    auto number = (let_<u8>("number") = 2);
+
+    while_(number <= n) {
+      if_(is_prime[number]) {
+        print(number);
+        print(' ');
+      };
+
+      ++number;
+    };
+
+    println();
+    return_;
+  };
+
+
+main_() {
+  auto n = (let_<u8>("n") = read_limit());
+  auto is_prime = (let_<Flags>("is_prime") = make_sieve(n));
+
+  print_primes(is_prime, n);
+  return_;
+};

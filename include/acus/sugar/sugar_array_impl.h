@@ -15,7 +15,7 @@ namespace acus::sugar::impl {
       using IndexType = ArrayIndexType<ArrayType>;
       auto i = (let_<IndexType>(nextVarName()) = 0);
       while_(i < ArrayType::Size) {
-	operations::Assign<ElementType>::apply(arr[i++] = val);
+	operations::Assign<ElementType>::apply(arr[i++], val);
       };
     }
   }

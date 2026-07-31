@@ -1,0 +1,21 @@
+function_<void()>("main") | define {
+  // Acus provides signed and unsigned 8- and 16-bit integers.
+  let_<u8>("small") = 12;
+  let_<s8>("temperature") = s8{-7};
+  let_<u16>("wide") = var_("small").cast<u16>() * 100;
+
+  println(var_("small") + 3);
+  println(var_("temperature") - s8{5});
+  println(var_("wide") / 4);
+  println(var_("wide") % 7);
+
+  var_("small") += 10;
+  var_("small") *= 2;
+  println(var_("small"));
+
+  // Comparisons and logical operators produce Boolean values.
+  println((var_("small") > 20) && (var_("temperature") < s8{0}));
+  println((var_("small") == 44) || (var_("wide") == 0));
+
+  return_;
+};

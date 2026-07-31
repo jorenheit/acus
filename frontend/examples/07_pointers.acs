@@ -1,0 +1,22 @@
+using Values = Array<u8, 5>;
+
+auto setValue = function_<void(Ptr<u8>, u8)>("setValue") | declare;
+
+function_<void()>("main") | define {
+  let_<Values>("values") = Values{1, 2, 3, 4, 5};
+
+  setValue(&var_("values")[2], 99);
+
+  let_<Ptr<u8>>("p") = &var_("values")[0];
+  for_(let_<u8>("i") = 0, var_("i") < 5, ++var_("i")) {
+    println(*var_("p"));
+    ++var_("p");
+  };
+
+  return_;
+};
+
+function_<void(Ptr<u8>, u8)>("setValue", "target", "value") | define {
+  *var_("target") = var_("value");
+  return_;
+};

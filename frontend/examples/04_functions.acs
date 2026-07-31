@@ -1,0 +1,20 @@
+// Declare a function before main so it can be called before its definition.
+auto square = function_<u16(u8)>("square") | declare;
+auto printRange = function_<void(u8, u8)>("printRange") | declare;
+
+function_<void()>("main") | define {
+  println(square(12));
+  printRange(3, 7);
+  return_;
+};
+
+function_<u16(u8)>("square", "x") | define {
+  return_(var_("x").cast<u16>() * var_("x"));
+};
+
+function_<void(u8, u8)>("printRange", "first", "last") | define {
+  for_(let_<u8>("i") = var_("first"), var_("i") <= var_("last"), ++var_("i")) {
+    println(var_("i"));
+  };
+  return_;
+};
