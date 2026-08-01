@@ -22,10 +22,10 @@ constexpr int EscapeRadiusSquared = 4 * Scale;
 using Screen = ansi::Screen<ImageWidth, ScreenHeight>;
 using Palette = String<10>;
 
-auto screen_begin = Screen::begin.outline();
+auto screen_begin = Screen::begin;
+auto screen_end = Screen::end;
 auto screen_clear = Screen::clear.outline();
 auto screen_move_to = Screen::move_to.outline();
-auto screen_end = Screen::end.outline();
 
 
 auto map_x = function_<s16(u8)>("map_x", "column") | define {

@@ -9,13 +9,15 @@ Acus Sugar is a layer of syntactic sugar sprinkled on top of the Acus API. It pr
 > [!NOTE]
 > Acus Sugar is under active development. The syntax and standard-library API may still change.
 
+## Learn By Example
+Prefer learning by example? Skip to [the list of full examples below](#full-examples).
+
 ## Minimal C++ example
 
 Include the Sugar umbrella header, then import the Sugar namespace:
 
 ```cpp
 #include <iostream>
-
 #include <acus/sugar/sugar.h>
 
 using namespace acus::sugar;
@@ -65,6 +67,9 @@ acs hello.acs -o hello.bf
 
 ### Basic structure
 
+>[!NOTE]
+>These steps are added automatically when using `acs`.
+
 A program is opened with `program_()` and finalized with `endProgram()`:
 
 ```cpp
@@ -80,8 +85,6 @@ The second argument names the entry function and defaults to `"main"`. After the
 ```cpp
 std::string bf = generateBrainfuck("example");
 ```
-
-These surrounding steps are added automatically when using `acs`.
 
 ### Defining and declaring functions
 
@@ -406,19 +409,19 @@ Library functions are stateless callable objects. Operations that naturally belo
 ```cpp
 using Line = String<40>;
 ...
-let<u8>("len") = Line::length(var_("line"));
-let<u8>("pos") = Line::find_char(var_("line"), ':');
+let_<u8>("len") = Line::length(var_("line"));
+let_<u8>("pos") = Line::find_char(var_("line"), ':');
 
 using Lines = Array<Line, 5>;
 ...
-let<u8>("x") = Lines::contains(var_("lines"), var_("line"));
+let_<u8>("x") = Lines::contains(var_("lines"), var_("line"));
 ```
 Free-standing operations remain grouped into namespaces such as `io`, `algorithm`, `ascii`, `string`, `math` and `ansi`:
 
 ```cpp
-using Line = String<40>
-let<Line>("line") = io::read_line<Line>();
-let<u16>("x") = math::sqrt<u16>(value);
+using Line = String<40>;
+let_<Line>("line") = io::read_line<Line>();
+let_<u16>("x") = math::sqrt<u16>(value);
 ```
 
 A returned `Expr` can be stored in a normal C++ variable. That variable is only a handle to the generated Acus expression or storage:
@@ -494,14 +497,17 @@ algorithm::clear<People>(people);
 
 Unless marked **inline-only**, a function can also be used through `.outline()`.
 
-#### General algorithms
+<details>
+<summary><strong>General Algorithms</strong></summary>
 
 | Function              | Signature        | Description                                                                     | Use         |
 |-----------------------|------------------|---------------------------------------------------------------------------------|-------------|
 | `algorithm::clear<T>` | `(T) -> void`    | Clears a value according to its type. Works recursively for arrays and structs. | Inline-only |
 | `algorithm::swap<T>`  | `(T, T) -> void` | Exchanges two assignable values.                                                | Inline-only |
 
-#### Input
+</details>
+
+<details> <summary><strong>Input</strong></summary>
 
 | Function                    | Signature          | Description                                                | Use                |
 |-----------------------------|--------------------|------------------------------------------------------------|--------------------|
@@ -513,8 +519,10 @@ For example:
 using Line = String<80>;
 auto read_line = io::read_line<Line>.outline();
 ```
+</details>
 
-#### ASCII
+
+<details> <summary><strong>ASCII</strong></summary>
 
 | Function                 | Signature    | Description                                                                       |
 |--------------------------|--------------|-----------------------------------------------------------------------------------|
@@ -528,9 +536,11 @@ auto read_line = io::read_line<Line>.outline();
 | `ascii::to_upper`        | `(u8) -> u8` | Converts a lowercase ASCII letter to uppercase and leaves other bytes unchanged.  |
 
 All ASCII functions can be used inline or outlined.
+</details>
 
-#### String members
+<details> <summary><strong>Strings</strong></summary>
 
+#### String<N> members
 For a concrete type such as:
 
 ```cpp
@@ -540,17 +550,17 @@ using Word = String<10>;
 
 the following library objects are available on `Text`:
 
-| Function                      | Signature                 | Description                                                                  | Use                |
-|-------------------------------|---------------------------|------------------------------------------------------------------------------|--------------------|
-| `Text::length`                | `(Text) -> u8/u16`        | Returns the number of characters before the null terminator.                 | Inline or outlined |
-| `Text::find_char`             | `(Text, u8) -> u8/u16`    | Returns the first matching character index, or `Text::Size` when absent.     | Inline or outlined |
-| `Text::starts_with<Other>`    | `(Text, Other) -> u8`     | Tests whether the string begins with another string.                         | Inline or outlined |
-| `Text::ends_with<Other>`      | `(Text, Other) -> u8`     | Tests whether the string ends with another string.                           | Inline or outlined |
-| `Text::find_str<Other>`       | `(Text, Other) -> u8/u16` | Returns the first matching substring index, or `Text::Size` when absent.     | Inline or outlined |
-| `Text::contains<Other>`       | `(Text, Other) -> u8`     | Tests whether another string occurs within the string.                       | Inline or outlined |
-| `Text::append_to_copy<Other>` | `(Text, Other) -> Text`   | Returns a copy with as much of the second string appended as fits.           | Inline or outlined |
-| `Text::to_int<Int, Base>`     | `(Text) -> Int`           | Parses an integer in base 2 through 36, stopping at the first invalid digit. | Inline or outlined |
-| `Text::append<Other>`         | `(Text, Other) -> void`   | Appends in place, truncating at the destination capacity.                    | Inline-only        |
+| Function                           | Signature                      | Description                                                                  | Use                |
+|------------------------------------|--------------------------------|------------------------------------------------------------------------------|--------------------|
+| `String<N>::length`                | `(String<N>) -> u8/u16`        | Returns the number of characters before the null terminator.                 | Inline or outlined |
+| `String<N>::find_char`             | `(String<N>, u8) -> u8/u16`    | Returns the first matching character index, or `Text::Size` when absent.     | Inline or outlined |
+| `String<N>::starts_with<Other>`    | `(String<N>, Other) -> u8`     | Tests whether the string begins with another string.                         | Inline or outlined |
+| `String<N>::ends_with<Other>`      | `(String<N>, Other) -> u8`     | Tests whether the string ends with another string.                           | Inline or outlined |
+| `String<N>::find_str<Other>`       | `(String<N>, Other) -> u8/u16` | Returns the first matching substring index, or `Text::Size` when absent.     | Inline or outlined |
+| `String<N>::contains<Other>`       | `(String<N>, Other) -> u8`     | Tests whether another string occurs within the string.                       | Inline or outlined |
+| `String<N>::append_to_copy<Other>` | `(String<N>, Other) -> Text`   | Returns a copy with as much of the second string appended as fits.           | Inline or outlined |
+| `String<N>::to_int<Int, Base>`     | `(String<N>) -> Int`           | Parses an integer in base 2 through 36, stopping at the first invalid digit. | Inline or outlined |
+| `String<N>::append<Other>`         | `(String<N>, Other) -> void`   | Appends in place, truncating at the destination capacity.                    | Inline-only        |
 
 Examples:
 
@@ -578,9 +588,9 @@ Functions for which neither string is a natural receiver, or which construct a n
 auto order = string::compare<String<10>, String<20>>(lhs, rhs);
 auto format_hex = string::from_int<u16, 16>.outline();
 ```
+</details>
 
-#### Array members
-
+<details> <summary><strong>Arrays</strong></summary>
 Array algorithms are attached to the complete array type, so the element type and length do not need to be repeated:
 
 ```cpp
@@ -611,8 +621,9 @@ For arrays shorter than 256 elements, index-returning functions use `u8`; otherw
 Only operations supported by the element type are usable. For example, `Array<Person, 5>::find` is available when `Person` supports equality, while sorting additionally requires an ordering operation.
 
 Array algorithms may select either constant-index unrolling or runtime-index loops according to the configuration in `sugar_config.h`; this does not change their public call syntax.
+</details>
 
-#### Mathematics
+<details><summary><strong>Math</strong></summary>
 
 | Function               | Signature                | Description                                                          |
 |------------------------|--------------------------|----------------------------------------------------------------------|
@@ -628,8 +639,9 @@ Array algorithms may select either constant-index unrolling or runtime-index loo
 | `math::gcd<Int>`       | `(Int, Int) -> Int`      | Returns the greatest common divisor.                                 |
 
 All mathematics functions can be used inline or outlined.
+</details>
 
-### ANSI terminal screens
+<details> <summary><strong>ANSI Terminal Screen</strong></summary>
 
 `ansi::Screen<Width, Height, Left, Top>` describes a fixed rectangular region of an ANSI-compatible terminal. `Left` and `Top` default to 1 and use ANSI's one-based terminal coordinates; coordinates passed to the methods are zero-based within the screen.
 
@@ -657,24 +669,942 @@ Screen operations write ANSI escape sequences directly and do not maintain a fra
 ```cpp
 auto put_screen = Screen::put.outline();
 ```
+</details>
 
-## Examples
-
-The `examples` directory contains small programs demonstrating both the core Acus API and Sugar. The Sugar-focused examples include:
-
-| Example                | Highlights                                                                       |
-|------------------------|----------------------------------------------------------------------------------|
-| `sugar_hello_world.cc` | Minimal program structure and formatted output.                                  |
-| `sugar_text.cc`        | Line input, outlining, ASCII conversion, string length and integer conversion.   |
-| `sugar_arrays.cc`      | Arrays of strings, sorting, searching and recursive clearing.                    |
-| `sugar_structs.cc`     | Structs, arrays of structs, generic equality, `find` and `clear`.                |
-| `pong.cc`              | Functions, globals, runtime input and ANSI screen drawing in a complete program. |
-
-Build the examples with:
+## Full Examples
+Listed below are the complete programs from the [`tools/acs/examples`](tools/acs/examples) directory, ordered roughly from simplest to most involved. After [installing `acs`](tools/acs/README.md), copy an example into a `.acs` file and compile it to Brainfuck with:
 
 ```sh
-make examples
+acs example.acs -o example.bf
 ```
+
+The generated Brainfuck can then be run with any compatible interpreter, including [`bfint`](tools/bfint/README.md).
+
+<details>
+<summary><strong>01 — Hello World</strong></summary>
+
+Source: [`01_hello.acs`](tools/acs/examples/01_hello.acs)
+
+```cpp
+// A .acs file normally contains the contents of the Acus program scope.
+function_<void()>("main") | define {
+  println("Hello from Acus sugar!");
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>02 — Variables and Arithmetic</strong></summary>
+
+Source: [`02_variables_and_arithmetic.acs`](tools/acs/examples/02_variables_and_arithmetic.acs)
+
+```cpp
+function_<void()>("main") | define {
+  // Acus provides signed and unsigned 8- and 16-bit integers.
+  let_<u8>("small") = 12;
+  let_<s8>("temperature") = s8{-7};
+  let_<u16>("wide") = var_("small").cast<u16>() * 100;
+
+  println(var_("small") + 3);
+  println(var_("temperature") - s8{5});
+  println(var_("wide") / 4);
+  println(var_("wide") % 7);
+
+  var_("small") += 10;
+  var_("small") *= 2;
+  println(var_("small"));
+
+  // Comparisons and logical operators produce Boolean values.
+  println((var_("small") > 20) && (var_("temperature") < s8{0}));
+  println((var_("small") == 44) || (var_("wide") == 0));
+
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>03 — Control Flow</strong></summary>
+
+Source: [`03_control_flow.acs`](tools/acs/examples/03_control_flow.acs)
+
+```cpp
+function_<void()>("main") | define {
+  let_<u8>("value") = 7;
+
+  if_(var_("value") < 10) {
+    println("value is small");
+  } else_ {
+    println("value is large");
+  };
+
+  // Print odd numbers below 10, but stop before 9.
+  for_(let_<u8>("i") = 0, var_("i") < 10, ++var_("i")) {
+    if_(var_("i") % 2 == 0) {
+      continue_;
+    };
+    if_(var_("i") == 9) {
+      break_;
+    };
+    println(var_("i"));
+  };
+
+  let_<u8>("countdown") = 3;
+  while_(var_("countdown") > 0) {
+    println(var_("countdown"));
+    --var_("countdown");
+  };
+
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>04 — Functions</strong></summary>
+
+Source: [`04_functions.acs`](tools/acs/examples/04_functions.acs)
+
+```cpp
+// Declare a function before main so it can be called before its definition.
+auto square = function_<u16(u8)>("square") | declare;
+auto printRange = function_<void(u8, u8)>("printRange") | declare;
+
+function_<void()>("main") | define {
+  println(square(12));
+  printRange(3, 7);
+  return_;
+};
+
+function_<u16(u8)>("square", "x") | define {
+  return_(var_("x").cast<u16>() * var_("x"));
+};
+
+function_<void(u8, u8)>("printRange", "first", "last") | define {
+  for_(let_<u8>("i") = var_("first"), var_("i") <= var_("last"), ++var_("i")) {
+    println(var_("i"));
+  };
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>05 — Recursion</strong></summary>
+
+Source: [`05_recursion.acs`](tools/acs/examples/05_recursion.acs)
+
+```cpp
+auto fibonacci = function_<u16(u8)>("fibonacci") | declare;
+
+function_<void()>("main") | define {
+  for_(let_<u8>("i") = 0, var_("i") < 10, ++var_("i")) {
+    println(fibonacci(var_("i")));
+  };
+  return_;
+};
+
+function_<u16(u8)>("fibonacci", "n") | define {
+  if_(var_("n") < 2) {
+    return_(var_("n"));
+  } else_ {
+    return_(fibonacci(var_("n") - 1) + fibonacci(var_("n") - 2));
+  };
+};
+```
+
+</details>
+
+<details>
+<summary><strong>06 — Arrays and Structs</strong></summary>
+
+Source: [`06_arrays_and_structs.acs`](tools/acs/examples/06_arrays_and_structs.acs)
+
+```cpp
+// Define an array-type
+using Values = Array<u8, 5>;
+
+// Define a structure containing 2 fields
+using Point = Struct<"Point",
+  Field<"x", u8>,
+  Field<"y", u8>
+>;
+
+// Function that takes the array
+auto print_array = function_<void(Values)>("print_array", "arr") | define {
+  auto arr = var_("arr");
+  print('[');
+  for_(let_<u8>("i") = 0, var_("i") < 5, ++var_("i")) {
+    print(arr[var_("i")]);
+    if_(var_("i") < 4) { print(", "); };
+  };
+  println(']');
+  return_;
+};
+
+// Function that takes the Point-type
+auto print_point = function_<void(Point)>("print_point", "p") | define {
+  auto p = var_("p");
+  print('{');
+  print(p.field("x"));
+  print(", ");
+  print(p.field("y"));
+  println('}');
+  return_;
+};
+
+// Main
+function_<void()>("main") | define {
+  let_<Point>("point") = Point{3, 4};
+  let_<Values>("values") = Values{2, 4, 6, 8, 10};
+
+  auto p = var_("point");
+  p.field("x") += 10;
+  print_point(p);
+
+  auto arr = var_("values");
+  arr[2] = 42;
+  print_array(arr);
+
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>07 — Pointers</strong></summary>
+
+Source: [`07_pointers.acs`](tools/acs/examples/07_pointers.acs)
+
+```cpp
+using Values = Array<u8, 5>;
+
+auto setValue = function_<void(Ptr<u8>, u8)>("setValue") | declare;
+
+function_<void()>("main") | define {
+  let_<Values>("values") = Values{1, 2, 3, 4, 5};
+
+  setValue(&var_("values")[2], 99);
+
+  let_<Ptr<u8>>("p") = &var_("values")[0];
+  for_(let_<u8>("i") = 0, var_("i") < 5, ++var_("i")) {
+    println(*var_("p"));
+    ++var_("p");
+  };
+
+  return_;
+};
+
+function_<void(Ptr<u8>, u8)>("setValue", "target", "value") | define {
+  *var_("target") = var_("value");
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>08 — Globals</strong></summary>
+
+Source: [`08_globals.acs`](tools/acs/examples/08_globals.acs)
+
+```cpp
+global_<u16>("calls");
+global_<String<16>>("message");
+
+auto greet = function_<void()>("greet") | declare;
+
+function_<void()>("main") | define {
+  var_("calls") = 0;
+  var_("message") = "Hello, world!";
+
+  greet();
+  greet();
+  println(var_("calls"));
+
+  return_;
+};
+
+function_<void()>("greet") | define {
+  ++var_("calls");
+  println(var_("message"));
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>09 — Input and Strings</strong></summary>
+
+Source: [`09_input_and_strings.acs`](tools/acs/examples/09_input_and_strings.acs)
+
+```cpp
+using NameString = String<20>;
+auto read_line = io::read_line<NameString>.outline();
+auto strlen = NameString::length.outline();
+
+function_<void()>("main") | define {
+  print("What is your name? ");
+  auto name = read_line();
+
+  print("Hello, ");
+  println(name);
+
+  print("Your name has ");
+  print(strlen(name));
+  println(" characters.");
+
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>10 — Prime Sieve</strong></summary>
+
+Source: [`10_prime_sieve.acs`](tools/acs/examples/10_prime_sieve.acs)
+
+```cpp
+// Sieve of Eratosthenes
+// Asks for N and prints all prime numbers up to and including N.
+
+constexpr size_t MinLimit = 2;
+constexpr size_t MaxLimit = 100;
+
+using Input = String<3>;
+using Flags = Array<u8, MaxLimit + 1>;
+
+auto read_line = io::read_line<Input>.outline();
+auto to_int = Input::to_int<u8>.outline();
+
+
+auto read_limit = function_<u8()>("read_limit") | define {
+  auto n = let_<u8>("n");
+  auto valid = (let_<u8>("valid") = 0);
+
+  while_(!valid) {
+    print("Find primes up to N (2-100): ");
+    n = to_int(read_line());
+
+    if_(n < MinLimit) {
+      println("N must be at least 2.");
+    }
+    else_ {
+      if_(n > MaxLimit) {
+        println("N must not exceed 100.");
+      }
+      else_ {
+        valid = 1;
+      };
+    };
+  };
+
+   return_(n);
+};
+
+
+auto make_sieve = function_<Flags(u8)>("make_sieve", "n") | define {
+  auto n = var_("n");
+  auto is_prime = let_<Flags>("is_prime");
+
+  // Initially assume that every number is prime.
+  Flags::fill(is_prime, 1);
+  is_prime[0] = 0;
+  is_prime[1] = 0;
+
+  // Strike out the multiples of every remaining prime.
+  auto prime = (let_<u8>("prime") = 2);
+
+  while_(prime * prime <= n) {
+    if_(is_prime[prime]) {
+      auto multiple = (let_<u8>("multiple") = prime * prime);
+
+      while_(multiple <= n) {
+        is_prime[multiple] = 0;
+        multiple += prime;
+      };
+    };
+
+    ++prime;
+  };
+
+  return_(is_prime);
+};
+
+
+auto print_primes =
+  function_<void(Flags, u8)>("print_primes", "is_prime", "n") | define {
+    auto is_prime = var_("is_prime");
+    auto n = var_("n");
+
+    println("Prime numbers:");
+
+    auto number = (let_<u8>("number") = 2);
+
+    while_(number <= n) {
+      if_(is_prime[number]) {
+        print(number);
+        print(' ');
+      };
+
+      ++number;
+    };
+
+    println();
+    return_;
+  };
+
+
+main_() {
+  auto n = (let_<u8>("n") = read_limit());
+  auto is_prime = (let_<Flags>("is_prime") = make_sieve(n));
+
+  print_primes(is_prime, n);
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>11 — Mandelbrot Set with ANSI Screen</strong></summary>
+
+Source: [`11_mandelbrot.acs`](tools/acs/examples/11_mandelbrot.acs)
+
+```cpp
+// Mandelbrot set with progress display
+//
+// Renders an 80 x 24 ASCII image. The first row of the ANSI screen is
+// reserved for a progress indicator.
+
+constexpr int ImageWidth = 80;
+constexpr int ImageHeight = 24;
+constexpr int ScreenHeight = ImageHeight + 1;
+constexpr int MaxIterations = 24;
+
+constexpr int Scale = 64;
+constexpr int XMin = -2 * Scale;
+constexpr int XMax =  1 * Scale;
+constexpr int YMin = -1 * Scale;
+constexpr int YMax =  1 * Scale;
+
+constexpr int XRange = XMax - XMin;
+constexpr int YRange = YMax - YMin;
+constexpr int EscapeRadius = 2 * Scale;
+constexpr int EscapeRadiusSquared = 4 * Scale;
+
+using Screen = ansi::Screen<ImageWidth, ScreenHeight>;
+using Palette = String<10>;
+
+auto screen_begin = Screen::begin;
+auto screen_end = Screen::end;
+auto screen_clear = Screen::clear.outline();
+auto screen_move_to = Screen::move_to.outline();
+
+
+auto map_x = function_<s16(u8)>("map_x", "column") | define {
+  auto column = var_("column").cast<s16>();
+
+  return_(XMin + column * XRange / (ImageWidth - 1));
+};
+
+
+auto map_y = function_<s16(u8)>("map_y", "row") | define {
+  auto row = var_("row").cast<s16>();
+
+  return_(YMax - row * YRange / (ImageHeight - 1));
+};
+
+
+auto escape_iterations =
+  function_<u8(s16, s16)>("escape_iterations", "cx", "cy") | define {
+    auto cx = var_("cx");
+    auto cy = var_("cy");
+
+    auto zx = (let_<s16>("zx") = s16{0});
+    auto zy = (let_<s16>("zy") = s16{0});
+
+    auto zx_squared = let_<s16>("zx_squared");
+    auto zy_squared = let_<s16>("zy_squared");
+    auto next_zx = let_<s16>("next_zx");
+    auto next_zy = let_<s16>("next_zy");
+
+    auto iterations = (let_<u8>("iterations") = 0);
+
+    while_(iterations < MaxIterations) {
+      // Keep the next multiplication inside the signed 16-bit range.
+      if_((zx > EscapeRadius) || (zx < -EscapeRadius) ||
+          (zy > EscapeRadius) || (zy < -EscapeRadius)) {
+        break_;
+      };
+
+      zx_squared = zx * zx / Scale;
+      zy_squared = zy * zy / Scale;
+
+      if_(zx_squared + zy_squared > EscapeRadiusSquared) {
+        break_;
+      };
+
+      next_zx = zx_squared - zy_squared + cx;
+      next_zy = (zx * zy / Scale) * 2 + cy;
+
+      zx = next_zx;
+      zy = next_zy;
+      ++iterations;
+    };
+
+    return_(iterations);
+  };
+
+
+auto shade = function_<u8(u8)>("shade", "iterations") | define {
+  auto iterations = var_("iterations");
+  auto palette = (let_<Palette>("palette") = " .:-=+*#%@");
+
+  return_(palette[iterations * 9 / MaxIterations]);
+};
+
+
+auto show_progress = function_<void(u8)>("show_progress", "row") | define {
+  auto row = var_("row");
+
+  screen_move_to(0, 0);
+  print("Rendering row ");
+  print(row);
+  print("/");
+  print(ImageHeight);
+  print("   ");
+
+  return_;
+};
+
+
+auto render = function_<void()>("render") | define {
+  screen_clear();
+
+  auto row = (let_<u8>("row") = 0);
+
+  while_(row < ImageHeight) {
+    show_progress(row + 1);
+
+    // Move once per row. The pixels can then be written sequentially without
+    // emitting an ANSI cursor-positioning sequence for every character.
+    screen_move_to(0, row + 1);
+
+    auto cy = (let_<s16>("cy") = map_y(row));
+    auto column = (let_<u8>("column") = 0);
+
+    while_(column < ImageWidth) {
+      auto cx = (let_<s16>("cx") = map_x(column));
+      auto iterations =
+        (let_<u8>("iterations") = escape_iterations(cx, cy));
+
+      put(shade(iterations));
+      ++column;
+    };
+
+    ++row;
+  };
+
+  screen_move_to(0, 0);
+  print("Rendering complete: ");
+  print(ImageHeight);
+  print("/");
+  print(ImageHeight);
+  print("   ");
+
+  return_;
+};
+
+
+main_() {
+  screen_begin();
+  render();
+  screen_end();
+
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>11b — Mandelbrot Set with Plain Output</strong></summary>
+
+Source: [`11_mandelbrot_no_screen.acs`](tools/acs/examples/11_mandelbrot_no_screen.acs)
+
+```cpp
+// Mandelbrot set
+// Renders an 80 x 24 ASCII image using signed fixed-point arithmetic.
+
+constexpr int Width = 80;
+constexpr int Height = 24;
+constexpr int MaxIterations = 24;
+
+constexpr int Scale = 64;
+constexpr int XMin = -2 * Scale;
+constexpr int XMax =  1 * Scale;
+constexpr int YMin = -1 * Scale;
+constexpr int YMax =  1 * Scale;
+
+constexpr int XRange = XMax - XMin;
+constexpr int YRange = YMax - YMin;
+constexpr int EscapeRadius = 2 * Scale;
+constexpr int EscapeRadiusSquared = 4 * Scale;
+
+using Palette = String<10>;
+
+
+auto map_x = function_<s16(s16)>("map_x", "column") | define {
+  auto column = var_("column");
+
+  return_(XMin + column * XRange / (Width - 1));
+};
+
+
+auto map_y = function_<s16(s16)>("map_y", "row") | define {
+  auto row = var_("row");
+
+  return_(YMax - row * YRange / (Height - 1));
+};
+
+
+auto escape_iterations =
+  function_<u8(s16, s16)>("escape_iterations", "cx", "cy") | define {
+    auto cx = var_("cx");
+    auto cy = var_("cy");
+
+    auto zx = (let_<s16>("zx") = s16{0});
+    auto zy = (let_<s16>("zy") = s16{0});
+
+    auto zx_squared = let_<s16>("zx_squared");
+    auto zy_squared = let_<s16>("zy_squared");
+    auto next_zx = let_<s16>("next_zx");
+    auto next_zy = let_<s16>("next_zy");
+
+    auto iterations = (let_<u8>("iterations") = 0);
+
+    while_(iterations < MaxIterations) {
+      // Prevent the next multiplication from overflowing s16.
+      if_((zx > EscapeRadius) || (zx < -EscapeRadius) ||
+          (zy > EscapeRadius) || (zy < -EscapeRadius)) {
+        break_;
+      };
+
+      zx_squared = zx * zx / Scale;
+      zy_squared = zy * zy / Scale;
+
+      if_(zx_squared + zy_squared > EscapeRadiusSquared) {
+        break_;
+      };
+
+      next_zx = zx_squared - zy_squared + cx;
+      next_zy = (zx * zy / Scale) * 2 + cy;
+
+      zx = next_zx;
+      zy = next_zy;
+      ++iterations;
+    };
+
+    return_(iterations);
+  };
+
+
+auto shade = function_<u8(u8)>("shade", "iterations") | define {
+  auto iterations = var_("iterations");
+  auto palette = (let_<Palette>("palette") = " .:-=+*#%@");
+
+  return_(palette[iterations * 9 / MaxIterations]);
+};
+
+
+auto render = function_<void()>("render") | define {
+  auto row = (let_<s16>("row") = s16{0});
+
+  while_(row < Height) {
+    auto cy = (let_<s16>("cy") = map_y(row));
+    auto column = (let_<s16>("column") = s16{0});
+
+    while_(column < Width) {
+      auto cx = (let_<s16>("cx") = map_x(column));
+      auto iterations =
+        (let_<u8>("iterations") = escape_iterations(cx, cy));
+
+      put(shade(iterations));
+      ++column;
+    };
+
+    println();
+    ++row;
+  };
+
+  return_;
+};
+
+
+main_() {
+  render();
+  return_;
+};
+```
+
+</details>
+
+<details>
+<summary><strong>12 — Pong</strong></summary>
+
+Source: [`12_pong.acs`](tools/acs/examples/12_pong.acs)
+
+```cpp
+
+constexpr size_t ScreenWidth  = 40;
+constexpr size_t ScreenHeight = 20;
+constexpr size_t PaddleHeight = 4;
+
+constexpr size_t LeftPaddleX  = 2;
+constexpr size_t RightPaddleX = ScreenWidth - 3;
+
+constexpr size_t MinPaddleY = 1;
+constexpr size_t MaxPaddleY = ScreenHeight - PaddleHeight - 1;
+
+constexpr size_t InitialPaddleY = ScreenHeight / 2 - PaddleHeight / 2;
+constexpr size_t InitialBallX   = ScreenWidth / 2;
+constexpr size_t InitialBallY   = ScreenHeight / 2;
+
+constexpr size_t BallDelay = 10;
+
+using Screen = ansi::Screen<ScreenWidth, ScreenHeight>;
+
+
+global_<u8>("leftY");
+global_<u8>("rightY");
+
+global_<u8>("ballX");
+global_<u8>("ballY");
+global_<u8>("ballRight");
+global_<u8>("ballDown");
+
+global_<u8>("running");
+global_<u8>("tick");
+
+
+auto drawPaddle =
+  function_<void(u8, u8, u8)>("drawPaddle", "x", "y", "glyph") | define {
+  auto x     = var_("x");
+  auto y     = var_("y");
+  auto glyph = var_("glyph");
+
+  Screen::put(x, y, glyph);
+  Screen::put(x, y + 1, glyph);
+  Screen::put(x, y + 2, glyph);
+  Screen::put(x, y + 3, glyph);
+
+  return_;
+};
+
+
+auto drawBorder =
+  function_<void()>("drawBorder") | define {
+  for (size_t x = 0; x < ScreenWidth; ++x) {
+    Screen::put(x, 0, '-');
+    Screen::put(x, ScreenHeight - 1, '-');
+  }
+
+  for (size_t y = 1; y < ScreenHeight - 1; ++y) {
+    Screen::put(0, y, '|');
+    Screen::put(ScreenWidth - 1, y, '|');
+  }
+
+  Screen::put(0, 0, '+');
+  Screen::put(ScreenWidth - 1, 0, '+');
+  Screen::put(0, ScreenHeight - 1, '+');
+  Screen::put(ScreenWidth - 1, ScreenHeight - 1, '+');
+
+  return_;
+};
+
+
+auto resetBall =
+  function_<void(u8, u8)>("resetBall", "right", "down") | define {
+  auto ballX     = var_("ballX");
+  auto ballY     = var_("ballY");
+  auto ballRight = var_("ballRight");
+  auto ballDown  = var_("ballDown");
+
+  ballX     = InitialBallX;
+  ballY     = InitialBallY;
+  ballRight = var_("right");
+  ballDown  = var_("down");
+
+  return_;
+};
+
+
+auto handleInput =
+  function_<void(u8)>("handleInput", "key") | define {
+  auto key     = var_("key");
+  auto leftY   = var_("leftY");
+  auto rightY  = var_("rightY");
+  auto running = var_("running");
+
+  if_(key == 'q') {
+    running = 0;
+  };
+
+  if_(key == 'w') {
+    if_(leftY > MinPaddleY) {
+      drawPaddle(LeftPaddleX, leftY, ' ');
+      --leftY;
+      drawPaddle(LeftPaddleX, leftY, '#');
+    };
+  };
+
+  if_(key == 's') {
+    if_(leftY < MaxPaddleY) {
+      drawPaddle(LeftPaddleX, leftY, ' ');
+      ++leftY;
+      drawPaddle(LeftPaddleX, leftY, '#');
+    };
+  };
+
+  if_(key == 'o') {
+    if_(rightY > MinPaddleY) {
+      drawPaddle(RightPaddleX, rightY, ' ');
+      --rightY;
+      drawPaddle(RightPaddleX, rightY, '#');
+    };
+  };
+
+  if_(key == 'l') {
+    if_(rightY < MaxPaddleY) {
+      drawPaddle(RightPaddleX, rightY, ' ');
+      ++rightY;
+      drawPaddle(RightPaddleX, rightY, '#');
+    };
+  };
+
+  return_;
+};
+
+
+auto stepBall =
+  function_<void()>("stepBall") | define {
+  auto leftY    = var_("leftY");
+  auto rightY   = var_("rightY");
+  auto ballX    = var_("ballX");
+  auto ballY    = var_("ballY");
+  auto movingRight = var_("ballRight");
+  auto movingDown  = var_("ballDown");
+
+  Screen::put(ballX, ballY, ' ');
+
+  /*
+   * Vertical movement
+   */
+  if_(movingDown) {
+    if_(ballY == ScreenHeight - 2) {
+      movingDown = 0;
+      --ballY;
+    }
+    else_ {
+      ++ballY;
+    };
+  }
+  else_ {
+    if_(ballY == 1) {
+      movingDown = 1;
+      ++ballY;
+    }
+    else_ {
+      --ballY;
+    };
+  };
+
+  /*
+   * Horizontal movement and paddle collisions
+   */
+  if_(movingRight) {
+    if_(ballX == RightPaddleX - 1) {
+      if_(ballY >= rightY && ballY < rightY + PaddleHeight) {
+	movingRight = 0;
+	--ballX;
+      }
+      else_ {
+	resetBall(0, 1);
+      };
+    }
+    else_ {
+      ++ballX;
+    };
+  }
+  else_ {
+    if_(ballX == LeftPaddleX + 1) {
+      if_(ballY >= leftY && ballY < leftY + PaddleHeight) {
+	movingRight = 1;
+	++ballX;
+      }
+      else_ {
+	resetBall(1, 0);
+      };
+    }
+    else_ {
+      --ballX;
+    };
+  };
+
+  Screen::put(ballX, ballY, 'O');
+  return_;
+};
+
+
+main_() {
+  auto leftY  = var_("leftY");
+  auto rightY = var_("rightY");
+  auto running = var_("running");
+  auto tick    = var_("tick");
+
+  leftY  = InitialPaddleY;
+  rightY = InitialPaddleY;
+  running = 1;
+  tick    = 0;
+
+  resetBall(1, 1);
+
+  Screen::clear();
+  drawBorder();
+
+  drawPaddle(LeftPaddleX, leftY, '#');
+  drawPaddle(RightPaddleX, rightY, '#');
+  Screen::put(var_("ballX"), var_("ballY"), 'O');
+
+  auto key = let_<u8>("key");
+
+  while_(running) {
+    read(key);
+    handleInput(key);
+
+    ++tick;
+
+    if_(tick == BallDelay) {
+      tick = 0;
+      stepBall();
+    };
+  };
+
+  Screen::clear();
+  return_;
+};
+```
+
+</details>
 
 ## License
 

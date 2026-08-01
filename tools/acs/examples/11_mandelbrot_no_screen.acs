@@ -1,0 +1,112 @@
+// Mandelbrot set
+// Renders an 80 x 24 ASCII image using signed fixed-point arithmetic.
+
+constexpr int Width = 80;
+constexpr int Height = 24;
+constexpr int MaxIterations = 24;
+
+constexpr int Scale = 64;
+constexpr int XMin = -2 * Scale;
+constexpr int XMax =  1 * Scale;
+constexpr int YMin = -1 * Scale;
+constexpr int YMax =  1 * Scale;
+
+constexpr int XRange = XMax - XMin;
+constexpr int YRange = YMax - YMin;
+constexpr int EscapeRadius = 2 * Scale;
+constexpr int EscapeRadiusSquared = 4 * Scale;
+
+using Palette = String<10>;
+
+
+auto map_x = function_<s16(s16)>("map_x", "column") | define {
+  auto column = var_("column");
+
+  return_(XMin + column * XRange / (Width - 1));
+};
+
+
+auto map_y = function_<s16(s16)>("map_y", "row") | define {
+  auto row = var_("row");
+
+  return_(YMax - row * YRange / (Height - 1));
+};
+
+
+auto escape_iterations =
+  function_<u8(s16, s16)>("escape_iterations", "cx", "cy") | define {
+    auto cx = var_("cx");
+    auto cy = var_("cy");
+
+    auto zx = (let_<s16>("zx") = s16{0});
+    auto zy = (let_<s16>("zy") = s16{0});
+
+    auto zx_squared = let_<s16>("zx_squared");
+    auto zy_squared = let_<s16>("zy_squared");
+    auto next_zx = let_<s16>("next_zx");
+    auto next_zy = let_<s16>("next_zy");
+
+    auto iterations = (let_<u8>("iterations") = 0);
+
+    while_(iterations < MaxIterations) {
+      // Prevent the next multiplication from overflowing s16.
+      if_((zx > EscapeRadius) || (zx < -EscapeRadius) ||
+          (zy > EscapeRadius) || (zy < -EscapeRadius)) {
+        break_;
+      };
+
+      zx_squared = zx * zx / Scale;
+      zy_squared = zy * zy / Scale;
+
+      if_(zx_squared + zy_squared > EscapeRadiusSquared) {
+        break_;
+      };
+
+      next_zx = zx_squared - zy_squared + cx;
+      next_zy = (zx * zy / Scale) * 2 + cy;
+
+      zx = next_zx;
+      zy = next_zy;
+      ++iterations;
+    };
+
+    return_(iterations);
+  };
+
+
+auto shade = function_<u8(u8)>("shade", "iterations") | define {
+  auto iterations = var_("iterations");
+  auto palette = (let_<Palette>("palette") = " .:-=+*#%@");
+
+  return_(palette[iterations * 9 / MaxIterations]);
+};
+
+
+auto render = function_<void()>("render") | define {
+  auto row = (let_<s16>("row") = s16{0});
+
+  while_(row < Height) {
+    auto cy = (let_<s16>("cy") = map_y(row));
+    auto column = (let_<s16>("column") = s16{0});
+
+    while_(column < Width) {
+      auto cx = (let_<s16>("cx") = map_x(column));
+      auto iterations =
+        (let_<u8>("iterations") = escape_iterations(cx, cy));
+
+      put(shade(iterations));
+      ++column;
+    };
+
+    println();
+    ++row;
+  };
+
+  return_;
+};
+
+
+main_() {
+  render();
+  return_;
+};

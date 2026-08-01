@@ -16,7 +16,7 @@ void printHelp(std::string const &progName)
               << "--rand-max [N]      Specifiy maximum value returned by RNG.\n"
               << "                      Defaults to maximum supported value of cell-type\n"
               << "--no-random-warning Don't display a warning when ? occurs without running --random.\n\n"
-              << "Example: " << progName << " --random -t int16 -o output.txt program.bf\n";
+              << "Example: " << progName << " --random program.bf\n";
 }
 
 void printGamingHelp(std::string const &progName)

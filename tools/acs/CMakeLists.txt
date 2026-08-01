@@ -1,0 +1,5 @@
+install(
+  PROGRAMS acs.py
+  DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  RENAME acs
+)

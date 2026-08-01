@@ -1,8 +1,0 @@
-
-[ ] assignMove -> reduce code size when returning non-globals by moving them into return-slot instead of copy.
-[ ] go over TODO's in the code
-[ ] options
-    - Unreachable blocks are an error
-[ ] typesystem namespace should be used by user and should import types::TypeHanlde
-[ ] no more ts::init
-[ ] namespace acus::sugar -> initialize a global assembler and define free function api with functions that return an expression container that has operator overloading.

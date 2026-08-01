@@ -1,15 +1,36 @@
-*
-!.gitignore
-!Makefile
-!README.md
-!README-sugar.md
-!LICENSE
-!todo.txt
-!include/
-!src/
-!testsuite/
-!doc/
-!examples/
-!assets/
-!bfint/
-!frontend/
+# CMake build trees and generated metadata
+/build/
+/build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+compile_commands.json
+Testing/
+
+# Compiled artifacts
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.o
+*.obj
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Editor and temporary files
+*~
+*.swp
+*.swo
+.DS_Store
+
+# Local archives
+*.zip
+
+# Local maintenance helpers
+/add_licence_to_all_project_files.sh

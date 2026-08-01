@@ -1,0 +1,13 @@
+if(NOT EXISTS "@PROJECT_BINARY_DIR@/install_manifest.txt")
+  message(FATAL_ERROR "No install manifest found. Run the install target first.")
+endif()
+
+file(STRINGS "@PROJECT_BINARY_DIR@/install_manifest.txt" installed_files)
+list(REVERSE installed_files)
+
+foreach(file IN LISTS installed_files)
+  if(EXISTS "${file}" OR IS_SYMLINK "${file}")
+    message(STATUS "Removing ${file}")
+    file(REMOVE "${file}")
+  endif()
+endforeach()

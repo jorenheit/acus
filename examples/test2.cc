@@ -1,5 +1,5 @@
 #include <iostream>
-#include "../include/acus/acus.h"
+#include <acus/acus.h>
 
 using namespace acus::api;
 

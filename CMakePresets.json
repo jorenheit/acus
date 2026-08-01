@@ -1,0 +1,71 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default development build",
+      "binaryDir": "${sourceDir}/build/default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "ACUS_BUILD_BFINT": false,
+        "ACUS_BUILD_EXAMPLES": false,
+        "ACUS_BUILD_TESTS": false,
+        "ACUS_INSTALL_ACS": true
+      }
+    },
+    {
+      "name": "dev",
+      "displayName": "Full developer build",
+      "binaryDir": "${sourceDir}/build/dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "ACUS_BUILD_BFINT": true,
+        "ACUS_BUILD_EXAMPLES": true,
+        "ACUS_BUILD_TESTS": true,
+        "ACUS_INSTALL_ACS": true
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release build",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ACUS_BUILD_BFINT": false,
+        "ACUS_BUILD_EXAMPLES": false,
+        "ACUS_BUILD_TESTS": false,
+        "ACUS_INSTALL_ACS": true
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
