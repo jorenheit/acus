@@ -8,7 +8,8 @@ Acus is a toolkit for building Brainfuck programs without having to write Brainf
 ## Choose your flavor
 To get started quickly, choose one of the following:
 1. For installing the library and its components, refer to the [building instructions](BUILDING.md).
-2. For examples and a guide on how to use the library, scroll down.
+2. For a complete overview of the API, [click here](#public-api-reference).
+2. For examples and a guide on how to use the library, continue reading.
 3. To start generating Brainfuck programs using the library's embedded programming language and pseudo-frontend `acs`, click [here](README-sugar.md).
 4. For information about the included Brainfuck interpreter, click [here](tools/bfint/README.md).
 
@@ -385,7 +386,7 @@ a.callFunctionPointer("fPtr")
 a.print("x");
 ```
 
-## Public API reference
+## Public API Reference
 
 The tables below describe the supported user-facing backend API exposed by `<acus/acus.h>`. For readability, the final optional `std::source_location` argument accepted by API functions is omitted from the signatures. Low-level storage, proxy, cache, and primitive-IR types that are transitively visible through the implementation headers are not treated as stable frontend API here.
 
