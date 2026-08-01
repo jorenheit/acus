@@ -1,0 +1,31 @@
+     Brainfuck Interpreter Profile
+========================================
+ Program:                  primes.bf
+ Status:                   completed
+ Elapsed time:             403.278 ms
+
+ Program
+ -------
+ Brainfuck instructions:   2,956,078
+ Preprocessed operations:  37,781
+
+ Execution
+ ---------
+ Executed instructions:    250,355,869
+ Execution rate:           620.80 Mop/s
+ Highest tape address:     3,856
+ Tape cells touched:       3,857
+ Maximum loop depth:       5
+
+ Instruction counts
+ ------------------
+ Op               Count     Percent
+ +          12,612,983       5.04%
+ -          14,708,040       5.87%
+ <         103,366,442      41.29%
+ >         103,366,480      41.29%
+ [           2,179,270       0.87%
+ ]          14,122,535       5.64%
+ .                 116       0.00%
+ ,                   3       0.00%
+ ?                   0       0.00%

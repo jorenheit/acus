@@ -1,29 +1,34 @@
 #include <cassert>
 #include <chrono>
 #include <csignal>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
+#include <string_view>
 #include <utility>
+
 #include <ncurses.h>
 
 #include "bfint.h"
 
+volatile std::sig_atomic_t BFInterpreter::s_interrupted = 0;
+
 BFInterpreter::BFInterpreter(Options const &opt):
-  d_array(opt.tapeLength),
-  d_uniformDist(0, (opt.randMax != 0) ? opt.randMax : 255),
-  d_randomEnabled(opt.randomEnabled),
-  d_randMax(opt.randMax),
-  d_randomWarningEnabled(opt.randomWarningEnabled),
-  d_gamingMode(opt.gamingMode)
+  d_opt(opt),
+  d_uniformDist(0, (opt.randMax != 0) ? opt.randMax : 255)
 {
-  // init code
-  std::ifstream file(opt.bfFile);
-  if (!file.is_open())
-    throw std::string("File not found: ") + opt.bfFile;
- 
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  d_code = buffer.str();
+  if (opt.bfFile.empty()) {
+    preprocess(std::cin);
+  }
+  else {
+    std::ifstream file(opt.bfFile);
+    if (!file.is_open()) {
+      throw std::string("File not found: ") + opt.bfFile;
+    }
+    preprocess(file);
+  }
 
   // init rng
   auto t0 = std::chrono::system_clock::now().time_since_epoch();
@@ -31,152 +36,258 @@ BFInterpreter::BFInterpreter(Options const &opt):
   d_rng.seed(ms);
 }
 
-void BFInterpreter::reset() {
-  std::fill(d_array.begin(), d_array.end(), 0);
-  d_arrayPointer = 0;
-}
-
-std::vector<BFInterpreter::OpCode> BFInterpreter::preprocess(std::string const &code) {
+void BFInterpreter::preprocess(std::istream &in) {
   std::vector<OpCode> result;
-  std::stack<int> loopStack;
+  std::stack<size_t> loopStack;
 
-  auto insert = [&](Op op) {
-    result.push_back({op, 0});
+  auto const insert = [&](char op) {
+    if (std::string("[].,?").contains(op)) {
+      result.push_back({op, 0});
+    }
   };
 
-  auto insertRepeatable = [&](Op op) {
-    if (result.size() > 0 && op == result.back().op) {
+  auto const insertRepeatable = [&](char op) {
+    if (!result.empty() && op == result.back().op) {
       ++result.back().arg;
-    } else {
+    }
+    else {
       result.push_back({op, 1});
     }
   };
 
-  auto insertStartLoop = [&] {
-    result.push_back({START_LOOP, 0});
+  auto const insertStartLoop = [&] {
+    result.push_back({'[', 0});
     loopStack.push(result.size() - 1);
   };
 
-  auto insertEndLoop = [&] {
+  auto const insertEndLoop = [&] {
+    if (loopStack.empty()) {
+      throw std::string("Error: unmatched ']'.");
+    }
+
     size_t const fromIndex = loopStack.top();
-    result.push_back({END_LOOP, fromIndex});
-    loopStack.pop();      
+    result.push_back({']', fromIndex});
+    loopStack.pop();
 
     size_t const toIndex = result.size() - 1;
     result[fromIndex].arg = toIndex;
   };
 
-  for (char c: code) {
-    switch (Op op = static_cast<Op>(c)) {
-    case LEFT:
-    case RIGHT:
-    case PLUS:
-    case MINUS:      insertRepeatable(op); break;
-    case START_LOOP: insertStartLoop();    break;
-    case END_LOOP:   insertEndLoop();      break;
-    default:         insert(op);           break;
+  char c;
+  while (in >> c) {
+    switch (c) {
+    case '<':
+    case '>':
+    case '+':
+    case '-': insertRepeatable(c); break;
+    case '[': insertStartLoop();   break;
+    case ']': insertEndLoop();     break;
+    default:  insert(c);           break;
     }
   }
 
-  return result;
+  if (!loopStack.empty()) {
+    throw std::string("Error: unmatched '['.");
+  }
+
+  std::swap(d_code, result);
 }
 
 int BFInterpreter::run() {
-    
-  // Setup ncurses window
-  if (d_gamingMode) {
-    auto win = initscr();
+  if (d_opt.tapeLength <= 0) {
+    throw std::string("Error: tape length must be positive.");
+  }
+
+  s_interrupted = 0;
+  auto const previousHandler = std::signal(SIGINT, &BFInterpreter::handleSignal);
+
+  bool cursesActive = false;
+  if (d_opt.gamingMode) {
+    auto *win = initscr();
+    cursesActive = true;
     scrollok(win, true);
     cbreak();
     noecho();
     nonl();
     nodelay(stdscr, TRUE);
     curs_set(0);
-
-    signal(SIGINT,
-	   [](int sig){
-	     finish(sig);
-	   });
   }
 
-  std::vector<OpCode> code = preprocess(d_code);
+  std::vector<char> tape(static_cast<size_t>(d_opt.tapeLength));
+  size_t codePointer = 0;
+  int dataPointer = 0;
+  int depth = 0;
+  Stats stats{};
+  auto const startedAt = std::chrono::steady_clock::now();
+  bool timingStopped = false;
 
-  reset();  
-  int codePointer = 0;
-  while (codePointer < code.size()) {
+  auto const stopTiming = [&] {
+    if (!timingStopped) {
+      stats.elapsed = std::chrono::steady_clock::now() - startedAt;
+      timingStopped = true;
+    }
+  };
 
-    OpCode instr = code[codePointer];
-    switch (instr.op) {
-    case LEFT:       pointerDec(instr.arg);		break;
-    case RIGHT:      pointerInc(instr.arg);		break;
-    case PLUS:       plus(instr.arg);			break;
-    case MINUS:      minus(instr.arg);			break;
-    case PRINT:      print();				break;
-    case READ:       read();				break;
-    case START_LOOP: startLoop(codePointer, instr.arg);	break;
-    case END_LOOP:   endLoop(codePointer, instr.arg);	break;
-    case RAND:       random();				break;
-    default: std::unreachable();
+  auto const cleanup = [&] {
+    if (cursesActive) {
+      finishCurses();
+      cursesActive = false;
     }
 
-    ++codePointer;
+    if (previousHandler != SIG_ERR) {
+      std::signal(SIGINT, previousHandler);
+    }
+  };
+
+  auto const extendTape = [&] {
+    while (dataPointer >= static_cast<int>(tape.size())) {
+      tape.resize(2 * tape.size());
+    }
+  };
+
+  auto const checkNegative = [&] {
+    if (dataPointer < 0) {
+      throw std::string("Error: trying to decrement pointer beyond beginning.");
+    }
+    if (depth < 0) {
+      throw std::string("Error: unbalanced loops.");
+    }
+  };
+
+  auto const plus = [&](size_t n) {
+    stats.opCount[PLUS] += n;
+    tape[dataPointer] += static_cast<char>(n);
+  };
+
+  auto const minus = [&](size_t n) {
+    stats.opCount[MINUS] += n;
+    tape[dataPointer] -= static_cast<char>(n);
+  };
+
+  auto const right = [&](size_t n) {
+    stats.opCount[RIGHT] += n;
+    dataPointer += static_cast<int>(n);
+    extendTape();
+
+    if (static_cast<size_t>(dataPointer) > stats.maxAddress) {
+      stats.maxAddress = static_cast<size_t>(dataPointer);
+    }
+  };
+
+  auto const left = [&](size_t n) {
+    stats.opCount[LEFT] += n;
+    dataPointer -= static_cast<int>(n);
+    checkNegative();
+  };
+
+  auto const startLoop = [&](size_t dest) {
+    ++stats.opCount[START_LOOP];
+    if (tape[dataPointer]) {
+      if (static_cast<size_t>(++depth) > stats.maxNestingDepth) {
+        stats.maxNestingDepth = static_cast<size_t>(depth);
+      }
+    }
+    else {
+      codePointer = dest;
+    }
+  };
+
+  auto const endLoop = [&](size_t dest) {
+    ++stats.opCount[END_LOOP];
+    if (tape[dataPointer]) {
+      codePointer = dest;
+    }
+    else {
+      --depth;
+      checkNegative();
+    }
+  };
+
+  auto const print = [&] {
+    ++stats.opCount[PRINT];
+    char const c = tape[dataPointer];
+    if (d_opt.gamingMode) {
+      printCurses(c);
+    }
+    else {
+      std::cout << c << std::flush;
+    }
+  };
+
+  auto const read = [&] {
+    ++stats.opCount[READ];
+    if (d_opt.gamingMode) {
+      int const c = getch();
+      tape[dataPointer] = (c < 0) ? 0 : static_cast<char>(c);
+    }
+    else {
+      char c = 0;
+      if (!std::cin.get(c)) {
+        c = 0;
+      }
+      tape[dataPointer] = c;
+    }
+  };
+
+  auto const random = [&] {
+    ++stats.opCount[RAND];
+    BFInterpreter::random(tape[dataPointer]);
+  };
+
+  try {
+    while (codePointer < d_code.size()) {
+      if (s_interrupted) {
+        stats.interrupted = true;
+        break;
+      }
+
+      OpCode const instr = d_code[codePointer];
+      switch (instr.op) {
+      case '<': left(instr.arg);      break;
+      case '>': right(instr.arg);     break;
+      case '+': plus(instr.arg);      break;
+      case '-': minus(instr.arg);     break;
+      case '.': print();              break;
+      case ',': read();               break;
+      case '[': startLoop(instr.arg); break;
+      case ']': endLoop(instr.arg);   break;
+      case '?': random();             break;
+      default: std::unreachable();
+      }
+
+      ++codePointer;
+    }
+
+    stopTiming();
+
+    if (d_opt.gamingMode && !stats.interrupted) {
+      nodelay(stdscr, false);
+      getch();
+    }
+
+    cleanup();
+    printStats(stats);
+  }
+  catch (...) {
+    stats.failed = true;
+    stopTiming();
+    cleanup();
+    printStats(stats);
+    throw;
   }
 
-  if (d_gamingMode) {
-    nodelay(stdscr, false);
-    getch();
-    finish(0);
+  if (stats.interrupted) {
+    std::cerr << "\nInterrupted by SIGINT.\n";
+    return 130;
   }
 
   return 0;
 }
 
-void BFInterpreter::plus(int n) {
-  d_array[d_arrayPointer] += n;
-}
-    
-void BFInterpreter::minus(int n) {
-  d_array[d_arrayPointer] -= n;
-}
-
-void BFInterpreter::pointerInc(int n) {
-  d_arrayPointer += n;
-
-  while (d_arrayPointer >= d_array.size())
-    d_array.resize(2 * d_array.size());
-}
-
-void BFInterpreter::pointerDec(int n) {
-  if (d_arrayPointer == 0)
-    throw std::string("Error: trying to decrement pointer beyond beginning.");
-
-  d_arrayPointer -= n;
-}
-
-void BFInterpreter::startLoop(int &current, int dest) {
-  current = (d_array[d_arrayPointer] != 0) ? current : dest;
-}
-
-void BFInterpreter::endLoop(int &current, int dest) {
-  current = (d_array[d_arrayPointer] != 0) ? dest : current;
-}
-
-void BFInterpreter::print() {
-  if (d_gamingMode)
-    printCurses();
-  else
-    printStream(std::cout);
-}
-
-void BFInterpreter::printStream(std::ostream &out) {
-  out << (char)d_array[d_arrayPointer] << std::flush;
-}
-
-void BFInterpreter::printCurses() {
+void BFInterpreter::printCurses(char c) {
   static char const ESC = 27; // Control char
   static std::string ansiBuffer;
     
-  char const c = d_array[d_arrayPointer];
   if (c == ESC) {
     if (ansiBuffer.empty()) {
       ansiBuffer.push_back(c);
@@ -196,6 +307,36 @@ void BFInterpreter::printCurses() {
         
   refresh();
 }
+
+void BFInterpreter::random(char &dest) {
+  static bool warned = false;
+
+  if (d_opt.randomEnabled) {
+    dest = static_cast<char>(d_uniformDist(d_rng));
+  }
+  else if (d_opt.randomWarningEnabled && !warned) {
+    static std::string const warning =
+      "\n"
+      "=========================== !!!!!! ==============================\n"
+      "Warning: BF-code contains '?'-commands, which may be\n"
+      "interpreted as the random-operation, an extension to the\n"
+      "canonical BF instruction set. This extension can be enabled\n"
+      "with the --random option.\n"
+      "This warning can be disabled with the --no-random-warning option.\n"
+      "=========================== !!!!!! ==============================\n";
+
+    if (d_opt.gamingMode) {
+      addstr(warning.c_str());
+      refresh();
+    }
+    else {
+      std::cerr << warning;
+    }
+
+    warned = true;
+  }
+}
+
 
 void BFInterpreter::handleAnsi(std::string &ansiStr, bool const force) {
   static char const ESC = 27; // Control char
@@ -225,11 +366,11 @@ void BFInterpreter::handleAnsi(std::string &ansiStr, bool const force) {
 
   // helpers
   auto cursorUp = [&] {
-      int n = std::stoi(ansiStr.substr(2, ansiStr.length() - 3));
-      if (row) {
-	row = std::max(0, row - n);
-	move(row, col);
-      }
+    int n = std::stoi(ansiStr.substr(2, ansiStr.length() - 3));
+    if (row) {
+      row = std::max(0, row - n);
+      move(row, col);
+    }
   };
 
   auto cursorDown = [&] {
@@ -290,21 +431,21 @@ void BFInterpreter::handleAnsi(std::string &ansiStr, bool const force) {
   auto clearScreen = [&] {
     int n = (ansiStr.length() == 3) ? 0 : std::stoi(ansiStr.substr(2, ansiStr.length() - 3));
     switch (n) {
-      case 0: clrtobot(); return;
-      case 1: {
-	for (int i = 0; i <= row; ++i) {
-	  move(i, 0);
-	  clrtoeol();
-	}
-	move(row, col);
-	return;
+    case 0: clrtobot(); return;
+    case 1: {
+      for (int i = 0; i <= row; ++i) {
+	move(i, 0);
+	clrtoeol();
       }
-      case 2: {
-	move(0,0);
-	clrtobot();
-	return;
-      }
-      default: handled = false;
+      move(row, col);
+      return;
+    }
+    case 2: {
+      move(0,0);
+      clrtobot();
+      return;
+    }
+    default: handled = false;
     }
   };
   
@@ -331,66 +472,138 @@ void BFInterpreter::handleAnsi(std::string &ansiStr, bool const force) {
   // Still going. Don't do anything and wait for next call
 }
 
-void BFInterpreter::read() {
-  if (d_gamingMode)
-    readCurses();
-  else
-    readStream(std::cin);
-}
-
-void BFInterpreter::readStream(std::istream &in)
-{
-  char c;
-  in.get(c);
-  d_array[d_arrayPointer] = c;
-}
-
-void BFInterpreter::readCurses()
-{ 
-  int c = getch();
-  d_array[d_arrayPointer] = (c < 0) ? 0 : static_cast<char>(c);
-}
-
-void BFInterpreter::random() {
-  static bool warned = false;
-  if (d_randomEnabled) {
-    auto val = d_uniformDist(d_rng);
-    d_array[d_arrayPointer] = val;
+void BFInterpreter::printStats(Stats const &stats) {
+  if (d_opt.profileFile.empty()) {
+    return;
   }
-  else if (d_randomWarningEnabled && !warned)
-  {
-    static std::string const warning =
-      "\n"
-      "=========================== !!!!!! ==============================\n"
-      "Warning: BF-code contains '?'-commands, which may be\n"
-      "interpreted as the random-operation, an extension to the\n"
-      "canonical BF instructionset. This extension can be enabled\n"
-      "with the --random option.\n"
-      "This warning can be disabled with the --no-random-warning option.\n"
-      "=========================== !!!!!! ==============================\n";
-                        
-    if (!d_gamingMode)
-      std::cerr << warning;
-    else
-    {
-      addstr(warning.c_str());
-      assert(false);
+
+  std::ofstream file(d_opt.profileFile);
+  if (!file) {
+    std::cerr << "Could not open file for writing: " << d_opt.profileFile << '\n';
+    return;
+  }
+
+  static constexpr std::array<char, NUM_OPS> opChars{
+    '+', '-', '<', '>', '[', ']', '.', ',', '?'
+  };
+
+  auto const formatInteger = [](std::uint64_t value) {
+    std::string result = std::to_string(value);
+    for (std::ptrdiff_t pos = static_cast<std::ptrdiff_t>(result.size()) - 3;
+         pos > 0;
+         pos -= 3) {
+      result.insert(static_cast<size_t>(pos), ",");
     }
-    warned = true;
+    return result;
+  };
+
+  auto const formatDuration = [](std::chrono::steady_clock::duration duration) {
+    double const seconds = std::chrono::duration<double>(duration).count();
+    std::ostringstream out;
+
+    if (seconds >= 1.0) {
+      out << std::fixed << std::setprecision(3) << seconds << " s";
+    }
+    else {
+      out << std::fixed << std::setprecision(3) << seconds * 1000.0 << " ms";
+    }
+
+    return out.str();
+  };
+
+  auto const formatRate = [](double rate) {
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(2);
+
+    if (rate >= 1'000'000'000.0) {
+      out << rate / 1'000'000'000.0 << " Gop/s";
+    }
+    else if (rate >= 1'000'000.0) {
+      out << rate / 1'000'000.0 << " Mop/s";
+    }
+    else if (rate >= 1'000.0) {
+      out << rate / 1'000.0 << " kop/s";
+    }
+    else {
+      out << rate << " op/s";
+    }
+
+    return out.str();
+  };
+
+  std::uint64_t executedOps = 0;
+  for (std::uint64_t const count : stats.opCount) {
+    executedOps += count;
+  }
+
+  std::uint64_t sourceOps = 0;
+  for (OpCode const &instr : d_code) {
+    switch (instr.op) {
+    case '+':
+    case '-':
+    case '<':
+    case '>': sourceOps += instr.arg; break;
+    default:  ++sourceOps;            break;
+    }
+  }
+
+  double const seconds = std::chrono::duration<double>(stats.elapsed).count();
+  double const rate = (seconds > 0.0)
+                    ? static_cast<double>(executedOps) / seconds
+                    : 0.0;
+
+  char const *status = stats.interrupted ? "interrupted (SIGINT)"
+                     : stats.failed      ? "failed"
+                                         : "completed";
+
+  file << "     Brainfuck Interpreter Profile\n"
+       << "========================================\n"
+       << " Program:                  "
+       << (d_opt.bfFile.empty() ? "<stdin>" : d_opt.bfFile) << '\n'
+       << " Status:                   " << status << '\n'
+       << " Elapsed time:             " << formatDuration(stats.elapsed) << '\n'
+       << '\n'
+       << " Program\n"
+       << " -------\n"
+       << " Brainfuck instructions:   " << formatInteger(sourceOps) << '\n'
+       << " Preprocessed operations:  " << formatInteger(d_code.size()) << '\n'
+       << '\n'
+       << " Execution\n"
+       << " ---------\n"
+       << " Executed instructions:    " << formatInteger(executedOps) << '\n'
+       << " Execution rate:           " << formatRate(rate) << '\n'
+       << " Highest tape address:     " << formatInteger(stats.maxAddress) << '\n'
+       << " Tape cells touched:       " << formatInteger(stats.maxAddress + 1) << '\n'
+       << " Maximum loop depth:       " << formatInteger(stats.maxNestingDepth) << '\n'
+       << '\n'
+       << " Instruction counts\n"
+       << " ------------------\n"
+       << std::left
+       << std::setw(5)  << " Op"
+       << std::right
+       << std::setw(18) << "Count"
+       << std::setw(12) << "Percent" << '\n';
+
+  for (size_t i = 0; i < NUM_OPS; ++i) {
+    double const percentage = (executedOps != 0)
+                            ? 100.0 * static_cast<double>(stats.opCount[i])
+                                    / static_cast<double>(executedOps)
+                            : 0.0;
+
+    file << " "
+	 << std::left
+         << std::setw(3)  << opChars[i]
+         << std::right
+         << std::setw(18) << formatInteger(stats.opCount[i])
+         << std::setw(11) << std::fixed << std::setprecision(2) << percentage
+         << "%\n";
   }
 }
 
-void BFInterpreter::printState()
-{
-  for (auto x: d_array)
-    std::cout << (int)x << ' ';
-  std::cout << '\n';
+void BFInterpreter::handleSignal(int) {
+  s_interrupted = 1;
 }
 
-void BFInterpreter::finish(int sig)
-{
+void BFInterpreter::finishCurses() {
   endwin();
-  if (sig == SIGINT)
-    exit(0);
 }
-

@@ -1,15 +1,20 @@
 #ifndef BFINT_H
 #define BFINT_H
 
-#include <vector>
-#include <stack>
-#include <random>
+#include <array>
+#include <chrono>
+#include <csignal>
+#include <cstdint>
 #include <iostream>
+#include <random>
+#include <stack>
+#include <vector>
 
 struct Options {
   int          err{0};
   int          tapeLength{30000};
   std::string  bfFile;
+  std::string  profileFile;
   bool         randomEnabled{false};
   int          randMax{0};
   bool         randomWarningEnabled{true};
@@ -17,68 +22,56 @@ struct Options {
 };
 
 class BFInterpreter {
-  
-  std::vector<char> d_array;
-  std::string d_code;
-  size_t d_arrayPointer{0};
-  size_t d_codePointer{0};
-  std::stack<int> d_loopStack;
+
+  Options d_opt;
 
   using RngType = std::mt19937;
   std::uniform_int_distribution<RngType::result_type> d_uniformDist;
   RngType d_rng;
 
-  // Options
-  bool const d_randomEnabled{false};
-  int  const d_randMax{0};
-  bool const d_randomWarningEnabled{true};
-  bool const d_gamingMode{false};
-    
-  enum Op: char {
-      PLUS  = '+',
-      MINUS = '-',
-      LEFT  = '<',
-      RIGHT = '>',
-      START_LOOP = '[',
-      END_LOOP = ']',
-      PRINT = '.',
-      READ = ',',
-      RAND = '?',
-    };
-
   struct OpCode {
-    Op op;
+    char op;
     size_t arg;
   };
 
-  public:
+  std::vector<OpCode> d_code;
+
+  enum Instructions {
+    PLUS,
+    MINUS,
+    LEFT,
+    RIGHT,
+    START_LOOP,
+    END_LOOP,
+    PRINT,
+    READ,
+    RAND,
+    NUM_OPS
+  };
+
+  struct Stats {
+    size_t maxAddress{0};
+    size_t maxNestingDepth{0};
+    std::array<std::uint64_t, NUM_OPS> opCount{};
+    std::chrono::steady_clock::duration elapsed{};
+    bool interrupted{false};
+    bool failed{false};
+  };
+
+  static volatile std::sig_atomic_t s_interrupted;
+
+public:
   BFInterpreter(Options const &opt);
   int run();
 
 private:
-  static std::vector<OpCode> preprocess(std::string const &code);
-  
-  int run(std::istream &in, std::ostream &out);
-  int consume(Op op);
-  void plus(int n);
-  void minus(int n);
-  void pointerInc(int n);
-  void pointerDec(int n);
-  void startLoop(int &current, int dest);
-  void endLoop(int &current, int dest);
-  void print();
-  void printStream(std::ostream &out);
-  void printCurses();
-  void read();
-  void readStream(std::istream &in);
-  void readCurses();
-  void random();
-  void printState();
+  void preprocess(std::istream &code);
+  void printCurses(char c);
+  void random(char &c);
+  void printStats(Stats const &stats);
   void handleAnsi(std::string &ansiStr, bool const force);
-  static void finish(int sig);
-  void reset();
+  static void handleSignal(int sig);
+  static void finishCurses();
 };
-
-
 
 #endif

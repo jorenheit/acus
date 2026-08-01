@@ -34,3 +34,6 @@ __pycache__/
 
 # Local maintenance helpers
 /add_licence_to_all_project_files.sh
+
+#Brainfuck source
+*.bf

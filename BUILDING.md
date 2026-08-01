@@ -52,6 +52,9 @@ ctest --test-dir build --output-on-failure
 
 Use `--verbose` to display test output while a test is running.
 
+>[!WARNING]
+>The testsuite contains tests that take a very long time to execute.
+
 ## Presets
 
 The repository includes three convenience presets:

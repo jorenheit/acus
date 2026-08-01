@@ -357,7 +357,7 @@ auto fooPtrType = ts::function_pointer(fooType);
 a.declareLocal("fPtr", fooPtrType);
 
 // 5. Ask user for input:
-a.declareLocal("input", ts::s16());
+a.declareLocal("input", ts::u8());
 a.print(literal::string("Enter 'd' or 't': "));
 a.read("input");
 
