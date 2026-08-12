@@ -1,3 +1,4 @@
 # Generated Brainfuck programs and captured output
 *.bf
 *_out.txt
+*.prof
