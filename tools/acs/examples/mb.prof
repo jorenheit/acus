@@ -1,0 +1,31 @@
+     Brainfuck Interpreter Profile
+========================================
+ Program:                  mb.bf
+ Status:                   completed
+ Elapsed time:             3956.408 s
+
+ Program
+ -------
+ Brainfuck instructions:   481,647
+ Preprocessed operations:  122,205
+
+ Execution
+ ---------
+ Executed instructions:    7,187,276,844,721
+ Execution rate:           1.82 Gop/s
+ Highest tape address:     665
+ Tape cells touched:       666
+ Maximum loop depth:       6
+
+ Instruction counts
+ ------------------
+ Op               Count     Percent
+ +     198,438,728,525       2.76%
+ -     198,657,213,050       2.76%
+ <   3,290,937,032,299      45.79%
+ >   3,290,937,032,337      45.79%
+ [       9,159,838,449       0.13%
+ ]     199,146,998,117       2.77%
+ .               1,944       0.00%
+ ,                   0       0.00%
+ ?                   0       0.00%

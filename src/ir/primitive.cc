@@ -476,15 +476,9 @@ namespace acus::Algorithm {
   
 }
 
-#define TXT(Name) std::string primitive::Name::text(Context const &ctx) const 
-#define GEN(Name) std::string primitive::Name::generate(Context const &ctx) const
-#define MERGE(Name) std::shared_ptr<primitive::Node> primitive::Name::merge(Node const *other) const
-#define RULE(Other, Result, ...)					\
-  if ([[maybe_unused]] auto const *rhs = dynamic_cast<Other const *>(other)) { \
-    return std::make_shared<Result>(__VA_ARGS__);			\
-  }
 
 // Codegen
+#define GEN(Name) std::string primitive::Name::generate(Context const &ctx) const
 
 GEN(Comment) {
   return "";
@@ -603,6 +597,12 @@ GEN(Equal) {
 }
 
 // Merge Rules
+#define MERGE(Name) std::shared_ptr<primitive::Node> primitive::Name::merge(Node const *other) const
+#define RULE(Other, Result, ...)					\
+  if ([[maybe_unused]] auto const *rhs = dynamic_cast<Other const *>(other)) { \
+    return std::make_shared<Result>(__VA_ARGS__);			\
+  }
+
 MERGE(Equal) {
   RULE(ZeroCell, ZeroCell);
   RULE(ZeroCellPlus, ZeroCellPlus);
@@ -625,6 +625,12 @@ MERGE(ZeroCell) {
 MERGE(ZeroCellPlus) {
   RULE(ZeroCellPlus, ZeroCellPlus);
   RULE(ZeroCell, ZeroCellPlus);
+  return nullptr;
+}
+
+MERGE(LoopClose) {
+  RULE(ZeroCell, LoopClose, tag);
+  RULE(ZeroCellPlus, LoopClose, tag);
   return nullptr;
 }
 
@@ -741,6 +747,8 @@ MERGE(GreaterOrEqual) {
 
 
 // Textual representation (TODO)
+#define TXT(Name) std::string primitive::Name::text(Context const &ctx) const 
+
 TXT(Comment) {
   return txt;
 }

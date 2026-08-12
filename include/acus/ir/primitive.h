@@ -96,6 +96,7 @@ namespace acus::primitive {
     std::string tag;
     inline explicit LoopClose(std::string tag): tag(std::move(tag)) {}
     COMMON_INTERFACE;
+    MERGABLE;
   };
 
   struct MovePointerRelative: Node {

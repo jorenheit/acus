@@ -202,7 +202,7 @@ void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs)
     //   lhsCopy.high  = low(a1*b0)
     //
     // Complete high byte:
-    //   lhs.high += low(a0*b1) + low(a1*b0)
+    //   lhs.high = low(a0*b1) + low(a1*b0)
     addByteInto(lhs, High, cross0, Low);
     addByteInto(lhs, High, lhsCopy, High);
 

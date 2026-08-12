@@ -12,6 +12,7 @@ To get started quickly, choose one of the following:
 2. For examples and a guide on how to use the library, continue reading.
 3. To start generating Brainfuck programs using the library's embedded programming language and pseudo-frontend `acs`, click [here](README-sugar.md).
 4. For information about the included Brainfuck interpreter, click [here](tools/bfint/README.md).
+5. For technical information about acus, click [here](https://jorenheit.github.io/bfcpu).
 
 ## Introduction
 Acus is primarily intended for building experimental languages and DSLs that target Brainfuck. It's a C++23 library that provides the machinery that a higher-level language frontend can call into: declaring variables, creating functions, pointers, arrays, user-defined types, flow control, etc. Acus lays these constructs out on the Brainfuck tape and lowers them to plain Brainfuck source.
