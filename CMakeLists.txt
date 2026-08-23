@@ -14,6 +14,8 @@ option(ACUS_BUILD_EXAMPLES "Build the C++ examples" OFF)
 option(ACUS_BUILD_TESTS "Build the Acus test suites" OFF)
 option(ACUS_INSTALL_ACS "Install the acs Python frontend" ON)
 option(ACUS_ENABLE_WARNINGS "Enable the project's warning flags" ON)
+option(ACUS_BUILD_DEV_APP "Build the dev-app" OFF)
+
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
@@ -48,6 +50,11 @@ endif()
 
 if(ACUS_BUILD_BFINT)
   add_subdirectory(tools/bfint)
+endif()
+
+if(ACUS_BUILD_DEV_APP)
+  add_executable(acus-dev devapp/dev.cc)
+  target_link_libraries(acus-dev PRIVATE acus)
 endif()
 
 if(PROJECT_IS_TOP_LEVEL)
