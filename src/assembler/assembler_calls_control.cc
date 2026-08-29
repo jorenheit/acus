@@ -391,7 +391,7 @@ void Assembler::prepareNextFrame(std::string const &functionName, std::vector<Ex
 
   // Set target block in next frame
   emit<primitive::MovePointerRelative>(currentFrameSize); 
-  setNextBlock(functionName, "");
+  setTargetBlock(functionName, "");
   emit<primitive::MovePointerRelative>(-currentFrameSize);
 }
 

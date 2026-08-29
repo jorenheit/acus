@@ -113,23 +113,31 @@ namespace acus::Algorithm {
   }
 
   std::string modify(int val, int current, int tmp) {
+
+    auto const [n, countBack] = [&] -> std::pair<int, bool> {
+      int norm = val % 256;
+      if (norm < 0) norm += 256;
+      bool const countBack = norm > 128;
+      return {countBack ? 256 - norm : norm, countBack};
+    }();
+    
     if (val == 0) return "";
 
-    auto const [countBack,  n] = [&] -> std::pair<bool, int> {
-      if (val > 0 && val <= 128) {
-	return {false, val};
-      }
-      else if (val > 0) {
-	return {true, 256 - (val & 0xff)};
-      }
-      else if (val < 0 && val >= -128) {
-	return {true, std::abs(val)};
-      }
-      else if (val < 0) {
-	return {false, 256 - (std::abs(val) & 0xff)};
-      }
-      std::unreachable();
-    }();
+    // auto const [countBack,  n] = [&] -> std::pair<bool, int> {
+    //   if (val > 0 && val <= 128) {
+    // 	return {false, val};
+    //   }
+    //   else if (val > 0) {
+    // 	return {true, 256 - (val & 0xff)};
+    //   }
+    //   else if (val < 0 && val >= -128) {
+    // 	return {true, std::abs(val)};
+    //   }
+    //   else if (val < 0) {
+    // 	return {false, 256 - (std::abs(val) & 0xff)};
+    //   }
+    //   std::unreachable();
+    // }();
 
     auto const naive = [&] -> std::string {
       std::ostringstream oss;

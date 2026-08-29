@@ -292,6 +292,7 @@ namespace acus {
     void beginBlock(std::string const &name);
     void endBlock();    
     void constructMetaBlocks();
+    void setTargetBlock(std::string const &f, std::string const &b);
     void setNextBlock(std::string const &f, std::string const &b);
     void setNextBlock(Expression obj);
     

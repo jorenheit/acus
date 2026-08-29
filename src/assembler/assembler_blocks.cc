@@ -44,8 +44,11 @@ void Assembler::label(std::string const &labelName, API_FUNC) {
   beginBlock(labelName);
 }
 
-void Assembler::setNextBlock(std::string const &f, std::string const &b) {
-
+void Assembler::setTargetBlock(std::string const &f, std::string const &b) {
+  // Note: This version can be called even when the pointer is in a different
+  // frame with unknown contents in the TargetBlock cell. The correct value
+  // will be built from scratch here.
+  
   if (_currentBlock != nullptr) {
     _currentBlock->children.emplace_back(f, b);
   }
@@ -60,7 +63,42 @@ void Assembler::setNextBlock(std::string const &f, std::string const &b) {
   moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
   emit<primitive::ConstructConstant>([f, b](primitive::Context const &ctx) -> int {
     return (ctx.getDispatchIndex(f, b) >> 8) & 0xff;
+  }, 0, MacroCell::Scratch0 - MacroCell::Value1);
+  
+  popPtr();
+}
+
+
+void Assembler::setNextBlock(std::string const &f, std::string const &b) {
+  assert(_currentFunction != nullptr);
+  assert(_currentBlock != nullptr);
+
+  // Note: This should only be called when the pointer is in the current frame.
+  // This version uses ChangeBy, assuming the current value in the TargetBlock
+  // is set to the current block-ID.
+
+  if (_currentBlock != nullptr) {
+    _currentBlock->children.emplace_back(f, b);
+  }
+
+  std::string const cf = _currentFunction->name;
+  std::string const cb = _currentBlock->name;
+  
+  pushPtr();
+
+  moveTo(FrameLayout::TargetBlock, MacroCell::Value0);
+  emit<primitive::ChangeBy>([f, b, cf, cb](primitive::Context const &ctx) -> int {
+    int const currentValue = ctx.getDispatchIndex(cf, cb) & 0xff;
+    int const targetValue  = ctx.getDispatchIndex(f, b) & 0xff;
+    return targetValue - currentValue;
   }, 0, MacroCell::Scratch0 - MacroCell::Value0);
+  
+  moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
+  emit<primitive::ChangeBy>([f, b, cf, cb](primitive::Context const &ctx) -> int {
+    int const currentValue = (ctx.getDispatchIndex(cf, cb) >> 8) & 0xff;
+    int const targetValue  = (ctx.getDispatchIndex(f, b) >> 8) & 0xff;
+    return targetValue - currentValue;
+  }, 0, MacroCell::Scratch0 - MacroCell::Value1);
   
   popPtr();
 }

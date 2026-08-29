@@ -255,7 +255,7 @@ void Assembler::endProgram(API_FUNC) {
   inc();
 
   // Populate the TargetBlock with the index corresponding to the entrypoint
-  setNextBlock(_program.entryFunctionName, "");
+  setTargetBlock(_program.entryFunctionName, "");
 
   // The high byte of the TargetBlock is the main loop-guard (Run-flag). 
   moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
