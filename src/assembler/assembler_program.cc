@@ -49,11 +49,12 @@ void Assembler::endProgram(API_FUNC) {
 	      "entry function must be of type 'void()', but is of type '", entryFunctionType->str(), "'."); 
 	      
   
-
-  // Generate the metablocks, builtin functions, bootstrap and hatstrap sequences.
+  // Generate the metablocks and builtin functions
   constructBuiltinFunctions();
-  deferredFunctionCallTypeChecks();
   constructMetaBlocks();
+
+  // Check if all calls and jumps can be resolved properly
+  deferredFunctionCallTypeChecks();
   deferredLabelChecks();
 
   // Mark reachability for all blocks
@@ -69,8 +70,11 @@ void Assembler::endProgram(API_FUNC) {
     }
   }
 
-  // TODO: error if number of blocks is too large
-  // TODO: document how the switch works
+  API_REQUIRE(dispatchBlocks.size() <= 0xfeff, error::ErrorCode::TooManyBlocks,
+	      "Number of blocks exceeds maximum (0xfeff)");
+
+  // Start building result-sequence
+  primitive::Sequence result;
   
   // Find optimal switch-shape
   auto const [outerSwitchCaseCount, innerSwitchCaseCount] = [&] -> std::pair<int, int> {
@@ -97,7 +101,7 @@ void Assembler::endProgram(API_FUNC) {
       Result result{outer, inner};
       if (result.sum <= best.sum) {
 	if (result.sum < best.sum || result.diff < best.diff) {
-	  std::swap(best, result);
+	  best = result;
 	}
       }
     }
@@ -105,61 +109,8 @@ void Assembler::endProgram(API_FUNC) {
     return {best.outer, best.inner};
   }();
 
-  
-  primitive::Sequence result;
-  setTargetSequence(&result);
-
-  _dp.set(0, static_cast<MacroCell::Field>(0));
-  switchField(MacroCell::SeekMarker);
-  setToValue(1);
-  switchField(MacroCell::FrameMarker);
-  setToValue(1);
-
-  moveTo(1 + _program.globalVariableFrameSize()); 
-  _dp.set(0);
-  switchField(MacroCell::FrameMarker);
-  setToValue(1);
-
-  setNextBlock(_program.entryFunctionName, "");
-  moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
-  loopOpen("main loop");
-
-  // Use Daniel's algorithm to copy the TargetBlock into the scratch cells
-  // 1: Move TargetBlock high byte value into Scratch1 and Flag
-  loopOpen(); {
-    switchField(MacroCell::Scratch1); inc();
-    switchField(MacroCell::Flag);     inc();
-    switchField(MacroCell::Value1);   dec();
-  } loopClose();
-    
-  // 2: Move TargetBlock low byte value into Value1 and Scratch0
-  switchField(MacroCell::Value0);
-  loopOpen(); {
-    switchField(MacroCell::Value1);   inc();
-    switchField(MacroCell::Scratch0); inc();
-    switchField(MacroCell::Value0);   dec();
-  } loopClose();
-    
-  // 3: Restore low byte in Value0
-  switchField(MacroCell::Value1);
-  loopOpen(); {
-    switchField(MacroCell::Value0); inc();
-    switchField(MacroCell::Value1); dec();
-  } loopClose();
-
-  // 4: Restore high byte in Value1
-  switchField(MacroCell::Flag);
-  loopOpen(); {
-    switchField(MacroCell::Value1); inc();
-    switchField(MacroCell::Flag);   dec();
-  } loopClose();
-    
-  // Current state:
-  // Pointer at Flag (0)
-  // Value0 and Value1 restored
-  // Scratch0 = copy of Value0
-  // Scratch1 = copy of Value1 
-
+ 
+  // TODO: document how the switch works 
   auto constructSwitches = [&](MacroCell::Field outerValueField,
 			       MacroCell::Field outerFlagField,
 			       MacroCell::Field innerValueField,
@@ -214,7 +165,6 @@ void Assembler::endProgram(API_FUNC) {
       switchField(valueField);
     };
 
-
     // Set flag
     switchField(outerFlagField);
     inc();
@@ -223,7 +173,7 @@ void Assembler::endProgram(API_FUNC) {
     switchField(outerValueField);
     dec();
 
-    // Build the outer switch
+    // Outer switch
     impl(impl,
 	 outerValueField,
 	 outerFlagField,
@@ -239,13 +189,14 @@ void Assembler::endProgram(API_FUNC) {
 	   // Set flag
 	   switchField(innerFlagField);
 	   inc();
-	   // No initial decrement for inner switch
+	   // Inner switch
 	   impl(impl,
 		innerValueField,
 		innerFlagField,
 		thisInnerSwitchCaseCount,
 		0,
 		[&](int innerCaseIndex) {
+		  // Insert block body
 		  size_t const dispatchIndex = outerCaseIndex * innerSwitchCaseCount + innerCaseIndex;
 		  assert(dispatchIndex < dispatchBlocks.size());
 		  result.append(dispatchBlocks[dispatchIndex]->code);    
@@ -253,14 +204,76 @@ void Assembler::endProgram(API_FUNC) {
 	 });
   };
 
-  // Construct switches
-  constructSwitches(MacroCell::Scratch1, MacroCell::Flag,      // outer switch fields
-		    MacroCell::Scratch0, MacroCell::Scratch1); // inner switch fields
+
+  auto copyTargetBlockToScratch = [&]{
+    // Use Daniel's algorithm to copy the TargetBlock into the scratch cells
+    // 1: Move TargetBlock high byte value into Scratch1 and Flag
+    loopOpen(); {
+      switchField(MacroCell::Scratch1); inc();
+      switchField(MacroCell::Flag);     inc();
+      switchField(MacroCell::Value1);   dec();
+    } loopClose();
+    
+    // 2: Move TargetBlock low byte value into Value1 and Scratch0
+    switchField(MacroCell::Value0);
+    loopOpen(); {
+      switchField(MacroCell::Value1);   inc();
+      switchField(MacroCell::Scratch0); inc();
+      switchField(MacroCell::Value0);   dec();
+    } loopClose();
+    
+    // 3: Restore low byte in Value0
+    switchField(MacroCell::Value1);
+    loopOpen(); {
+      switchField(MacroCell::Value0); inc();
+      switchField(MacroCell::Value1); dec();
+    } loopClose();
+
+    // 4: Restore high byte in Value1
+    switchField(MacroCell::Flag);
+    loopOpen(); {
+      switchField(MacroCell::Value1); inc();
+      switchField(MacroCell::Flag);   dec();
+    } loopClose();
+  };
+
   
-  // Close main loop
-  switchField(MacroCell::Value1);
-  loopClose("main loop");
+  // Construct final result
+  setTargetSequence(&result);
+
+  // Mark the first cell (start of global frame) with a SeekMarker and a FrameMarker
+  _dp.set(0, static_cast<MacroCell::Field>(0));
+  switchField(MacroCell::SeekMarker);
+  inc();
+  switchField(MacroCell::FrameMarker);
+  inc();
+
+  // Mark the start of Frame 1 (main-function) with a FrameMarker
+  moveTo(1 + _program.globalVariableFrameSize()); 
+  _dp.set(0);
+  switchField(MacroCell::FrameMarker);
+  inc();
+
+  // Populate the TargetBlock with the index corresponding to the entrypoint
+  setNextBlock(_program.entryFunctionName, "");
+
+  // The high byte of the TargetBlock is the main loop-guard (Run-flag). 
+  moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
+  loopOpen("main loop"); {
+
+    // Make a temporary copy of the TargetBlock cells
+    copyTargetBlockToScratch();
+
+    // Construct switches that use the copied values to select the correct block
+    constructSwitches(MacroCell::Scratch1, MacroCell::Flag,      // outer switch fields
+		      MacroCell::Scratch0, MacroCell::Scratch1); // inner switch fields
+  
+    // Close main loop
+    switchField(MacroCell::Value1);
+  } loopClose("main loop");
+
   _state.begun = false;
+  setTargetSequence(nullptr);
 
   // Primitive merging
   mergeSequence(result);

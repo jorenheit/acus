@@ -16,46 +16,11 @@ void Assembler::beginBlock(std::string const &name) {
 
   _currentBlock = &block;
   setTargetSequence(&block.code);
-
-  // NOT NECESSARY ANYMORE:
-  // To start a block, we need to check 2 conditions:
-  // 1. Does the block-index match the value stored in the TargetBlock cell?
-  // 2. Is the Run-cell still set?
-  //
-  // If both are true, the Flag field of the TargetBlock cell is set to 1 and
-  // used as the conditional cell upon which it is decided whether or not to enter
-  // the block.
-  
-  // moveTo(FrameLayout::TargetBlock, MacroCell::Value0);
-  // compare16ToConstConstructive(/* value =    */ _currentBlock->globalBlockIndex,
-  // 			       /* highByte = */ Cell{FrameLayout::TargetBlock, MacroCell::Value1},
-  // 			       /* result =   */ Cell{FrameLayout::TargetBlock, MacroCell::Flag},
-  // 			       Temps<2>::select(FrameLayout::TargetBlock, MacroCell::Scratch0,
-  // 						FrameLayout::TargetBlock, MacroCell::Scratch1));
-
-  // moveTo(FrameLayout::RunState, MacroCell::Value0);
-  // andConstructive(/* result = */ Cell{FrameLayout::RunState, MacroCell::Flag},
-  // 		  /* other  = */ Cell{FrameLayout::TargetBlock, MacroCell::Flag},
-  // 		  Temps<2>::select(FrameLayout::RunState, MacroCell::Scratch0,
-  // 				   FrameLayout::RunState, MacroCell::Scratch1));
-
-  // Clear the targetblock flag
-  // moveTo(FrameLayout::TargetBlock, MacroCell::Flag);
-  // zeroCell();
-
-  // Open the block, conditional on the run-flag
-  // moveTo(FrameLayout::RunState, MacroCell::Flag);
-  // loopOpen();
-  // zeroCell();
   moveToOrigin();
 }
 
 void Assembler::endBlock() {
   assert(_currentBlock != nullptr);
-
-  // We move back to the Flag stored in the RunState cell (guaranteed zero)
-  // moveTo(FrameLayout::RunState, MacroCell::Flag);
-  // loopClose();
   moveToOrigin();
   _currentBlock = nullptr;
 }
@@ -87,7 +52,6 @@ void Assembler::setNextBlock(std::string const &f, std::string const &b) {
   
   pushPtr();
 
-  // TODO: replace by ConstructConstant
   moveTo(FrameLayout::TargetBlock, MacroCell::Value0);
   emit<primitive::ConstructConstant>([f, b](primitive::Context const &ctx) -> int {
     return ctx.getDispatchIndex(f, b) & 0xff;

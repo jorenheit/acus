@@ -144,12 +144,8 @@ void Assembler::abortProgram(API_FUNC) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  // moveTo(FrameLayout::RunState, MacroCell::Value0);
-  // zeroCell();
   moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
   zeroCell();
-
-  //  popFrame();
 
   // Block boundary
   assert(_currentBlock != nullptr);

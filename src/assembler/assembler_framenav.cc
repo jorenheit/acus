@@ -29,8 +29,6 @@ void Assembler::pushFrame() {
   moveTo(0, MacroCell::FrameMarker);
   emit<primitive::MovePointerRelative>(currentFrameSize);
   setToValue(1);
-  //  moveTo(FrameLayout::RunState, MacroCell::Value0);
-  //  setToValue(1);
   moveToOrigin();
 }
 
@@ -39,13 +37,12 @@ void Assembler::popFrame() {
   assert(_currentFunction != nullptr);
   assert(_currentSeq != nullptr);
 
-  // Check if function is the entry-point of the program. If so, we need to set the run-cell to 0
+  // Check if function is the entry-point of the program. If so, we need to set the
+  // TargetBlock's high-byte to 0 to abort the program.
   // If not, we do a dynamic move left until we hit the next frame marker.
 
   pushPtr();
   if (_currentFunction->name == _program.entryFunctionName) {
-    //moveTo(FrameLayout::RunState, MacroCell::Value0);
-    //    zeroCell();
     moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
     zeroCell();
     moveToOrigin();

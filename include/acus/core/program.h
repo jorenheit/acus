@@ -23,8 +23,6 @@ namespace acus {
 
 struct Program {
 
-  primitive::Sequence bootstrap;
-  primitive::Sequence hatstrap;
   std::string name;
   std::string entryFunctionName;
   
