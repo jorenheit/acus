@@ -68,24 +68,28 @@ void Assembler::constructBuiltinFunctions() {
   _usedBuiltinFunctions.clear();
 }
 
-primitive::Context Assembler::constructContext() const {
+primitive::Context Assembler::constructContext(std::vector<Function::Block *> const &dispatchBlocks, int innerSwitchCaseCount) const {
 
-  auto const constructBlockIDtoIndexMap = [&](){
+  auto const constructBlockIDToDispatchIndexMap = [&]{
     std::unordered_map<std::string, int> result;
-    for (auto const &f: _program.functions) {
-      // Special block ID equal to the first block of a function to indicate
-      // the entry-point of this function (easy lookup).
-      assert(f.blocks.size() > 0);
-      result[f.name] = f.blocks[0]->globalBlockIndex;
-      for (auto const &b: f.blocks) {
-	std::string const id = f.name + "." + b->name;
-	result[id] = b->globalBlockIndex;
+    for (size_t i = 0; i != dispatchBlocks.size(); ++i) {
+      Function::Block const *block = dispatchBlocks[i];
+
+      int const outer = i / innerSwitchCaseCount + 1;
+      int const inner = i % innerSwitchCaseCount;
+
+      size_t const dispatchIndex = (outer << 8) | inner;
+      result[block->id] = dispatchIndex;
+
+      if (block->isEntryPoint) {
+	std::string const &functionName = _program.functions[block->parentFunctionIndex].name;
+	result[functionName] = dispatchIndex;
       }
     }
     return result;
   };
-  
-  auto const constructStackFrameSizeMap = [&](){
+
+  auto const constructStackFrameSizeMap = [&]{
     std::unordered_map<std::string, int> result;
     for (auto const &f: _program.functions) {
       result[f.name] = f.frame.totalLogicalCells();
@@ -93,33 +97,20 @@ primitive::Context Assembler::constructContext() const {
     return result;
   };
 
-  auto const constructLocalBaseOffsetMap = [&](){
+  auto const constructLocalBaseOffsetMap = [&]{
     std::unordered_map<std::string, int> result;
     for (auto const &f: _program.functions) {
       result[f.name] = f.frame.localBase();
     }
     return result;
   };
-  
+
   return primitive::Context {
     .fieldCount = MacroCell::FieldCount,
-    .blockIDtoIndex = constructBlockIDtoIndexMap(),
+    .blockIDToDispatchIndex = constructBlockIDToDispatchIndexMap(),
     .stackFrameSize = constructStackFrameSizeMap(),
     .localBaseOffset = constructLocalBaseOffsetMap()
   };
-}
-
-
-primitive::Sequence Assembler::compilePrimitives(API_CTX) {
-  primitive::Sequence result = _program.bootstrap;
-  for (auto &fn: _program.functions) {
-    checkFunctionFlowValidity(fn, API_FWD);  
-    for (auto const &block:  fn.blocks) {
-      if (block->reachable) result.append(block->code);
-    }
-  }
-  result.append(_program.hatstrap);
-  return result;
 }
 
 std::string Assembler::brainfuck(std::string const &name, API_FUNC) const {
@@ -134,7 +125,7 @@ std::string Assembler::primitives(std::string const &name, API_FUNC) const {
   return _txt.at(name);
 }
 
-void Assembler::simplifySequence(primitive::Sequence &seq) {
+void Assembler::mergeSequence(primitive::Sequence &seq) {
   if (seq.nodes.empty()) return;
   
   primitive::Sequence merged;

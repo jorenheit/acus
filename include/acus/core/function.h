@@ -27,6 +27,7 @@ struct Function {
   struct Block {
     size_t globalBlockIndex = 0;
     size_t parentFunctionIndex = 0;
+    bool isEntryPoint = false;
     std::string name;
     std::string id;
     primitive::Sequence code;
@@ -64,11 +65,13 @@ struct Function {
     blockByName[blockName] = blocks.size();
     blocks.push_back(std::make_unique<Block>());
 
+    
     Block &b = *blocks.back();
     b.globalBlockIndex = -1; 
     b.parentFunctionIndex = functionIndex;
     b.name = std::move(blockName);
     b.id = name + "." + b.name;
+    b.isEntryPoint = (blocks.size() == 1);
     return b;
   }
 

@@ -638,10 +638,10 @@ namespace acus {
     std::string builtinFunctionName(BuiltinFunction func);
     void constructBuiltinFunctions();    
     void setTargetSequence(primitive::Sequence *seq);
-    primitive::Context constructContext() const;    
+    primitive::Context constructContext(std::vector<Function::Block *> const &, int) const;    
     primitive::Sequence compilePrimitives(API_CTX);
     static std::string simplifyBrainfuck(std::string const &bf);
-    static void simplifySequence(primitive::Sequence &seq);
+    static void mergeSequence(primitive::Sequence &seq);
 
     // Function call and block name checks
     void functionCallTypeCheck(types::FunctionType const *functionType, std::vector<Expression> const &args, API_CTX);

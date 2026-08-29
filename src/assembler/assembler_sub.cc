@@ -121,7 +121,7 @@ void Assembler::sub16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps
   loopOpen(); {
     zeroCell(); // reset carry
     moveTo(high);
-    subConst(1);
+    dec();
     moveTo(carry);
   } loopClose();
   

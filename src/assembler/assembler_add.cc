@@ -139,7 +139,7 @@ void Assembler::add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps
   loopOpen(); {
     zeroCell(); // reset carry
     moveTo(high);
-    addConst(1);
+    inc();
     moveTo(carry);
   } loopClose();
   

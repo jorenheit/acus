@@ -524,7 +524,7 @@ void Assembler::divModConst(int denom, Cell modResult, Temps<5> tmp) {
     return;
   }
   if (denom == 0) {
-    moveTo(divResult); zeroCell(); subConst(1);
+    moveTo(divResult); zeroCell(); dec();
     popPtr();
     return;
   }
@@ -608,8 +608,8 @@ void Assembler::divMod16Const(int denom, Cell high, Cell modResultLow, Cell modR
   }
   
   if (denom == 0) {
-    moveTo(divResultLow);  zeroCell(); subConst(1);
-    moveTo(divResultHigh); zeroCell(); subConst(1);
+    moveTo(divResultLow);  zeroCell(); dec();
+    moveTo(divResultHigh); zeroCell(); dec();
     popPtr();
     return;
   }

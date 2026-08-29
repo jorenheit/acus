@@ -144,11 +144,12 @@ void Assembler::abortProgram(API_FUNC) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  moveTo(FrameLayout::RunState, MacroCell::Value0);
+  // moveTo(FrameLayout::RunState, MacroCell::Value0);
+  // zeroCell();
+  moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
   zeroCell();
 
-  // Sync and pop
-  popFrame();
+  //  popFrame();
 
   // Block boundary
   assert(_currentBlock != nullptr);
@@ -311,15 +312,15 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     std::string const &functionName = literal::cast<types::FunctionPointerType>(val)->functionName();
     primitive::DInt const diff = currentFrameSize + paramStart + offset;
     emit<primitive::MovePointerRelative>(diff);
-    zeroCell();
-    emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
-      return ctx.getBlockIndex(functionName) & 0xff;
-    });
+    emit<primitive::ConstructConstant>([functionName](primitive::Context const &ctx) -> int {
+      return ctx.getDispatchIndex(functionName) & 0xff;
+    }, 0, MacroCell::Scratch0 - MacroCell::Value0);
+
     switchField(MacroCell::Value1);
-    zeroCell();
-    emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
-      return (ctx.getBlockIndex(functionName) >> 8) & 0xff;
-    });
+    emit<primitive::ConstructConstant>([functionName](primitive::Context const &ctx) -> int {
+      return (ctx.getDispatchIndex(functionName) >> 8) & 0xff;
+    }, 0, MacroCell::Scratch0 - MacroCell::Value1);
+
     switchField(MacroCell::Value0);
     emit<primitive::MovePointerRelative>(-diff);
     offset += MacroCell::FieldCount;
@@ -436,9 +437,8 @@ void Assembler::prepareNextFrame(Expression fptr, std::vector<Expression> const 
 }
 
 
-
-
 void Assembler::fetchReturnData() {
+  assert(false && "should not be necessary anymore");
   assert(_currentSeq != nullptr);  
   assert(_currentFunction != nullptr);
 
@@ -449,10 +449,24 @@ void Assembler::fetchReturnData() {
   pushPtr();
   
   // Get run-state
-  moveTo(FrameLayout::RunState);
+  moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
   emit<primitive::MovePointerRelative>(stackFrameSize);
-  emit<primitive::MoveData>(-stackFrameSize);
+
+  // On Value1 field of the call-frame -> if 0, set our own Value1 field to 0 as well
+  notDestructive(Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
+  loopOpen(); {
+    emit<primitive::MovePointerRelative>(-stackFrameSize);
+    zeroCell();
+    emit<primitive::MovePointerRelative>(stackFrameSize);
+    dec();
+  } loopClose();
   emit<primitive::MovePointerRelative>(-stackFrameSize);
+  
+  
+  // moveTo(FrameLayout::RunState);
+  // emit<primitive::MovePointerRelative>(stackFrameSize);
+  // emit<primitive::MoveData>(-stackFrameSize);
+  // emit<primitive::MovePointerRelative>(-stackFrameSize);
 
   popPtr();
 }
@@ -481,7 +495,7 @@ void Assembler::fetchReturnData(Slot returnSlot) {
       emit<primitive::MovePointerRelative>(-diff);
     }
   }
-  fetchReturnData(); // fetch the rest
+  //  fetchReturnData(); // fetch the rest
   popPtr();
 }
 

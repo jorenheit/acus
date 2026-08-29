@@ -60,6 +60,11 @@ struct Program {
     globalBlockOrder.push_back(&block);
   }
 
+  inline Function::Block *getBlock(size_t blockIndex) {
+    if (blockIndex >= globalBlockOrder.size()) return nullptr;
+    return globalBlockOrder[blockIndex];
+  }
+
   inline int globalVariableFrameSize() const {
     int result = 0;
     for (auto const &slot: globals) result += slot.size();

@@ -355,15 +355,16 @@ void Assembler::assignSlot(Slot slot, literal::Literal val) {
   else if (types::isFunctionPointer(slot.type())) {
     std::string const &functionName = literal::cast<types::FunctionPointerType>(val)->functionName();
 
-    moveTo(slot, MacroCell::Value0); zeroCell();
-    emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
-      return ctx.getBlockIndex(functionName) & 0xff;
-    });
+    // TODO: replace by ConstructConstant
+    moveTo(slot, MacroCell::Value0);
+    emit<primitive::ConstructConstant>([functionName](primitive::Context const &ctx) -> int {
+      return ctx.getDispatchIndex(functionName) & 0xff;
+    }, 0, MacroCell::Scratch0 - MacroCell::Value0);
 
-    moveTo(slot, MacroCell::Value1); zeroCell();
-    emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
-      return (ctx.getBlockIndex(functionName) >> 8) & 0xff;
-    });
+    moveTo(slot, MacroCell::Value1); 
+    emit<primitive::ConstructConstant>([functionName](primitive::Context const &ctx) -> int {
+      return (ctx.getDispatchIndex(functionName) >> 8) & 0xff;
+    }, 0, MacroCell::Scratch0 - MacroCell::Value1);
   }
   else {
     assert(false && "not implemented");

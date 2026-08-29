@@ -17,14 +17,15 @@ namespace acus::primitive {
   struct Context {
     
     int fieldCount;
-    std::unordered_map<std::string, int> blockIDtoIndex;
+
+    std::unordered_map<std::string, int> blockIDToDispatchIndex;
     std::unordered_map<std::string, int> stackFrameSize;
     std::unordered_map<std::string, int> localBaseOffset;
 
-    int getBlockIndex(std::string const &f, std::string const &b = "") const {      
+    int getDispatchIndex(std::string const &f, std::string const &b = "") const {      
       std::string const id = f + (b.empty() ? "" : (std::string(".") + b));
-      assert(blockIDtoIndex.contains(id));
-      return blockIDtoIndex.at(id);
+      assert(blockIDToDispatchIndex.contains(id));
+      return blockIDToDispatchIndex.at(id);
     }
 
     int getStackFrameSize(std::string const &f) const {

@@ -137,7 +137,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
   // Already add '0' to the 1's digit (at the base) to make sure there is at least 1 nonzero.
   // Plant a marker at the base of the array.
   moveTo(digits);
-  addConst('0');	  
+  addConst('0');
   setSeekMarker();
 	
   // Start at right-most digit and move left until first nonzero is found.
@@ -223,9 +223,8 @@ void Assembler::printString(Expression expr) {
 void Assembler::printStringConst(std::string const &str) {
 
   if (str.size() == 0) return;
-  
   Slot ch = getTemp(ts::u8());
-
+  
   pushPtr();
   moveTo(ch);
   setToValue(str[0], Temps<1>::select(ch, MacroCell::Scratch0));

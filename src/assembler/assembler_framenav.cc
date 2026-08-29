@@ -29,8 +29,8 @@ void Assembler::pushFrame() {
   moveTo(0, MacroCell::FrameMarker);
   emit<primitive::MovePointerRelative>(currentFrameSize);
   setToValue(1);
-  moveTo(FrameLayout::RunState, MacroCell::Value0);
-  setToValue(1);
+  //  moveTo(FrameLayout::RunState, MacroCell::Value0);
+  //  setToValue(1);
   moveToOrigin();
 }
 
@@ -44,7 +44,9 @@ void Assembler::popFrame() {
 
   pushPtr();
   if (_currentFunction->name == _program.entryFunctionName) {
-    moveTo(FrameLayout::RunState, MacroCell::Value0);
+    //moveTo(FrameLayout::RunState, MacroCell::Value0);
+    //    zeroCell();
+    moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
     zeroCell();
     moveToOrigin();
   }

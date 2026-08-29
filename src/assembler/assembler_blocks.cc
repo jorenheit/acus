@@ -6,7 +6,7 @@
 #include "assembler.ih"
 
 void Assembler::beginBlock(std::string const &name) {
-  
+
   Function::Block &block = _currentFunction->createBlock(name);
   _program.registerBlock(block);
 
@@ -17,6 +17,7 @@ void Assembler::beginBlock(std::string const &name) {
   _currentBlock = &block;
   setTargetSequence(&block.code);
 
+  // NOT NECESSARY ANYMORE:
   // To start a block, we need to check 2 conditions:
   // 1. Does the block-index match the value stored in the TargetBlock cell?
   // 2. Is the Run-cell still set?
@@ -25,27 +26,27 @@ void Assembler::beginBlock(std::string const &name) {
   // used as the conditional cell upon which it is decided whether or not to enter
   // the block.
   
-  moveTo(FrameLayout::TargetBlock, MacroCell::Value0);
-  compare16ToConstConstructive(/* value =    */ _currentBlock->globalBlockIndex,
-			       /* highByte = */ Cell{FrameLayout::TargetBlock, MacroCell::Value1},
-			       /* result =   */ Cell{FrameLayout::TargetBlock, MacroCell::Flag},
-			       Temps<2>::select(FrameLayout::TargetBlock, MacroCell::Scratch0,
-						FrameLayout::TargetBlock, MacroCell::Scratch1));
+  // moveTo(FrameLayout::TargetBlock, MacroCell::Value0);
+  // compare16ToConstConstructive(/* value =    */ _currentBlock->globalBlockIndex,
+  // 			       /* highByte = */ Cell{FrameLayout::TargetBlock, MacroCell::Value1},
+  // 			       /* result =   */ Cell{FrameLayout::TargetBlock, MacroCell::Flag},
+  // 			       Temps<2>::select(FrameLayout::TargetBlock, MacroCell::Scratch0,
+  // 						FrameLayout::TargetBlock, MacroCell::Scratch1));
 
-  moveTo(FrameLayout::RunState, MacroCell::Value0);
-  andConstructive(/* result = */ Cell{FrameLayout::RunState, MacroCell::Flag},
-		  /* other  = */ Cell{FrameLayout::TargetBlock, MacroCell::Flag},
-		  Temps<2>::select(FrameLayout::RunState, MacroCell::Scratch0,
-				   FrameLayout::RunState, MacroCell::Scratch1));
+  // moveTo(FrameLayout::RunState, MacroCell::Value0);
+  // andConstructive(/* result = */ Cell{FrameLayout::RunState, MacroCell::Flag},
+  // 		  /* other  = */ Cell{FrameLayout::TargetBlock, MacroCell::Flag},
+  // 		  Temps<2>::select(FrameLayout::RunState, MacroCell::Scratch0,
+  // 				   FrameLayout::RunState, MacroCell::Scratch1));
 
   // Clear the targetblock flag
-  moveTo(FrameLayout::TargetBlock, MacroCell::Flag);
-  zeroCell();
+  // moveTo(FrameLayout::TargetBlock, MacroCell::Flag);
+  // zeroCell();
 
   // Open the block, conditional on the run-flag
-  moveTo(FrameLayout::RunState, MacroCell::Flag);
-  loopOpen();
-  zeroCell();
+  // moveTo(FrameLayout::RunState, MacroCell::Flag);
+  // loopOpen();
+  // zeroCell();
   moveToOrigin();
 }
 
@@ -53,8 +54,8 @@ void Assembler::endBlock() {
   assert(_currentBlock != nullptr);
 
   // We move back to the Flag stored in the RunState cell (guaranteed zero)
-  moveTo(FrameLayout::RunState, MacroCell::Flag);
-  loopClose();
+  // moveTo(FrameLayout::RunState, MacroCell::Flag);
+  // loopClose();
   moveToOrigin();
   _currentBlock = nullptr;
 }
@@ -86,17 +87,16 @@ void Assembler::setNextBlock(std::string const &f, std::string const &b) {
   
   pushPtr();
 
+  // TODO: replace by ConstructConstant
   moveTo(FrameLayout::TargetBlock, MacroCell::Value0);
-  zeroCell();
-  emit<primitive::ChangeBy>([f, b](primitive::Context const &ctx) -> int {
-    return ctx.getBlockIndex(f, b) & 0xff;
-  });
+  emit<primitive::ConstructConstant>([f, b](primitive::Context const &ctx) -> int {
+    return ctx.getDispatchIndex(f, b) & 0xff;
+  }, 0, MacroCell::Scratch0 - MacroCell::Value0);
   
   moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
-  zeroCell();
-  emit<primitive::ChangeBy>([f, b](primitive::Context const &ctx) -> int {
-    return (ctx.getBlockIndex(f, b) >> 8) & 0xff;
-  });
+  emit<primitive::ConstructConstant>([f, b](primitive::Context const &ctx) -> int {
+    return (ctx.getDispatchIndex(f, b) >> 8) & 0xff;
+  }, 0, MacroCell::Scratch0 - MacroCell::Value0);
   
   popPtr();
 }
@@ -104,7 +104,7 @@ void Assembler::setNextBlock(std::string const &f, std::string const &b) {
 void Assembler::setNextBlock(Expression obj) {
   assert(types::isFunctionPointer(obj.type()));
   
-  auto const targetSlot  = Slot {
+  auto const targetSlot = Slot {
     SlotData{
       .name = "target_block",
       .type = obj.type(),
@@ -175,7 +175,7 @@ void Assembler::constructMetaBlocks() {
     beginBlock(m.name); {
 
       if (returnType == ts::void_t() || not m.returnSlot){
-	fetchReturnData();
+	//	fetchReturnData();
       }
       else {
 	assert(m.returnSlot.has_value());
@@ -188,28 +188,46 @@ void Assembler::constructMetaBlocks() {
 	_cache.controlBoundary();
       }
 
+
+      // Set next block
+      setNextBlock(m.caller, m.nextBlockName);
+      
       // Check if the run-state has become 0. If so, unwind the stack
-      moveTo(FrameLayout::RunState, MacroCell::Value0);
-      copyField(Cell{FrameLayout::RunState, MacroCell::Scratch0},
-		Temps<1>::select(_dp.current().offset, MacroCell::Scratch1)); 
-      moveTo(FrameLayout::RunState, MacroCell::Scratch1);
-      setToValue(1);
+      // moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
+      // notConstructive(Cell{FrameLayout::TargetBlock, MacroCell::Scratch0},
+      // 		      Temps<1>::select(_dp.current().offset, MacroCell::Scratch1));
+      // moveTo(FrameLayout::TargetBlock, MacroCell::Scratch0);
+      // loopOpen(); {
+      // 	dec();
+      // 	popFrame();
+      // } loopClose();
+      // moveToOrigin();
+
       
-      switchField(MacroCell::Scratch0);
-      loopOpen(); { // if run: sync globals and set next block
-	zeroCell();
-	switchField(MacroCell::Scratch1);
-	zeroCell();
-	setNextBlock(m.caller, m.nextBlockName);
-	switchField(MacroCell::Scratch0);	
-      } loopClose();
       
-      switchField(MacroCell::Scratch1);
-      loopOpen(); { // else: pop frame
-	zeroCell();
-	popFrame(); // This leaves us at the Scratch1 cell in another frame: guaranteed 0
-      } loopClose();
-      switchField(MacroCell::Value0);
+      
+      
+      // moveTo(FrameLayout::RunState, MacroCell::Value0);
+      // copyField(Cell{FrameLayout::RunState, MacroCell::Scratch0},
+      // 		Temps<1>::select(_dp.current().offset, MacroCell::Scratch1)); 
+      // moveTo(FrameLayout::RunState, MacroCell::Scratch1);
+      // setToValue(1);
+      
+      // switchField(MacroCell::Scratch0);
+      // loopOpen(); { // if run: sync globals and set next block
+      // 	zeroCell();
+      // 	switchField(MacroCell::Scratch1);
+      // 	zeroCell();
+      // 	setNextBlock(m.caller, m.nextBlockName);
+      // 	switchField(MacroCell::Scratch0);	
+      // } loopClose();
+      
+      // switchField(MacroCell::Scratch1);
+      // loopOpen(); { // else: pop frame
+      // 	zeroCell();
+      // 	popFrame(); // This leaves us at the Scratch1 cell in another frame: guaranteed 0
+      // } loopClose();
+      // switchField(MacroCell::Value0);
     } endBlock();
   }
 
