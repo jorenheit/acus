@@ -231,7 +231,7 @@ void Assembler::printStringConst(std::string const &str) {
   emit<primitive::Out>();
   for (size_t i = 1; i != str.size(); ++i) {
     int const diff = str[i] - str[i - 1];
-    emit<primitive::ChangeBy>(diff);
+    emit<primitive::ChangeBy>(diff, 0, MacroCell::Value1 - MacroCell::Value0);
     emit<primitive::Out>();
   }
   zeroCell();

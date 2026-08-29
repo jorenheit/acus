@@ -146,6 +146,7 @@ namespace acus::primitive {
 
   struct ConstructConstant: Node {
 
+    bool naive;
     DInt value, current, scratch;
     
     /*
@@ -157,7 +158,15 @@ namespace acus::primitive {
      */
 
 
+    explicit ConstructConstant(DInt val):
+      naive(true),
+      value(std::move(val)),
+      current(0),
+      scratch(0)
+    {}
+    
     explicit ConstructConstant(DInt val, DInt current, DInt scratch):
+      naive(false),
       value(std::move(val)),
       current(std::move(current)),
       scratch(std::move(scratch))
@@ -169,7 +178,10 @@ namespace acus::primitive {
 
   
   struct ChangeBy: Node {
-    DInt delta;
+
+    bool naive;
+    DInt delta, current, scratch;
+
     /*
       Changes the value in the current cell by an amount 'delta'.
       
@@ -178,7 +190,20 @@ namespace acus::primitive {
       Invariants: -
     */
     
-    inline explicit ChangeBy(DInt d): delta(std::move(d)) {}
+    explicit ChangeBy(DInt delta):
+      naive(true),
+      delta(std::move(delta)),
+      current(0),
+      scratch(0)
+    {}
+    
+    explicit ChangeBy(DInt delta, DInt current, DInt scratch):
+      naive(false),
+      delta(std::move(delta)),
+      current(std::move(current)),
+      scratch(std::move(scratch))
+    {}
+
     COMMON_INTERFACE;
     MERGABLE;
   };
