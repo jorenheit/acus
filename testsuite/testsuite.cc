@@ -844,6 +844,26 @@ tests.push_back(expectOutput("Struct with two pointer fields",
 #include "tests/pointer_passed_through_two_calls.cc"
 			      }));
 
+ tests.push_back(expectOutput("Pointer To Pointer Across Frames",
+                             "A", []() {
+#include "tests/pointer_to_pointer_across_frames.cc"
+                             }));
+
+ tests.push_back(expectOutput("Dereferenced Struct Rebases Pointer Field",
+                             "A", []() {
+#include "tests/dereferenced_struct_rebases_pointer_field.cc"
+                             }));
+
+ tests.push_back(expectOutput("Pointer Write Rebases To Older Frame",
+                             "A", []() {
+#include "tests/pointer_write_rebases_to_older_frame.cc"
+                             }));
+
+ tests.push_back(expectOutput("Struct Write Rebases Pointer Field To Older Frame",
+                             "A", []() {
+#include "tests/struct_write_rebases_pointer_field_to_older_frame.cc"
+                             }));
+
  tests.push_back(expectOutput("Mixed named and pointer global access",
 			      "AXX", []() {
 #include "tests/mixed_named_and_pointer_global_access.cc"

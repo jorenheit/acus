@@ -443,6 +443,9 @@ namespace acus {
     void copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot, TransferMode mode = TransferMode::Copy);
     void copyConstIntoElement(literal::Literal const srcSlot, Slot arrSlot, Slot indexSlot);
     void copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot, TransferMode mode = TransferMode::Copy);
+    void rebasePointers(Slot slot, Cell depthDiff, auto &&rebase);
+    void rebasePointersToCurrentFrame(Slot slot, Cell frameDepth);
+    void rebasePointersToOlderFrame(Slot slot, Cell frameDepth);
     void dereferencePointerIntoSlot(Slot ptrSlot, Slot derefSlot);
     void writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot, TransferMode mode = TransferMode::Copy);
     void writeConstThroughDereferencedPointer(Slot ptrSlot, literal::Literal const value);

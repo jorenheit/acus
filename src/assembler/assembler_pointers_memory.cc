@@ -443,60 +443,87 @@ void Assembler::writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot, 
   assert(types::isPointer(ptrSlot.type()));
   assert(srcSlot.type() == types::cast<types::PointerType>(ptrSlot.type())->pointeeType());
 
+  // First resolve the requested Copy/Move into a private temporary. Pointer
+  // fields in that temporary can then be rebased destructively without ever
+  // modifying a copied source value. The temporary is always consumed by the
+  // actual write below.
+  Slot const tmp = getTemp(srcSlot.type());
+  Slot const frameDepth = getTemp(ts::u8());
+
   pushPtr();
+
+  // Preserve the destination depth before the source is moved. This matters
+  // when ptrSlot aliases storage contained in srcSlot.
+  moveTo(ptrSlot + RuntimePointer::FrameDepth, MacroCell::Value0);
+  copyField(Cell{frameDepth, MacroCell::Value0},
+            Temps<1>::select(frameDepth, MacroCell::Scratch0));
+
   // Leave a marker at the end of the current frame to guarantee that the
   // pointee is to our left.
-
   int const endOfFrame = _currentFunction->frame.totalLogicalCells();
   moveTo(endOfFrame);
   setSeekMarker();
   moveToPointee(ptrSlot);
 
-  // Set the marker and move back to the source (guaranteed to the right)
+  // Set the marker and move back to the source (guaranteed to the right).
+  // From this point on ptrSlot is no longer needed to locate the destination.
   setSeekMarker();
   seek(MacroCell::SeekMarker, primitive::Right, {}, false);
   _dp.set(endOfFrame);
-  
-  // Copy contents of the source-slot into the payload at the end of the frame
-  for (int i = 0; i != srcSlot.size(); ++i) {
-    moveTo(srcSlot + i, MacroCell::Value0);
-    copyOrMoveField(mode, Cell{endOfFrame + i, MacroCell::Payload0},
-		    Temps<1>::select(endOfFrame + i, MacroCell::Scratch0));
-    if (srcSlot.type()->usesValue1()) {
-      moveTo(srcSlot + i, MacroCell::Value1);
-      copyOrMoveField(mode, Cell{endOfFrame + i, MacroCell::Payload1},
-		      Temps<1>::select(endOfFrame + i, MacroCell::Scratch0));
+
+  // Resolve the requested transfer mode into the temporary. A copied source
+  // remains intact; a moved source is consumed here. From now on the temporary
+  // can always be treated destructively.
+  assignSlot(tmp, srcSlot, mode);
+
+  // The value will be stored 'frameDepth' frames closer to its pointees. Rebase
+  // every runtime pointer contained in the temporary before transporting it.
+  // Underflow represents undefined behavior: a forward stack pointer cannot be
+  // represented by RuntimePointer.
+  rebasePointersToOlderFrame(tmp, Cell{frameDepth, MacroCell::Value0});
+
+  // Move the already-rebased temporary into the payload at the end of the
+  // current frame. No pointer-specific metadata needs to travel with it.
+  for (int i = 0; i != tmp.size(); ++i) {
+    moveTo(tmp + i, MacroCell::Value0);
+    moveField(Cell{endOfFrame + i, MacroCell::Payload0});
+    if (tmp.type()->usesValue1()) {
+      moveTo(tmp + i, MacroCell::Value1);
+      moveField(Cell{endOfFrame + i, MacroCell::Payload1});
     }
   }
 
-  // Seek back to the pointee's slot
+  // Seek back to the pointee's slot, carrying only the value itself.
   moveTo(endOfFrame);
   Payload payload{
-    srcSlot.size(),
-    srcSlot.type()->usesValue1() ? Payload::Width::Double : Payload::Width::Single
+    tmp.size(),
+    tmp.type()->usesValue1() ? Payload::Width::Double : Payload::Width::Single
   };
-  
+
   seek(MacroCell::SeekMarker, primitive::Left, payload, false);
   resetSeekMarker();
   _dp.set(0);
-  
-  // Move contents of the payload in the slot
-  for (int i = 0; i != srcSlot.size(); ++i) {
+
+  // Move the payload into the pointee slot. The value is already expressed
+  // relative to this older frame, so this is now an ordinary bytewise move.
+  for (int i = 0; i != tmp.size(); ++i) {
     moveTo(i, MacroCell::Payload0);
     moveField(Cell{i, MacroCell::Value0});
-    if (srcSlot.type()->usesValue1()) {
+    if (tmp.type()->usesValue1()) {
       moveTo(i, MacroCell::Payload1);
       moveField(Cell{i, MacroCell::Value1});
     }
   }
 
-  // Seek back to the source
+  // Seek back to the source frame.
   seek(MacroCell::SeekMarker, primitive::Right, {}, false);
   resetSeekMarker();
   _dp.set(endOfFrame);
-  popPtr();
-}
 
+  popPtr();
+  freeTempSlot(frameDepth);
+  freeTempSlot(tmp);
+}
 
 void Assembler::writeConstThroughDereferencedPointer(Slot ptrSlot, literal::Literal const value) {
   assert(types::isPointer(ptrSlot.type()));
@@ -524,6 +551,61 @@ void Assembler::writeConstThroughDereferencedPointer(Slot ptrSlot, literal::Lite
   resetSeekMarker();
   _dp.set(endOfFrame);
   popPtr();
+}
+
+void Assembler::rebasePointers(Slot slot, Cell depthDiff, auto &&rebase) {
+  switch (slot.type()->tag()) {
+  case types::POINTER: {
+    Cell const currentDepth  { slot + RuntimePointer::FrameDepth, MacroCell::Value0 };
+    Cell const depthDiffCopy { slot + RuntimePointer::FrameDepth, MacroCell::Scratch0 };
+
+    // Make a disposable copy of the depth difference before rebasing, which consumes its operand.    
+    moveTo(depthDiff);
+    copyField(depthDiffCopy,
+              Temps<1>::select(slot + RuntimePointer::FrameDepth, MacroCell::Scratch1));
+    moveTo(currentDepth);
+    rebase(depthDiffCopy);
+    break;
+  }
+
+  case types::ARRAY: {
+    auto const arrayType = types::cast<types::ArrayType>(slot.type());
+    auto const elementType = arrayType->elementType();
+    for (int i = 0; i != arrayType->length(); ++i) {
+      rebasePointers(slot.sub(elementType, i * elementType->size()), depthDiff, rebase);
+    }
+    break;
+  }
+
+  case types::STRUCT: {
+    auto const structType = types::cast<types::StructType>(slot.type());
+    for (int i = 0; i != structType->fieldCount(); ++i) {
+      auto const fieldType = structType->fieldType(i);
+      rebasePointers(slot.sub(fieldType, structType->fieldOffset(i)), depthDiff, rebase);
+    }
+    break;
+  }
+
+  default:
+    // No pointers contained in this slot
+    break;
+  }  
+}
+
+void Assembler::rebasePointersToCurrentFrame(Slot slot, Cell depthToAdd) {
+  // Moving a pointer value into a newer frame increases its distance
+  // to the pointee by the number of crossed frames.
+  rebasePointers(slot, depthToAdd, [&](Cell diff) {
+    addDestructive(diff);
+  });
+}
+
+void Assembler::rebasePointersToOlderFrame(Slot slot, Cell depthToSub) {
+  // Moving a pointer value into an older frame decreases its distance
+  // to the pointee by the number of crossed frames.
+  rebasePointers(slot, depthToSub, [&](Cell diff) {
+    subDestructive(diff);
+  });
 }
 
 
@@ -579,6 +661,15 @@ void Assembler::dereferencePointerIntoSlot(Slot ptrSlot, Slot derefSlot) {
       zeroCell();
     }
   }
+
+  // The copied value used to live ptrSlot.FrameDepth frames behind this one.
+  // Any runtime pointers stored inside it are therefore that many frames farther
+  // from their pointees now that the value has been materialized here. These
+  // pointers must be rebased before they can be dereferenced properly.
+  rebasePointersToCurrentFrame(
+    derefSlot,
+    Cell{ptrSlot + RuntimePointer::FrameDepth, MacroCell::Value0}
+  );
   
   popPtr();
 }  
