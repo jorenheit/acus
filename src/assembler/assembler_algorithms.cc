@@ -151,6 +151,17 @@ void Assembler::compare16ToConstConstructive(int value, Cell high, Cell result, 
 
 void Assembler::moveToDynamicOffset(Cell offsetLow, Cell offsetHigh, TransferMode mode) {
 
+  // This algorithm was designed with a particular ordering of the macrocell in mind.
+  // If that ordering changes, this has to be updated as well. This static assert makes
+  // sure that we are notified of this, should that ever happen.
+  static_assert(MacroCell::Payload1 - MacroCell::Payload0 == 1 &&
+		MacroCell::Payload0 - MacroCell::Flag     == 1 &&
+		MacroCell::Flag     - MacroCell::Scratch1 == 1 &&
+		MacroCell::Scratch1 - MacroCell::Scratch0 == 1,
+		"MacroCell structure has changed; moveToDynamicOffset requires "
+		"Scratch0, Scratch1, Flag, Payload0 and Payload1 to be consecutive "
+		"and in that order.");  
+
   // First, copy the offsets into temporary storage of the current cell.
   // offsetLow -> Scratch1 and offsetHigh -> Scratch0 (why reverse order?)
   int const base = _dp.current().offset;
@@ -169,7 +180,7 @@ void Assembler::moveToDynamicOffset(Cell offsetLow, Cell offsetHigh, TransferMod
   moveTo(offsetLow);
   copyOrMoveField(mode, Cell{base, MacroCell::Scratch1}, Temps<1>::select(base, MacroCell::Scratch0));
   moveTo(offsetHigh);
-  copyOrMoveField(mode, Cell{base, MacroCell::Scratch0}, Temps<1>::select(base, MacroCell::Payload0));
+  copyOrMoveField(mode, Cell{base, MacroCell::Scratch0}, Temps<1>::select(base, MacroCell::Flag));
   moveTo(base, MacroCell::Payload1);
   inc();
 
