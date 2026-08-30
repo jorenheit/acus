@@ -43,7 +43,7 @@ Slot Assembler::addressOfSlot(Slot pointeeSlot, API_CTX) {
   return ptrSlot;
 }
 
-void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot, TransferMode mode) {
+void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot, TransferMode dataTransferMode) {
   // TransferMode::Move is valid only when arrSlot is part of a source object
   // being consumed as a whole, e.g. a temp/cache slot being discarded.
   // It destructively extracts the selected element in this mode.
@@ -57,7 +57,7 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   pushPtr();
 
   // Prepare offset-payload (index * sizeof(T))
-  auto [scaledIndexSlot, freeScaledIndexSlot] = [&] -> std::pair<Slot, bool> {
+  auto [scaledIndexSlot, tempScaledIndexSlot] = [&] -> std::pair<Slot, bool> {
     if (indexSlot.type()->usesValue1() && elementType->size() == 1) {
       // Index can be used as-is
       return {indexSlot, false};
@@ -81,7 +81,8 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
 			 Cell{scaledIndexSlot, MacroCell::Value1},
 			 payload,
 			 primitive::Left,
-			 mode);
+			 dataTransferMode,
+			 tempScaledIndexSlot ? TransferMode::Move : TransferMode::Copy);
 
   // Move payload into element
   for (int i = 0; i != elementType->size(); ++i) {
@@ -96,7 +97,7 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   // Return to start of array
   moveTo(arrSlot);
   resetSeekMarker();
-  if (freeScaledIndexSlot) freeTempSlot(scaledIndexSlot);
+  if (tempScaledIndexSlot) freeTempSlot(scaledIndexSlot);
   popPtr();
 
 }
@@ -436,7 +437,9 @@ void Assembler::moveToPointee(Slot ptrSlot) {
   } loopClose();
 
   // At the target frame -> move to offset indicated by pointer value in payload
-  moveToDynamicOffset(offsetLowPayload, offsetHighPayload);
+  // Because the dynamic algorithm below works from the scratch cells and needs the
+  // Payload cells empty, we can move them there instead of copying them.
+  moveToDynamicOffset(offsetLowPayload, offsetHighPayload, TransferMode::Move);
 }
 
 

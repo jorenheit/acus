@@ -461,8 +461,9 @@ namespace acus {
     void loopOpen(std::string const &tag = defaultOpenTag());
     void loopClose(std::string const &tag = defaultCloseTag());
 
-    void moveToDynamicOffset(Cell offsetLow, Cell offsetHigh);
-    void fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir, TransferMode mode = TransferMode::Copy);
+    void moveToDynamicOffset(Cell offsetLow, Cell offsetHigh, TransferMode mode = TransferMode::Copy);
+    void fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir,
+				TransferMode dataTransferMode, TransferMode offsetTransferMode);
   
     void moveField(Cell dest);
     void copyField(Cell dest, Temps<1>);

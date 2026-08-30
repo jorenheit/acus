@@ -206,7 +206,10 @@ void Assembler::endProgram(API_FUNC) {
 
 
   auto copyTargetBlockToScratch = [&]{
-    // Use Daniel's algorithm to copy the TargetBlock into the scratch cells
+    // Use Daniel's algorithm to copy the TargetBlock into the scratch cells.
+    // TODO: modify move/copy to take multiple destinations and simplify this
+    //       in terms of those primitives.
+    
     // 1: Move TargetBlock high byte value into Scratch1 and Flag
     loopOpen(); {
       switchField(MacroCell::Scratch1); inc();
@@ -281,6 +284,7 @@ void Assembler::endProgram(API_FUNC) {
   // Construct context for final generation passes
   primitive::Context ctx = constructContext(dispatchBlocks, innerSwitchCaseCount);  
 
+  // Save results
   _txt[_program.name] = result.dumpText(ctx);
   _bf[_program.name] = simplifyBrainfuck(result.dumpCode(ctx));
 }
@@ -345,9 +349,6 @@ void Assembler::endScope(API_FUNC) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  // TODO: should this actually be a cache boundary?
-  // Rather, cache entries should not be scoped?
-  //  _cache.controlBoundary();
   freeScope(_currentScope);
   _currentScope = _currentScope->parent;
 }

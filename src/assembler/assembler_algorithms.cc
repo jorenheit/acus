@@ -149,68 +149,145 @@ void Assembler::compare16ToConstConstructive(int value, Cell high, Cell result, 
   popPtr();
 }
 
-void Assembler::moveToDynamicOffset(Cell offsetLow, Cell offsetHigh) {
-  // WARNING: this leaves pointer in unknown position.
-  // Make sure to leave a marker in order to be able to seek back
-  
-  // Copy offset (16-bit) into payload cells of the current cell  
+void Assembler::moveToDynamicOffset(Cell offsetLow, Cell offsetHigh, TransferMode mode) {
+
+  // First, copy the offsets into temporary storage of the current cell.
+  // offsetLow -> Scratch1 and offsetHigh -> Scratch0 (why reverse order?)
   int const base = _dp.current().offset;
+  int const stride = MacroCell::FieldCount; 
+
+  pushPtr();
+
+  // Prepare current macrocell to be in this state:
+  // Current state:
+  // Scratch0 = high 
+  // Scratch1 = low
+  // Flag     = 0
+  // Payload0 = 0
+  // Payload1 = 1   <- pointer here
+
   moveTo(offsetLow);
-  copyField(Cell{base, MacroCell::Payload0}, Temps<1>::select(base, MacroCell::Scratch0));
+  copyOrMoveField(mode, Cell{base, MacroCell::Scratch1}, Temps<1>::select(base, MacroCell::Scratch0));
   moveTo(offsetHigh);
-  copyField(Cell{base, MacroCell::Payload1}, Temps<1>::select(base, MacroCell::Scratch0));
-  
-  // Starting at the current offset, move right while decrementing offset until
-  // both bytes have become zero. Then move the value back to the seek-marker
-  moveTo(base, MacroCell::Payload0);
-  orConstructive(Cell{base, MacroCell::Flag},
-		 Cell{base, MacroCell::Payload1},
-		 Temps<2>::select(base, MacroCell::Scratch0,
-				base, MacroCell::Scratch1));
-  moveTo(base, MacroCell::Flag);
+  copyOrMoveField(mode, Cell{base, MacroCell::Scratch0}, Temps<1>::select(base, MacroCell::Payload0));
+  moveTo(base, MacroCell::Payload1);
+  inc();
+
+  // From hereon, we use raw moves instead of switchField, because pointer position
+  // is not preserved within loops.
+  auto left  = [&](int n = 1) { assert(n >= 0); emit<primitive::MovePointerRelative>(-n); };
+  auto right = [&](int n = 1) { assert(n >= 0); emit<primitive::MovePointerRelative>(n);  };
+
+  // Daniel's algorithm  
   loopOpen(); {
-    zeroCell();
+    // <<<[->>]
+    //
+    // If low != 0:
+    //   --low
+    //   jump to Payload0 (known zero)
+    left(3);                      // Payload1 -> Scratch1
+    loopOpen(); {
+      dec();
+      right(2);                   // Scratch1 -> Payload0 (guaranteed 0)
+    } loopClose();
 
-    // Decrement the offset
-    switchField(MacroCell::Payload0);
-    dec16(Cell{base, MacroCell::Payload1},
-	  Temps<2>::select(base, MacroCell::Scratch0,
-			 base, MacroCell::Scratch1));
+    // If low was nonzero, the pointer is Payload0 and low was decremented.
+    // If low was zero, we're still at low.
     
-    // move payload forward by 1
-    moveField(Cell{base + 1, MacroCell::Payload0});
-    switchField(MacroCell::Payload1);
-    moveField(Cell{base + 1, MacroCell::Payload1});
+    // <[->->]
+    //
+    // Reached only on high when low was zero.
+    // If high != 0:
+    //   --high
+    //   low = 255
+    //
+    // Both paths finish such that the following +2 reaches Payload1
+    // iff the original 16-bit counter was nonzero.
 
-    // Follow along with pointer (raw -> compile-time offset remains at base)
-    switchField(MacroCell::Payload0);    
-    emit<primitive::MovePointerRelative>(MacroCell::FieldCount);
+    left();
+    loopOpen(); {
+      dec();
+      right();
+      dec();
+      right();
+    } loopClose();
 
-    // Flag <- (payload == 0)
-    orConstructive(Cell{base, MacroCell::Flag},
-		   Cell{base, MacroCell::Payload1},
-		   Temps<2>::select(base, MacroCell::Scratch0,
-				  base, MacroCell::Scratch1));
-    switchField(MacroCell::Flag);
+    right(2);
+
+    // If either byte was nonzero, we're now on Payload1 == 1.
+    // If both were zero, we're on Flag == 0 and this is skipped.
+    loopOpen(); {
+
+      // <+>
+      // Payload0 becomes the second iteration flag.
+      left();
+      inc();
+      right();
+
+      // [-<<<[...move one byte...]>>]
+      //
+      // First iteration: move low
+      // Second iteration: move high
+      loopOpen(); {
+	dec();
+	left(3);
+
+	emit<primitive::MoveData>(stride);
+
+	right(2);
+      } loopClose();
+
+      // We're now on Flag in the old macrocell.
+      // Move to Flag in the next macrocell.
+      right(stride);
+
+      // >>+<
+      // Set Payload1 of the new macrocell to 1,
+      // ending on Payload0 == 0.
+      right(2);
+      inc();
+      left();
+
+    } loopClose();
+
+    // If we moved:
+    //   Payload0(new) -> Payload1(new) == 1
+    //
+    // If counter was already zero:
+    //   Flag(old) -> Payload0(old) == 0
+    right();
+  
   } loopClose();
-  moveTo(base, MacroCell::Value0);
+
+  // We terminated on Payload0 of the final macrocell.
+  // Move to Payload1 and clear the flag.
+  right();
+  dec();
+
+  popPtr();
 }
 
-void Assembler::fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir, TransferMode mode) {
+void Assembler::fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir,
+				       TransferMode dataTransferMode, TransferMode offsetTransferMode) {
   assert(payload);
 
   int const base = _dp.current().offset;
   pushPtr();
-  moveToDynamicOffset(offsetLow, offsetHigh);
+  moveToDynamicOffset(offsetLow, offsetHigh, offsetTransferMode);
   
   // Base is now the cell we arrived at (at offset).
   // Load values into payload
   for (int i = 0; i != payload.size(); ++i) {
     moveTo(base + i, MacroCell::Value0);
-    copyOrMoveField(mode, Cell{base + i, MacroCell::Payload0}, Temps<1>::select(base + i, MacroCell::Scratch0));
+    copyOrMoveField(dataTransferMode,
+		    Cell{base + i, MacroCell::Payload0},
+		    Temps<1>::select(base + i, MacroCell::Scratch0));
+    
     if (payload.width(i) == Payload::Width::Double) {
       moveTo(base + i, MacroCell::Value1);
-      copyOrMoveField(mode, Cell{base + i, MacroCell::Payload1}, Temps<1>::select(base + i, MacroCell::Scratch0));
+      copyOrMoveField(dataTransferMode,
+		      Cell{base + i, MacroCell::Payload1},
+		      Temps<1>::select(base + i, MacroCell::Scratch0));
     }
   }
   
