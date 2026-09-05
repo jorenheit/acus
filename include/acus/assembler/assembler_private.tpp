@@ -23,10 +23,9 @@ void Assembler::branchOnSignBit(Slot slot, Cell const &flagCell, TrueBranch&& tr
   pushPtr();
   moveTo(slot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);    
   signBitConstructive(flagCell,
-		      Temps<4>::select(slot, MacroCell::Scratch0,
+		      Temps<3>::select(slot, MacroCell::Scratch0,
 				       slot, MacroCell::Scratch1,
-				       slot, MacroCell::Payload0,
-				       slot, MacroCell::Payload1));
+				       slot, MacroCell::Payload0));
   moveTo(slot, MacroCell::Scratch0);
   setToValue(1);
   moveTo(flagCell);

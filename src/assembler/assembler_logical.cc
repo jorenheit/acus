@@ -18,8 +18,7 @@ void Assembler::andSlotWithConst(Slot lhs, int val) {
   }
 
   if (lhs.type()->usesValue1()) {
-    bool16Destructive(Cell{lhs, MacroCell::Value1},
-		      Temps<1>::select(lhs, MacroCell::Scratch0));
+    bool16Destructive(Cell{lhs, MacroCell::Value1});
   } else {
     boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
   }
@@ -108,8 +107,7 @@ void Assembler::orSlotWithConst(Slot lhs, int val) {
   }
 
   if (lhs.type()->usesValue1()) {
-    bool16Destructive(Cell{lhs, MacroCell::Value1},
-		      Temps<1>::select(lhs, MacroCell::Scratch0));
+    bool16Destructive(Cell{lhs, MacroCell::Value1});
   } else {
     boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
   }
@@ -127,12 +125,9 @@ void Assembler::orSlotWithSlot(Slot lhs, Slot rhs) {
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     or16Destructive(Cell{lhs, MacroCell::Value1},
 		    Cell{rhsCopy, MacroCell::Value0},
-		    Cell{rhsCopy, MacroCell::Value1},
-		    Temps<1>::select(lhs, MacroCell::Scratch0));
-		     
+		    Cell{rhsCopy, MacroCell::Value1});
   } else {
-    orDestructive(Cell{rhsCopy, MacroCell::Value0},
-		  Temps<1>::select(lhs, MacroCell::Scratch0));
+    orDestructive(Cell{rhsCopy, MacroCell::Value0});
   }
 
   popPtr();
@@ -197,8 +192,7 @@ void Assembler::xorSlotWithConst(Slot lhs, int val) {
   }
   else {
     if (lhs.type()->usesValue1()) {
-      bool16Destructive(Cell{lhs, MacroCell::Value1},
-		       Temps<1>::select(lhs, MacroCell::Scratch0));
+      bool16Destructive(Cell{lhs, MacroCell::Value1});
     } else {
       boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
     }
@@ -218,13 +212,11 @@ void Assembler::xorSlotWithSlot(Slot lhs, Slot rhs) {
     xor16Destructive(Cell{lhs, MacroCell::Value1},
 		     Cell{rhsCopy, MacroCell::Value0},
 		     Cell{rhsCopy, MacroCell::Value1},
-		     Temps<2>::select(lhs, MacroCell::Scratch0,
-				      lhs, MacroCell::Scratch1));
+		     Temps<1>::select(lhs, MacroCell::Scratch0));
 		     
   } else {
     xorDestructive(Cell{rhsCopy, MacroCell::Value0},
-		   Temps<2>::select(lhs, MacroCell::Scratch0,
-				    lhs, MacroCell::Scratch1));
+		   Temps<1>::select(lhs, MacroCell::Scratch0));
   }
 
   popPtr();
@@ -245,8 +237,7 @@ void Assembler::xnorSlotWithConst(Slot lhs, int val) {
   }
   else {
     if (lhs.type()->usesValue1()) {
-      bool16Destructive(Cell{lhs, MacroCell::Value1},
-		       Temps<1>::select(lhs, MacroCell::Scratch0));
+      bool16Destructive(Cell{lhs, MacroCell::Value1});
     } else {
       boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
     }
@@ -266,22 +257,19 @@ void Assembler::xnorSlotWithSlot(Slot lhs, Slot rhs) {
     xnor16Destructive(Cell{lhs, MacroCell::Value1},
 		      Cell{rhsCopy, MacroCell::Value0},
 		      Cell{rhsCopy, MacroCell::Value1},
-		      Temps<2>::select(lhs, MacroCell::Scratch0,
-				       lhs, MacroCell::Scratch1));
-		     
+		      Temps<1>::select(lhs, MacroCell::Scratch0));
   } else {
     xnorDestructive(Cell{rhsCopy, MacroCell::Value0},
-		    Temps<2>::select(lhs, MacroCell::Scratch0,
-				     lhs, MacroCell::Scratch1));
+		    Temps<1>::select(lhs, MacroCell::Scratch0));
   }
 
   popPtr();
   freeTempSlot(rhsCopy);
 }
 
-void Assembler::orDestructive(Cell other, Temps<1> tmp) {
-  auto [cur, oth, tmp0] = getFieldIndices(_dp.current(), other, tmp.get<0>());
-  emit<primitive::Or>(cur, oth, tmp0);
+void Assembler::orDestructive(Cell other) {
+  auto [cur, oth] = getFieldIndices(_dp.current(), other);
+  emit<primitive::Or>(cur, oth);
 }
 
 void Assembler::orConstructive(Cell result, Cell other, Temps<2> tmp) {
@@ -292,11 +280,11 @@ void Assembler::orConstructive(Cell result, Cell other, Temps<2> tmp) {
   moveTo(other);
   copyField(otherCopy, tmp.select<1>());
   moveTo(result);
-  orDestructive(otherCopy, tmp.select<1>());
+  orDestructive(otherCopy);
   popPtr();
 }
 
-void Assembler::or16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
+void Assembler::or16Destructive(Cell high, Cell otherLow, Cell otherHigh) {
 
   pushPtr();
   Cell const currentLow = _dp.current();
@@ -304,13 +292,13 @@ void Assembler::or16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<
 
   // Collapse both to bool
   moveTo(currentLow);
-  bool16Destructive(currentHigh, tmp);
+  bool16Destructive(currentHigh);
   moveTo(otherLow);
-  bool16Destructive(otherHigh, tmp);
+  bool16Destructive(otherHigh);
 
   // And results
   moveTo(currentLow);
-  orDestructive(otherLow, tmp);
+  orDestructive(otherLow);
   popPtr();
 }
 
@@ -330,7 +318,7 @@ void Assembler::or16Constructive(Cell high, Cell result, Cell otherLow, Cell oth
   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
 
   moveTo(result);
-  or16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3>());
+  or16Destructive(resultHigh, otherCopyLow, otherCopyHigh);
   popPtr();
 }
 
@@ -358,9 +346,9 @@ void Assembler::and16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps
 
   // Collapse both to bool
   moveTo(currentLow);
-  bool16Destructive(currentHigh, tmp);
+  bool16Destructive(currentHigh);
   moveTo(otherLow);
-  bool16Destructive(otherHigh, tmp);
+  bool16Destructive(otherHigh);
 
   // And results
   moveTo(currentLow);
@@ -389,32 +377,32 @@ void Assembler::and16Constructive(Cell high, Cell result, Cell otherLow, Cell ot
   popPtr();
 }
 
-void Assembler::xorDestructive(Cell other, Temps<2> tmp) {
-  auto [cur, oth, tmp0, tmp1] = getFieldIndices(_dp.current(), other, tmp.get<0>(), tmp.get<1>());
-  emit<primitive::Xor>(cur, oth, tmp0, tmp1);
+void Assembler::xorDestructive(Cell other, Temps<1> tmp) {
+  auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+  emit<primitive::Xor>(cur, oth, scratch);
 }
 
-void Assembler::xorConstructive(Cell result, Cell other, Temps<3> tmp) { 
+void Assembler::xorConstructive(Cell result, Cell other, Temps<2> tmp) { 
   Cell const &otherCopy = tmp.get<0>();
   pushPtr();
   copyField(result, tmp.select<1>());  
   moveTo(other);
   copyField(otherCopy, tmp.select<1>());
   moveTo(result);
-  xorDestructive(otherCopy, tmp.select<1, 2>());
+  xorDestructive(otherCopy, tmp.select<1>());
   popPtr();
 }
 
-void Assembler::xor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<2> tmp) {
+void Assembler::xor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
   pushPtr();
   Cell const currentLow = _dp.current();
   Cell const currentHigh = high;
 
   // Collapse both to bool
   moveTo(currentLow);
-  bool16Destructive(currentHigh, tmp.select<0>());
+  bool16Destructive(currentHigh);
   moveTo(otherLow);
-  bool16Destructive(otherHigh, tmp.select<0>());
+  bool16Destructive(otherHigh);
 
   // And results
   moveTo(currentLow);
@@ -423,7 +411,7 @@ void Assembler::xor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps
 }
 
 
-void Assembler::xor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<5> tmp) { 
+void Assembler::xor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) { 
 
   Cell const currentLow = _dp.current();
   Cell const currentHigh = high;
@@ -439,7 +427,7 @@ void Assembler::xor16Constructive(Cell high, Cell result, Cell otherLow, Cell ot
   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
 
   moveTo(result);
-  xor16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3, 4>());
+  xor16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3>());
   popPtr();
 }
 
@@ -465,7 +453,7 @@ void Assembler::nand16Constructive(Cell high, Cell result, Cell otherLow, Cell o
 }
 
 void Assembler::norDestructive(Cell other, Temps<1> tmp) {
-  orDestructive(other, tmp);
+  orDestructive(other);
   notDestructive(tmp);
 }
 
@@ -475,7 +463,7 @@ void Assembler::norConstructive(Cell result, Cell other, Temps<2> tmp) {
 }
 
 void Assembler::nor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
-  or16Destructive(high, otherLow, otherHigh, tmp);
+  or16Destructive(high, otherLow, otherHigh);
   notDestructive(tmp);
 }
 
@@ -484,22 +472,22 @@ void Assembler::nor16Constructive(Cell high, Cell result, Cell otherLow, Cell ot
   notDestructive(tmp.select<0>());
 }
 
-void Assembler::xnorDestructive(Cell other, Temps<2> tmp) {
+void Assembler::xnorDestructive(Cell other, Temps<1> tmp) {
   xorDestructive(other, tmp);
-  notDestructive(tmp.select<1>());
+  notDestructive(tmp.select<0>());
 }
 
-void Assembler::xnorConstructive(Cell result, Cell other, Temps<3> tmp) {
+void Assembler::xnorConstructive(Cell result, Cell other, Temps<2> tmp) {
   xorConstructive(result, other, tmp);
   notDestructive(tmp.select<0>());
 }
 
-void Assembler::xnor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<2> tmp) {
+void Assembler::xnor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
   xor16Destructive(high, otherLow, otherHigh, tmp);
   notDestructive(tmp.select<0>());
 }
 
-void Assembler::xnor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<5> tmp) {
+void Assembler::xnor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
   xor16Constructive(high, result, otherLow, otherHigh, tmp);
   notDestructive(tmp.select<0>());
 }

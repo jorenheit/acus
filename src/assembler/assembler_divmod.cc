@@ -78,10 +78,9 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   pushPtr();
   moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{lhs, MacroCell::Flag},
-		      Temps<4>::select(lhs, MacroCell::Scratch0,
+		      Temps<3>::select(lhs, MacroCell::Scratch0,
 				       lhs, MacroCell::Scratch1,
-				       lhs, MacroCell::Payload0,
-				       lhs, MacroCell::Payload1));
+				       lhs, MacroCell::Payload0));
 
   Slot tmp = getTemp(ts::raw(1));
   Cell const lhsNegative { tmp, MacroCell::Flag };
@@ -211,10 +210,9 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   pushPtr();
   moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{lhs, MacroCell::Flag},
-		      Temps<4>::select(lhs, MacroCell::Scratch0,
+		      Temps<3>::select(lhs, MacroCell::Scratch0,
 				       lhs, MacroCell::Scratch1,
-				       lhs, MacroCell::Payload0,
-				       lhs, MacroCell::Payload1));
+				       lhs, MacroCell::Payload0));
 
   Slot tmp = getTemp(ts::raw(2));
   Cell const resultNegative { tmp, MacroCell::Flag };
@@ -234,10 +232,9 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   
   moveTo(rhsCopy, rhsCopy.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{rhsCopy, MacroCell::Flag},
-		      Temps<4>::select(rhsCopy, MacroCell::Scratch0,
+		      Temps<3>::select(rhsCopy, MacroCell::Scratch0,
 				       rhsCopy, MacroCell::Scratch1,
-				       rhsCopy, MacroCell::Payload0,
-				       rhsCopy, MacroCell::Payload1));
+				       rhsCopy, MacroCell::Payload0));
 
   
   moveTo(rhsCopy, MacroCell::Flag);
@@ -339,10 +336,9 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   // For signed integers, the sign of the result is equal to the sign of the LHS
   moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{lhs, MacroCell::Flag},
-		      Temps<4>::select(lhs, MacroCell::Scratch0,
+		      Temps<3>::select(lhs, MacroCell::Scratch0,
 				       lhs, MacroCell::Scratch1,
-				       lhs, MacroCell::Payload0,
-				       lhs, MacroCell::Payload1));
+				       lhs, MacroCell::Payload0));
 
   Slot tmp = getTemp(ts::u8());
   Cell const resultNegative { tmp, MacroCell::Flag };
@@ -476,10 +472,9 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   // For signed integers, the sign of the result is equal to the sign of the LHS
   moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{lhs, MacroCell::Flag},
-		      Temps<4>::select(lhs, MacroCell::Scratch0,
+		      Temps<3>::select(lhs, MacroCell::Scratch0,
 				       lhs, MacroCell::Scratch1,
-				       lhs, MacroCell::Payload0,
-				       lhs, MacroCell::Payload1));
+				       lhs, MacroCell::Payload0));
 
   Slot tmp = getTemp(ts::raw(2));
   Cell const resultNegative { tmp, MacroCell::Flag };

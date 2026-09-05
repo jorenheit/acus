@@ -479,33 +479,33 @@ namespace acus {
     void inc16(Cell high, Temps<2>);
     void dec16(Cell high, Temps<2>);
   
-    void signBitDestructive(Temps<3>);
-    void signBitConstructive(Cell result, Temps<4>);
+    void signBitDestructive(Temps<2>);
+    void signBitConstructive(Cell result, Temps<3>);
     
     void negateDestructive(Temps<2>);
     void negateConstructive(Cell result, Temps<2>);
-    void negate16Destructive(Cell high, Temps<6>);
-    void negate16Constructive(Cell high, Cell result, Temps<7>);
+    void negate16Destructive(Cell high, Temps<5>);
+    void negate16Constructive(Cell high, Cell result, Temps<6>);
     
     void addConst(int delta);
-    void addConstAndCarry(int delta, Cell carry, Temps<3>);
-    void add16Const(int delta, Cell high, Temps<4>);
+    void addConstAndCarry(int delta, Cell carry, Temps<2>);
+    void add16Const(int delta, Cell high, Temps<3>);
     void addDestructive(Cell other);
     void addConstructive(Cell result, Cell other, Temps<2>);
-    void add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
-    void add16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<6>);
-    void addAndCarryDestructive(Cell carry, Cell other, Temps<3>);
-    void addAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<4>);
+    void add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+    void add16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5>);
+    void addAndCarryDestructive(Cell carry, Cell other, Temps<2>);
+    void addAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
 
     void subConst(int delta);
-    void subConstAndCarry(int delta, Cell carry, Temps<3>);
-    void sub16Const(int delta, Cell high, Temps<4>);
+    void subConstAndCarry(int delta, Cell carry, Temps<2>);
+    void sub16Const(int delta, Cell high, Temps<3>);
     void subDestructive(Cell other);
     void subConstructive(Cell result, Cell other, Temps<2>);
-    void sub16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
-    void sub16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<6>);
-    void subAndCarryDestructive(Cell carry, Cell other, Temps<3>);
-    void subAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<4>);
+    void sub16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+    void sub16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5>);
+    void subAndCarryDestructive(Cell carry, Cell other, Temps<2>);
+    void subAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
 
     void mulConst(int factor, Temps<3>);
     void mul16Const(int factor, Cell high, Temps<8>);
@@ -523,7 +523,7 @@ namespace acus {
 
     void boolDestructive(Temps<1>);
     void boolConstructive(Cell result, Temps<1>);
-    void bool16Destructive(Cell high, Temps<1>);
+    void bool16Destructive(Cell high);
     void bool16Constructive(Cell high, Cell result, Temps<2>);
   
     void notDestructive(Temps<1>);
@@ -531,9 +531,9 @@ namespace acus {
     void not16Destructive(Cell high, Temps<1>);
     void not16Constructive(Cell high, Cell result, Temps<2>);
 
-    void orDestructive(Cell other, Temps<1>);
+    void orDestructive(Cell other);
     void orConstructive(Cell result, Cell other, Temps<2>);
-    void or16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
+    void or16Destructive(Cell high, Cell otherLow, Cell otherHigh);
     void or16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
 
     void norDestructive(Cell other, Temps<1>);
@@ -551,15 +551,15 @@ namespace acus {
     void nand16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
     void nand16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
 
-    void xorDestructive(Cell other, Temps<2>);
-    void xorConstructive(Cell result, Cell other, Temps<3>);
-    void xor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<2>);
-    void xor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<5>);
+    void xorDestructive(Cell other, Temps<1>);
+    void xorConstructive(Cell result, Cell other, Temps<2>);
+    void xor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
+    void xor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
 
-    void xnorDestructive(Cell other, Temps<2>);
-    void xnorConstructive(Cell result, Cell other, Temps<3>);
-    void xnor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<2>);
-    void xnor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<5>);
+    void xnorDestructive(Cell other, Temps<1>);
+    void xnorConstructive(Cell result, Cell other, Temps<2>);
+    void xnor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
+    void xnor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
 
     void compareToConstDestructive(int value, Temps<1>);
     void compareToConstConstructive(int value, Cell result, Temps<1>);    
@@ -571,23 +571,23 @@ namespace acus {
     void eq16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
     void eq16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
   
-    void lessDestructive(Cell other, Temps<2>);
-    void lessConstructive(Cell result, Cell other, Temps<3>);
+    void lessDestructive(Cell other, Temps<1>);
+    void lessConstructive(Cell result, Cell other, Temps<2>);
     void less16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
     void less16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8>);
 
-    void lessOrEqualDestructive(Cell other, Temps<2>);
-    void lessOrEqualConstructive(Cell result, Cell other, Temps<3>);
-    void lessOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
-    void lessOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8>);
+    void lessOrEqualDestructive(Cell other, Temps<1>);
+    void lessOrEqualConstructive(Cell result, Cell other, Temps<2>);
+    void lessOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+    void lessOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<6>);
 
-    void greaterDestructive(Cell other, Temps<2>);
-    void greaterConstructive(Cell result, Cell other, Temps<3>);
-    void greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
-    void greater16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8>);
+    void greaterDestructive(Cell other, Temps<1>);
+    void greaterConstructive(Cell result, Cell other, Temps<2>);
+    void greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+    void greater16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<6>);
 
-    void greaterOrEqualDestructive(Cell other, Temps<2>);
-    void greaterOrEqualConstructive(Cell result, Cell other, Temps<3>);
+    void greaterOrEqualDestructive(Cell other, Temps<1>);
+    void greaterOrEqualConstructive(Cell result, Cell other, Temps<2>);
     void greaterOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
     void greaterOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8>);
 

@@ -55,15 +55,12 @@ namespace acus::Algorithm {
   std::string zeroPlus()  { return "[+]"; }
 
   // Move current into target. Leaves current at 0
-  std::string moveValue(int current, int target) {
+  std::string moveValueAssumeZero(int current, int target) {
     assert(util::allDifferent(current, target));
     
     // [->+<]
     std::ostringstream oss;
-    oss << movePtr(target, current)
-	<< zero()
-	<< movePtr(current, target) 
-	<< "["
+    oss << "["
 	<<   decrement()
 	<<   movePtr(target, current)
 	<<   increment()
@@ -73,40 +70,75 @@ namespace acus::Algorithm {
     return oss.str();
   }
 
-  // Move current into both targets. Leaves current at 0
-  std::string moveValue(int current, int target1, int target2) {
-    assert(util::allDifferent(current, target1, target2));
-    // [->+>+<<]
+  template <typename Action>
+  std::string moveToTargetAnd(int &current, int target, Action &&action) {
     std::ostringstream oss;
-    oss << movePtr(target1, current)
-	<< zero()
-	<< movePtr(target2, target1)
-	<< zero()
-	<< movePtr(current, target2) 
-	<< "["
-	<<   decrement()
-	<<   movePtr(target1, current)
-	<<   increment()
-	<<   movePtr(target2, target1)
-	<<   increment()
-	<<   movePtr(current, target2)
-	<< "]";
+    oss << movePtr(target, current) << action();
+    current = target;
     return oss.str();
   }
 
-  // Copy current to target.
-  std::string copyValue(int current, int target, int tmp) {
-    assert(util::allDifferent(current, target, tmp));
-    // [->+>+<<]>>[-<<+>>]<<
+  
+  // Move value of current into target, and optionally other targets as well
+  template <typename... Targets>
+  requires (std::is_integral_v<Targets> && ...)
+  std::string moveValueAssumeZero(int current, int target, Targets ... others) {
+    assert(util::allDifferent(current, target, others...));
+
     std::ostringstream oss;
-    oss << moveValue(current, target, tmp)
-	<< movePtr(tmp, current)
-	<< moveValue(tmp, current)
-	<< movePtr(current, tmp);
+    int const origin = current;
+    
+    // Move into first target
+    oss << "["
+        << decrement()
+        << moveToTargetAnd(current, target, []{ return increment(); });
+
+    // Move into others as well if they are supplied
+    ((oss << moveToTargetAnd(current, others, []{ return increment(); })), ...);
+
+    // Move back to origin
+    oss << movePtr(origin, current)
+        << "]";
+
+    return oss.str();
+  }  
+  
+  // Move current into target. Leaves current at 0
+  template <typename... Targets>
+  requires (std::is_integral_v<Targets> && ...)
+  std::string moveValue(int current, int target, Targets ... others) {
+    assert(util::allDifferent(current, target, others...));
+    
+    std::ostringstream oss;
+    int const origin = current;
+
+    // First zero all targets
+    oss << moveToTargetAnd(current, target, zero);
+    // Zero remaining targets
+    ((oss << moveToTargetAnd(current, others, zero)), ...);    
+    // Now move back to origin and move the value into all targets
+    oss << movePtr(origin, current)
+	<< moveValueAssumeZero(origin, target, others ...);
+
     return oss.str();
   }
 
 
+  // Copy current to all specified targets (at least 1)
+  template <typename... Targets>
+  requires ((std::is_integral_v<Targets> && ...) && sizeof ... (Targets) >= 1)
+  std::string copyValue(int current, int tmp, Targets... targets) {
+    assert(util::allDifferent(current, tmp, targets ...));
+
+    std::ostringstream oss;
+
+    // Move current into all targets, including the tmp
+    oss << moveValue(current, tmp, targets...) << movePtr(tmp, current)
+        << moveValueAssumeZero(tmp, current) << movePtr(current, tmp);
+
+    return oss.str();
+  }
+  
   std::string modify(int n) {
     if (n == 0) return "";
     return (n > 0) ? increment(std::abs(n)) : decrement(std::abs(n));
@@ -165,20 +197,24 @@ namespace acus::Algorithm {
     oss << zero() << modify(val, current, tmp);
     return oss.str();    
   }
-  
+
+
   // Store !!current back intor current
   std::string boolean(int current, int tmp) {
     assert(util::allDifferent(current, tmp));
 
     std::ostringstream oss;
-    oss << moveValue(current, tmp)
-	<< movePtr(tmp, current)
+    oss << movePtr(tmp, current)
+	<< zero()
+	<< movePtr(current, tmp)
 	<< "["
-	<<   zero()
-	<<   movePtr(current, tmp)
-	<<   setToValue(1)
 	<<   movePtr(tmp, current)
+	<<   "+"
+	<<   movePtr(current, tmp)
+	<<   zero()
 	<< "]"
+	<< movePtr(tmp, current)
+	<< moveValueAssumeZero(tmp, current)
 	<< movePtr(current, tmp);
     return oss.str();
   }
@@ -192,36 +228,34 @@ namespace acus::Algorithm {
 	<< setToValue(1)
 	<< movePtr(current, tmp)
 	<< "["
-	<<   zero()
 	<<   movePtr(tmp, current)
-	<<   zero()
+	<<   "-"
 	<<   movePtr(current, tmp)
+	<<   zero()
 	<< "]"
 	<< movePtr(tmp, current)
-	<< moveValue(tmp, current)
+	<< moveValueAssumeZero(tmp, current)
 	<< movePtr(current, tmp);
-    
     return oss.str();
   }
-  
-  // Destructive OR (result in current, destroys other)
-  std::string orValues(int current, int other, int tmp) {
-    assert(util::allDifferent(current, other, tmp));
+
+  // Destructive OR (result in current, destroys other) -> boolean output
+  // TODO: check if we assume boolean output when using this
+  std::string orValues(int current, int other) {
+    assert(util::allDifferent(current, other));
     
     std::ostringstream oss;
-    oss << moveValue(current, tmp)
-	<< movePtr(tmp, current)
-	<< "["
+    oss << "["
 	<<   zero()
-	<<   movePtr(current, tmp)
+	<<   movePtr(other, current)
 	<<   setToValue(1)
-	<<   movePtr(tmp, current)
+	<<   movePtr(current, other)
 	<< "]"
-	<< movePtr(other, tmp)
+	<< movePtr(other, current)
 	<< "["
 	<<   zero()
 	<<   movePtr(current, other)
-	<<   setToValue(1)
+	<<   "+"
 	<<   movePtr(other, current)
 	<< "]"
 	<<  movePtr(current, other);
@@ -234,18 +268,28 @@ namespace acus::Algorithm {
     assert(util::allDifferent(current, other, tmp));
     
     std::ostringstream oss;
-    oss << moveValue(current, tmp)
-	<< movePtr(tmp, current)
+    oss << movePtr(tmp, current)
+	<< setToValue(2)
+	<< movePtr(current, tmp)
 	<< "["
 	<<   zero()
-	<<   movePtr(other, tmp)
-	<<   "["
-	<<     zero()
-	<<     movePtr(current, other)
-	<<     setToValue(1)
-	<<     movePtr(other, current)
-	<<   "]"
+	<<   movePtr(tmp, current)
+	<<   "-"
+	<<   movePtr(current,tmp)
+	<< "]+"
+	<< movePtr(other, current)
+	<< "["
+	<<   zero()
 	<<   movePtr(tmp, other)
+	<<   "-"
+	<<   movePtr(other, tmp)
+	<< "]"
+	<< movePtr(tmp, other)
+	<< "["
+	<<   zero()
+	<<   movePtr(current, tmp)
+	<<   "-"
+	<<   movePtr(tmp, current)
 	<< "]"
 	<<  movePtr(current, tmp);
 
@@ -253,54 +297,95 @@ namespace acus::Algorithm {
   }
 
   // Destructive XOR (result in current, destroys other)
-  std::string xorValues(int current, int other, int tmp1, int tmp2) {
-    assert(util::allDifferent(current, other, tmp1, tmp2));
+  std::string xorValues(int current, int other, int tmp) {
+    assert(util::allDifferent(current, other, tmp));
 
-    int const result = tmp1;
-    int const tmp = tmp2;
-    
     std::ostringstream oss;
-    oss << "["
-	<<   movePtr(other, current)
-	<<   notValue(other, tmp)
-	<<   moveValue(other, result)
-	<<   movePtr(current, other)
+    oss << movePtr(tmp, current)
+	<< zero()
+	<< movePtr(current, tmp)
+	<< "["
 	<<   zero()
+	<<   movePtr(tmp, current)
+	<<   "-"
+	<<   movePtr(current,tmp)
 	<< "]"
 	<< movePtr(other, current)
-	<< boolean(other, tmp)
 	<< "["
-	<<   moveValue(other, result)
+	<<   zero()
+	<<   movePtr(tmp, other)
+	<<   "+"
+	<<   movePtr(other, tmp)
 	<< "]"
-	<< movePtr(result, other)  
-	<< moveValue(result, current)
-	<< movePtr(current, result);
-    
+	<< movePtr(tmp, other)
+	<< "["
+	<<   "+"
+	<<   zero()
+	<<   movePtr(current, tmp)
+	<<   "+"
+	<<   movePtr(tmp, current)
+	<< "]"
+	<<  movePtr(current, tmp);
+
     return oss.str();
   }
-  
+
   // Destructive NAND (result in current, destroys other)
   std::string nandValues(int current, int other, int tmp) {
     assert(util::allDifferent(current, other, tmp));
-    
+      
     std::ostringstream oss;
-    oss << andValues(current, other, tmp)
-	<< notValue(current, tmp);
+    oss << movePtr(tmp, current)
+	<< setToValue(2)
+	<< movePtr(current, tmp)
+	<< "["
+	<<   zero()
+	<<   movePtr(tmp, current)
+	<<   "-"
+	<<   movePtr(current,tmp)
+	<< "]"
+	<< movePtr(other, current)
+	<< "["
+	<<   zero()
+	<<   movePtr(tmp, other)
+	<<   "-"
+	<<   movePtr(other, tmp)
+	<< "]"
+	<< movePtr(tmp, other)
+	<< "["
+	<<   zero()
+	<<   movePtr(current, tmp)
+	<<   "+"
+	<<   movePtr(tmp, current)
+	<< "]"
+	<<  movePtr(current, tmp);
 
     return oss.str();
   }
 
   // Destructive NOR (result in current, destroys other)
-  std::string norValues(int current, int other, int tmp) {
-    assert(util::allDifferent(current, other, tmp));
+  std::string norValues(int current, int other) {
+    assert(util::allDifferent(current, other));
     
     std::ostringstream oss;
-    oss << orValues(current, other, tmp)
-	<< notValue(current, tmp);
+    oss << "["
+	<<   zero()
+	<<   movePtr(other, current)
+	<<   setToValue(1)
+	<<   movePtr(current, other)
+	<< "]+"
+	<< movePtr(other, current)
+	<< "["
+	<<   zero()
+	<<   movePtr(current, other)
+	<<   "-"
+	<<   movePtr(other, current)
+	<< "]"
+	<<  movePtr(current, other);
 
     return oss.str();
   }
-  
+
 
   // Add other to current, destroys other
   std::string add(int current, int other) {
@@ -335,142 +420,159 @@ namespace acus::Algorithm {
       
     return oss.str();
   }
-  
 
-
-  // Decrement current and other until either (or both) becomes zero
-  std::string reducePair(int current, int other, int tmp1, int tmp2) {
-    assert(util::allDifferent(current, other, tmp1, tmp2));
-
-    std::ostringstream oss;
-    oss << copyValue(current, tmp1, tmp2)   // tmp1 = current
-	<< movePtr(tmp1, current)
-	<< "["
-	<<   zero()                         // tmp1 = 0 unless we rebuild it below
-	<<   movePtr(other, tmp1)
-	<<   copyValue(other, tmp2, tmp1)   // tmp2 = other, tmp1 reused as scratch
-	<<   movePtr(tmp2, other)
-	<<   "["                            // execute once iff other != 0
-	<<     zero()                       // make this a single-shot loop
-	<<     movePtr(current, tmp2)
-	<<     decrement()
-	<<     movePtr(other, current)
-	<<     decrement()
-	<<     movePtr(current, other)
-	<<     copyValue(current, tmp1, tmp2) // tmp1 = new current, tmp2 reused as scratch
-	<<     movePtr(tmp2, current)
-	<<   "]"
-	<<   movePtr(tmp1, tmp2)
-	<< "]"
-	<< movePtr(current, tmp1);
-
-    return oss.str();
-  }
-
-
-  
   // Compute current < other and stores the result in current. Other is destroyed
   // Result: 0 if false, any nonzero if true
-  std::string less(int current, int other, int tmp1, int tmp2) {
-    assert(util::allDifferent(current, other, tmp1, tmp2));
+  std::string less(int current, int other, int tmp) {
+    assert(util::allDifferent(current, other, tmp));
 
-    // Reduce pair -> if current < other, other is nonzero
     std::ostringstream oss;
-    oss << reducePair(current, other, tmp1, tmp2)
-	<< movePtr(tmp1, current)
-	<< setToValue(1)
-	<< movePtr(other, tmp1)
-	<< "["
-	<<   zero()
-        <<   movePtr(current, other)
-	<<   setToValue(1)
-	<<   movePtr(tmp1, current)
-	<<   setToValue(0)
-	<<   movePtr(other, tmp1)
-	<< "]"
-	<< movePtr(tmp1, other)
-	<< "["
-	<<   zero()
-	<<   movePtr(current, tmp1)
-	<<   setToValue(0)
-	<<   movePtr(tmp1, current)
-	<< "]"
-	<< movePtr(current, tmp1);
-      
-    return oss.str();
-  }
-
-  // Compute current <= other and stores the result in current. Other is destroyed
-  // Result: 0 if false, any nonzero if true
-  std::string lessOrEqual(int current, int other, int tmp1, int tmp2) {
-    assert(util::allDifferent(current, other, tmp1, tmp2));
-
-    // Reduce pair -> if current <= other, current == 0 -> return not(current)
-    std::ostringstream oss;
-    oss << reducePair(current, other, tmp1, tmp2)
-	<< movePtr(other, current)
+    oss << movePtr(tmp, current)
 	<< zero()
-	<< movePtr(current, other)
-	<< notValue(current, tmp1);
-      
-    return oss.str();
-  }
-  
-  // Compute current > other and stores the result in current. Other is destroyed
-  // Result: 0 if false, any nonzero if true  
-  std::string greater(int current, int other, int tmp1, int tmp2) {
-    assert(util::allDifferent(current, other, tmp1, tmp2));
-
-    // Reduce pair -> if current > other, current is nonzero
-    std::ostringstream oss;
-    oss << reducePair(current, other, tmp1, tmp2)
-	<< moveValue(current, other)
-      	<< movePtr(tmp1, current)
-	<< setToValue(1)
-	<< movePtr(other, tmp1)
+	<< movePtr(current, tmp)
+	<< "["
+	<<   "-"
+	<<   movePtr(other, current)
+	<<   "["
+	<<     "-"
+	<<     moveValueAssumeZero(other, tmp)
+	<<   "]"
+	<<   movePtr(tmp, other)
+	<<   moveValueAssumeZero(tmp, other)
+	<<   movePtr(current, tmp)
+	<< "]"
+	<< movePtr(other, current)
 	<< "["
 	<<   zero()
 	<<   movePtr(current, other)
-	<<   setToValue(1)
-	<<   movePtr(tmp1, current)
-	<<   setToValue(0)
-	<<   movePtr(other, tmp1)
+	<<   "+"
+	<<   movePtr(other, current)
 	<< "]"
-	<< movePtr(tmp1, other)
+	<< movePtr(current, other);
+      
+    return oss.str();
+  }
+  
+  // Compute current <= other and stores the result in current. Other is destroyed
+  // Result: 0 if false, any nonzero if true
+  std::string lessOrEqual(int current, int other, int tmp) {
+    assert(util::allDifferent(current, other, tmp));
+
+    std::ostringstream oss;
+    oss << movePtr(tmp, current)
+	<< zero()
+	<< movePtr(other, tmp)
+	<< "["
+	<<   "-"
+	<<   movePtr(tmp, other)
+	<<   moveValueAssumeZero(tmp, current)
+	<<   movePtr(current, tmp)
+	<<   "["
+	<<     "-"
+	<<     moveValueAssumeZero(current, tmp)
+	<<   "]"
+	<<   movePtr(other, current)
+	<< "]"
+	<< movePtr(tmp, other)
 	<< "["
 	<<   zero()
-	<<   movePtr(current, tmp1)
-	<<   setToValue(0)
-	<<   movePtr(tmp1, current)
+	<<   movePtr(current, tmp)
+	<<   "-"
+	<<   movePtr(tmp, current)
 	<< "]"
-	<< movePtr(current, tmp1);
+	<< movePtr(current, tmp)
+	<< "+";
+      
+    return oss.str();
+  }
+
+  // Compute current > other and stores the result in current. Other is destroyed
+  // Result: 0 if false, any nonzero if true  
+  std::string greater(int current, int other, int tmp) {
+    assert(util::allDifferent(current, other, tmp));
+
+    std::ostringstream oss;
+    oss << movePtr(tmp, current)
+	<< zero()
+	<< movePtr(other, tmp)
+	<< "["
+	<<   "-"
+	<<   movePtr(tmp, other)
+	<<   moveValueAssumeZero(tmp, current)
+	<<   movePtr(current, tmp)
+	<<   "["
+	<<     "-"
+	<<     moveValueAssumeZero(current, tmp)
+	<<   "]"
+	<<   movePtr(other, current)
+	<< "]"
+	<< movePtr(tmp, other)
+	<< "["
+	<<   zero()
+	<<   movePtr(current, tmp)
+	<<   "+"
+	<<   movePtr(tmp, current)
+	<< "]"
+	<< movePtr(current, tmp);
       
     return oss.str();
   }
 
   // Compute current >= other and stores the result in current. Other is destroyed
   // Result: 0 if false, any nonzero if true  
-  std::string greaterOrEqual(int current, int other, int tmp1, int tmp2) {
-    assert(util::allDifferent(current, other, tmp1, tmp2));
+  std::string greaterOrEqual(int current, int other, int tmp) {
+    assert(util::allDifferent(current, other, tmp));
 
-    // Reduce pair -> if current >= other, other == 0 -> return not(other)
     std::ostringstream oss;
-    oss << reducePair(current, other, tmp1, tmp2)
+    oss << movePtr(tmp, current)
+	<< zero()
+	<< movePtr(current, tmp)
+	<< "["
+	<<   "-"
+	<<   movePtr(other, current)
+	<<   "["
+	<<     "-"
+	<<     moveValueAssumeZero(other, tmp)
+	<<   "]"
+	<<   movePtr(tmp, other)
+	<<   moveValueAssumeZero(tmp, other)
+	<<   movePtr(current, tmp)
+	<< "]"
+	<< "+"
 	<< movePtr(other, current)
-	<< notValue(other, tmp1)
-	<< moveValue(other, current)
+	<< "["
+	<<   zero()
+	<<   movePtr(current, other)
+	<<   "-"
+	<<   movePtr(other, current)
+	<< "]"
 	<< movePtr(current, other);
       
     return oss.str();
   }
-  
+
+
   // Equal
   std::string equal(int current, int other) {
     assert(util::allDifferent(current, other));
     
     std::ostringstream oss;
-    oss << subtract(current, other)
-	<< notValue(current, other); // use empty other as tmp
+    oss << "["
+    <<   "-"
+    <<   movePtr(other, current)
+    <<   "-"
+    <<   movePtr(current, other)
+    << "]"
+    << "+"
+    << movePtr(other, current)
+    << "["
+    <<   zero()
+    <<   movePtr(current,other)
+    <<   "-"
+    <<   movePtr(other, current)
+    << "]"
+    << movePtr(current, other);
+    
     return oss.str();
   }
 
@@ -483,8 +585,6 @@ namespace acus::Algorithm {
 	<< notValue(current, tmp);
     return oss.str();
   }
-  
-  
 }
 
 
@@ -540,7 +640,7 @@ GEN(MoveData) {
 
 GEN(CopyData) {
   auto [cur, dst, tmp] = defer::resolve(ctx, current, dest, scratch);
-  return Algorithm::copyValue(cur, dst, tmp);
+  return Algorithm::copyValue(cur, tmp, dst);
 }
 
 GEN(Cmp) {
@@ -559,8 +659,8 @@ GEN(Not) {
 }
 
 GEN(Or) {
-  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
-  return Algorithm::orValues(cur, oth, tmp);
+  auto [cur, oth] = defer::resolve(ctx, current, other);
+  return Algorithm::orValues(cur, oth);
 }
 
 GEN(And) {
@@ -569,8 +669,8 @@ GEN(And) {
 }
 
 GEN(Xor) {
-  auto [cur, oth, tmp1, tmp2] = defer::resolve(ctx, current, other, scratch1, scratch2);
-  return Algorithm::xorValues(cur, oth, tmp1, tmp2);
+  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+  return Algorithm::xorValues(cur, oth, tmp);
 }
 
 GEN(In) {
@@ -592,23 +692,23 @@ GEN(Subtract) {
 }
 
 GEN(Less) {
-  auto [cur, oth, tmp1, tmp2] = defer::resolve(ctx, current, other, scratch1, scratch2);
-  return Algorithm::less(cur, oth, tmp1, tmp2);
+  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+  return Algorithm::less(cur, oth, tmp);
 }
 
 GEN(LessOrEqual) {
-  auto [cur, oth, tmp1, tmp2] = defer::resolve(ctx, current, other, scratch1, scratch2);
-  return Algorithm::lessOrEqual(cur, oth, tmp1, tmp2);
+  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+  return Algorithm::lessOrEqual(cur, oth, tmp);
 }
 
 GEN(Greater) {
-  auto [cur, oth, tmp1, tmp2] = defer::resolve(ctx, current, other, scratch1, scratch2);
-  return Algorithm::greater(cur, oth, tmp1, tmp2);
+  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+  return Algorithm::greater(cur, oth, tmp);
 }
 
 GEN(GreaterOrEqual) {
-  auto [cur, oth, tmp1, tmp2] = defer::resolve(ctx, current, other, scratch1, scratch2);
-  return Algorithm::greaterOrEqual(cur, oth, tmp1, tmp2);
+  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+  return Algorithm::greaterOrEqual(cur, oth, tmp);
 }
 
 GEN(Equal) {

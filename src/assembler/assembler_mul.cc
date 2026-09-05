@@ -49,10 +49,9 @@ void Assembler::mulSlotByConstSigned(Slot lhs, int factor) {
   pushPtr();
   moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{lhs, MacroCell::Flag},
-		      Temps<4>::select(lhs, MacroCell::Scratch0,
+		      Temps<3>::select(lhs, MacroCell::Scratch0,
 				       lhs, MacroCell::Scratch1,
-				       lhs, MacroCell::Payload0,
-				       lhs, MacroCell::Payload1));
+				       lhs, MacroCell::Payload0));
 
   Slot tmp = getTemp(ts::raw(1));
   Cell const lhsNegative { tmp, MacroCell::Flag };
@@ -230,10 +229,9 @@ void Assembler::mulSlotBySlotSigned(Slot lhs, Slot rhs) {
   pushPtr();
   moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{lhs, MacroCell::Flag},
-		      Temps<4>::select(lhs, MacroCell::Scratch0,
+		      Temps<3>::select(lhs, MacroCell::Scratch0,
 				       lhs, MacroCell::Scratch1,
-				       lhs, MacroCell::Payload0,
-				       lhs, MacroCell::Payload1));
+				       lhs, MacroCell::Payload0));
 
   Slot tmp = getTemp(ts::raw(2));
   Cell const resultNegative { tmp, MacroCell::Flag };
@@ -253,10 +251,9 @@ void Assembler::mulSlotBySlotSigned(Slot lhs, Slot rhs) {
   
   moveTo(rhsCopy, rhsCopy.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{rhsCopy, MacroCell::Flag},
-		      Temps<4>::select(rhsCopy, MacroCell::Scratch0,
+		      Temps<3>::select(rhsCopy, MacroCell::Scratch0,
 				       rhsCopy, MacroCell::Scratch1,
-				       rhsCopy, MacroCell::Payload0,
-				       rhsCopy, MacroCell::Payload1));
+				       rhsCopy, MacroCell::Payload0));
 
   
   moveTo(rhsCopy, MacroCell::Flag);
@@ -353,7 +350,7 @@ void Assembler::mul16Const(int factor, Cell high, Temps<8> tmp) {
 
   for (int i = 0; i != std::abs(factor) - 1; ++i) {
     moveTo(current);
-    add16Destructive(high, copy1low, copy1high, tmp.select<4, 5, 6, 7>());
+    add16Destructive(high, copy1low, copy1high, tmp.select<4, 5, 6>());
     moveTo(copy2low);
     copyField(copy1low, tmp.select<4>());
     moveTo(copy2high);
@@ -369,7 +366,7 @@ void Assembler::mul16Const(int factor, Cell high, Temps<8> tmp) {
   // All tmp cells have been cleared by this point and can be reused 
   if (factor < 0) {
     moveTo(current);
-    negate16Destructive(high, tmp.select<0, 1, 2, 3, 4, 5>());
+    negate16Destructive(high, tmp.select<0, 1, 2, 3, 4>());
   }
   
   popPtr();
@@ -439,7 +436,7 @@ void Assembler::mul16Destructive(Cell high, Cell factorLow, Cell factorHigh, Tem
     dec16(factorHigh, tmp.select<5, 6>());
 
     moveTo(current);
-    add16Destructive(high, copy1low, copy1high, tmp.select<5, 6, 7, 8>());
+    add16Destructive(high, copy1low, copy1high, tmp.select<5, 6, 7>());
 
     moveTo(copy2low);
     copyField(copy1low, tmp.select<5>());

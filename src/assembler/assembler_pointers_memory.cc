@@ -271,8 +271,7 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src, TransferMode mode) {
   setToValue(128, Temps<1>::select(dest, MacroCell::Scratch1));
   moveTo(dest, MacroCell::Value1);
   lessDestructive(Cell{dest, MacroCell::Scratch0},
-		  Temps<2>::select(dest, MacroCell::Scratch1,
-				   dest, MacroCell::Payload0));
+		  Temps<1>::select(dest, MacroCell::Scratch1));
   dec();
 
   popPtr();

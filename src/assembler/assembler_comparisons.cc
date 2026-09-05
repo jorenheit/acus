@@ -157,8 +157,7 @@ void Assembler::slotLessSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) 
 				       rhsCopy, MacroCell::Scratch1));
   } else {
     lessDestructive(Cell{rhsCopy, MacroCell::Value0},
-		    Temps<2>::select(lhs, MacroCell::Scratch0,
-				     lhs, MacroCell::Scratch1));
+		    Temps<1>::select(lhs, MacroCell::Scratch0));
   }
 
   popPtr();
@@ -299,14 +298,12 @@ void Assembler::slotLessEqualSlotUnsigned(Slot lhs, Slot rhs, bool const destroy
     lessOrEqual16Destructive(Cell{lhs, MacroCell::Value1},
 			     Cell{rhsCopy, MacroCell::Value0},
 			     Cell{rhsCopy, MacroCell::Value1},
-			     Temps<4>::select(lhs, MacroCell::Scratch0,
+			     Temps<3>::select(lhs, MacroCell::Scratch0,
 					      lhs, MacroCell::Scratch1,
-					      rhsCopy, MacroCell::Scratch0,
-					      rhsCopy, MacroCell::Scratch1));
+					      rhsCopy, MacroCell::Scratch0));
   } else {
     lessOrEqualDestructive(Cell{rhsCopy, MacroCell::Value0},
-			   Temps<2>::select(lhs, MacroCell::Scratch0,
-					    lhs, MacroCell::Scratch1));
+			   Temps<1>::select(lhs, MacroCell::Scratch0));
   }
 
   popPtr();
@@ -424,14 +421,12 @@ void Assembler::slotGreaterSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRh
     greater16Destructive(Cell{lhs, MacroCell::Value1},
 			 Cell{rhsCopy, MacroCell::Value0},
 			 Cell{rhsCopy, MacroCell::Value1},
-			 Temps<4>::select(lhs, MacroCell::Scratch0,
+			 Temps<3>::select(lhs, MacroCell::Scratch0,
 					  lhs, MacroCell::Scratch1,
-					  rhsCopy, MacroCell::Scratch0,
-					  rhsCopy, MacroCell::Scratch1));
+					  rhsCopy, MacroCell::Scratch0));
   } else {
     greaterDestructive(Cell{rhsCopy, MacroCell::Value0},
-		       Temps<2>::select(lhs, MacroCell::Scratch0,
-					lhs, MacroCell::Scratch1));
+		       Temps<1>::select(lhs, MacroCell::Scratch0));
   }
 
   popPtr();
@@ -556,8 +551,7 @@ void Assembler::slotGreaterEqualSlotUnsigned(Slot lhs, Slot rhs, bool const dest
 						 rhsCopy, MacroCell::Scratch1));
   } else {
     greaterOrEqualDestructive(Cell{rhsCopy, MacroCell::Value0},
-			      Temps<2>::select(lhs, MacroCell::Scratch0,
-					       lhs, MacroCell::Scratch1));
+			      Temps<1>::select(lhs, MacroCell::Scratch0));
   }
 
   popPtr();
@@ -650,19 +644,19 @@ void Assembler::eq16Constructive(Cell high, Cell result, Cell otherLow, Cell oth
 }
 
 
-void Assembler::lessDestructive(Cell other, Temps<2> tmp) { 
-  auto [cur, oth, tmp0, tmp1] = getFieldIndices(_dp.current(), other, tmp.get<0>(), tmp.get<1>());
-  emit<primitive::Less>(cur, oth, tmp0, tmp1);
+void Assembler::lessDestructive(Cell other, Temps<1> tmp) { 
+  auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+  emit<primitive::Less>(cur, oth, scratch);
 }
 
-void Assembler::lessConstructive(Cell result, Cell other, Temps<3> tmp) {
+void Assembler::lessConstructive(Cell result, Cell other, Temps<2> tmp) {
   Cell const &otherCopy = tmp.get<0>();
   pushPtr();
   copyField(result, tmp.select<1>());
   moveTo(other);
   copyField(otherCopy, tmp.select<1>());
   moveTo(result);
-  lessDestructive(otherCopy, tmp.select<1, 2>());
+  lessDestructive(otherCopy, tmp.select<1>());
   popPtr();
 }
 
@@ -680,7 +674,7 @@ void Assembler::less16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temp
   moveTo(currentHigh); copyField(currentCopyHigh, tmp.select<2>());
   
   moveTo(currentHigh);
-  lessDestructive(otherHigh, tmp.select<2, 3>());
+  lessDestructive(otherHigh, tmp.select<2>());
   Cell const highByteLess = currentHigh;
   // otherHigh cleared
   // currentHigh: xH < yH
@@ -692,7 +686,7 @@ void Assembler::less16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temp
   // currentCopyHigh: xH == yH
   
   moveTo(currentLow);
-  lessDestructive(otherLow, tmp.select<2, 3>()); 
+  lessDestructive(otherLow, tmp.select<2>()); 
   Cell const lowByteLess = currentLow;
   // otherLow cleared
   // currentLow: xL < yL
@@ -702,7 +696,7 @@ void Assembler::less16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temp
   // currentLow cleared
   // currentCopyHigh: xH == yH && xL < yL
   
-  orDestructive(highByteLess, tmp.select<2>());
+  orDestructive(highByteLess);
   // currentHigh cleared
   // currentCopyHigh: xH < yH || (xH == yH && xL < yL)
   
@@ -735,28 +729,28 @@ void Assembler::less16Constructive(Cell high, Cell result, Cell otherLow, Cell o
 }
 
 
-void Assembler::lessOrEqualDestructive(Cell other, Temps<2> tmp) {
-  auto [cur, oth, tmp0, tmp1] = getFieldIndices(_dp.current(), other, tmp.get<0>(), tmp.get<1>());
-  emit<primitive::LessOrEqual>(cur, oth, tmp0, tmp1);
+void Assembler::lessOrEqualDestructive(Cell other, Temps<1> tmp) {
+  auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+  emit<primitive::LessOrEqual>(cur, oth, scratch);
 }
 
-void Assembler::lessOrEqualConstructive(Cell result, Cell other, Temps<3> tmp) {
+void Assembler::lessOrEqualConstructive(Cell result, Cell other, Temps<2> tmp) {
   Cell const &otherCopy = tmp.get<0>();
   pushPtr();
   copyField(result, tmp.select<1>());
   moveTo(other);
   copyField(otherCopy, tmp.select<1>());
   moveTo(result);
-  lessOrEqualDestructive(otherCopy, tmp.select<1, 2>());
+  lessOrEqualDestructive(otherCopy, tmp.select<1>());
   popPtr();
 }
 
-void Assembler::lessOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
+void Assembler::lessOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
   greater16Destructive(high, otherLow, otherHigh, tmp);
   notDestructive(tmp.select<0>());
 }
 
-void Assembler::lessOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8> tmp) {
+void Assembler::lessOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<6> tmp) {
 
   Cell const currentLow = _dp.current();
   Cell const currentHigh = high;
@@ -772,29 +766,29 @@ void Assembler::lessOrEqual16Constructive(Cell high, Cell result, Cell otherLow,
   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
 
   moveTo(result);
-  lessOrEqual16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<4, 5, 6, 7>());
+  lessOrEqual16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3, 4, 5>());
   popPtr();  
 
 }
 
-void Assembler::greaterDestructive(Cell other, Temps<2> tmp) {
-  auto [cur, oth, tmp0, tmp1] = getFieldIndices(_dp.current(), other, tmp.get<0>(), tmp.get<1>());
-  emit<primitive::Greater>(cur, oth, tmp0, tmp1);
+void Assembler::greaterDestructive(Cell other, Temps<1> tmp) {
+  auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+  emit<primitive::Greater>(cur, oth, scratch);
 }
 
-void Assembler::greaterConstructive(Cell result, Cell other, Temps<3> tmp) {
+void Assembler::greaterConstructive(Cell result, Cell other, Temps<2> tmp) {
   Cell const &otherCopy = tmp.get<0>();
   pushPtr();
   copyField(result, tmp.select<1>());
   moveTo(other);
   copyField(otherCopy, tmp.select<1>());
   moveTo(result);
-  greaterDestructive(otherCopy, tmp.select<1, 2>());
+  greaterDestructive(otherCopy, tmp.select<1>());
   popPtr();
 }
 
 
-void Assembler::greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
+void Assembler::greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
   // xH > yH || (xH == yH && xL > yL)
 
   pushPtr();
@@ -808,7 +802,7 @@ void Assembler::greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, T
   moveTo(currentHigh); copyField(currentCopyHigh, tmp.select<2>());
   
   moveTo(currentHigh);
-  greaterDestructive(otherHigh, tmp.select<2, 3>());
+  greaterDestructive(otherHigh, tmp.select<2>());
   Cell const highByteGreater = currentHigh;
   // otherHigh cleared
   // currentHigh: xH > yH
@@ -820,7 +814,7 @@ void Assembler::greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, T
   // currentCopyHigh: xH == yH
   
   moveTo(currentLow);
-  greaterDestructive(otherLow, tmp.select<2, 3>()); 
+  greaterDestructive(otherLow, tmp.select<2>()); 
   Cell const lowByteGreater = currentLow;
   // otherLow cleared
   // currentLow: xL > yL
@@ -830,7 +824,7 @@ void Assembler::greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, T
   // currentLow cleared
   // currentCopyHigh: xH == yH && xL > yL
   
-  orDestructive(highByteGreater, tmp.select<2>());
+  orDestructive(highByteGreater);
   // currentHigh cleared
   // currentCopyHigh: xH > yH || (xH == yH && xL > yL)
   
@@ -842,7 +836,7 @@ void Assembler::greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, T
   
 }
 
-void Assembler::greater16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8> tmp) {
+void Assembler::greater16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<6> tmp) {
 
   Cell const currentLow = _dp.current();
   Cell const currentHigh = high;
@@ -858,25 +852,25 @@ void Assembler::greater16Constructive(Cell high, Cell result, Cell otherLow, Cel
   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
 
   moveTo(result);
-  greater16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<4, 5, 6, 7>());
+  greater16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3, 4, 5>());
   popPtr();  
 }
 
 
 
-void Assembler::greaterOrEqualDestructive(Cell other, Temps<2> tmp) {
-  auto [cur, oth, tmp0, tmp1] = getFieldIndices(_dp.current(), other, tmp.get<0>(), tmp.get<1>());
-  emit<primitive::GreaterOrEqual>(cur, oth, tmp0, tmp1);
+void Assembler::greaterOrEqualDestructive(Cell other, Temps<1> tmp) {
+  auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+  emit<primitive::GreaterOrEqual>(cur, oth, scratch);
 }
 
-void Assembler::greaterOrEqualConstructive(Cell result, Cell other, Temps<3> tmp) {
+void Assembler::greaterOrEqualConstructive(Cell result, Cell other, Temps<2> tmp) {
   Cell const &otherCopy = tmp.get<0>();
   pushPtr();
   copyField(result, tmp.select<1>());
   moveTo(other);
   copyField(otherCopy, tmp.select<1>());
   moveTo(result);
-  greaterOrEqualDestructive(otherCopy, tmp.select<1, 2>());
+  greaterOrEqualDestructive(otherCopy, tmp.select<1>());
   popPtr();
 }
 
@@ -891,7 +885,7 @@ void Assembler::greaterOrEqual16Constructive(Cell high, Cell result, Cell otherL
   Cell const currentHigh = high;
   Cell const otherCopyLow = tmp.get<0>();
   Cell const otherCopyHigh = tmp.get<1>();
-  Cell const resultHigh = tmp.get<2>();
+  Cell const resultHigh = tmp.get<2>();\
   
   pushPtr();
 

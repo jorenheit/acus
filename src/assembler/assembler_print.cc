@@ -187,10 +187,9 @@ void Assembler::printDecimalSlotSigned(Slot slot) {
   // Construct sign bit in the flag and use that to determine whether to print a - sign.
   moveTo(valSlot, valSlot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
   signBitConstructive(Cell{valSlot, MacroCell::Flag},
-		      Temps<4>::select(valSlot, MacroCell::Scratch0,
+		      Temps<3>::select(valSlot, MacroCell::Scratch0,
 				       valSlot, MacroCell::Scratch1,
-				       valSlot, MacroCell::Payload0,
-				       valSlot, MacroCell::Payload1));
+				       valSlot, MacroCell::Payload0));
 
   moveTo(valSlot, MacroCell::Flag);
   loopOpen(); {

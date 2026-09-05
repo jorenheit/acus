@@ -306,7 +306,7 @@ namespace acus::primitive {
   
 
   struct Or: Node {
-    DInt current, other, scratch;
+    DInt current, other;
 
     /*
       OR operator applied to the values stored at current and other. Overwrites
@@ -319,10 +319,9 @@ namespace acus::primitive {
       Clears: other
      */
     
-    inline explicit Or(DInt current, DInt other, DInt scratch):
+    inline explicit Or(DInt current, DInt other):
       current(std::move(current)),
-      other(std::move(other)),
-      scratch(std::move(scratch))
+      other(std::move(other))
     {}
 
     COMMON_INTERFACE;
@@ -330,7 +329,7 @@ namespace acus::primitive {
   };
 
   struct Xor: Node {
-    DInt current, other, scratch1, scratch2;
+    DInt current, other, scratch;
 
     /*
       XOR operator applied to the values stored at current and other. Overwrites
@@ -338,16 +337,15 @@ namespace acus::primitive {
       Consumes other as well (other == 0 afterwards).
       
       Assumed initial pointer position: current
-      Assumed empty: scratch1, scratch2
-      Invariants: ptr, scratch1, scratch2
+      Assumed empty: scratch
+      Invariants: ptr, scratch
       Clears: other
      */
     
-    inline explicit Xor(DInt current, DInt other, DInt scratch1, DInt scratch2):
+    inline explicit Xor(DInt current, DInt other, DInt scratch):
       current(std::move(current)),
       other(std::move(other)),
-      scratch1(std::move(scratch1)),
-      scratch2(std::move(scratch2))
+      scratch(std::move(scratch))
     {}
 
     COMMON_INTERFACE;
@@ -380,7 +378,7 @@ namespace acus::primitive {
   };
 
   struct Less: Node {
-    DInt current, other, scratch1, scratch2;
+    DInt current, other, scratch;
 
     /*
       NAND operator applied to the values stored at current and other. Overwrites
@@ -388,17 +386,16 @@ namespace acus::primitive {
       other as well (other == 0 afterwards).
       
       Assumed initial pointer position: current
-      Assumed empty: scratch1, scratch2
-      Invariants: ptr, scratch1, scratch2
+      Assumed empty: scratch
+      Invariants: ptr, scratch
       Clears: other
       
      */
     
-    inline explicit Less(DInt current, DInt other, DInt scratch1, DInt scratch2):
+    inline explicit Less(DInt current, DInt other, DInt scratch):
       current(std::move(current)),
       other(std::move(other)),
-      scratch1(std::move(scratch1)),
-      scratch2(std::move(scratch2))
+      scratch(std::move(scratch))
     {}
 
     COMMON_INTERFACE;
@@ -406,7 +403,7 @@ namespace acus::primitive {
   };
 
   struct LessOrEqual: Node {
-    DInt current, other, scratch1, scratch2;
+    DInt current, other, scratch;
 
     /*
       NAND operator applied to the values stored at current and other. Overwrites
@@ -414,17 +411,16 @@ namespace acus::primitive {
       other as well (other == 0 afterwards).
       
       Assumed initial pointer position: current
-      Assumed empty: scratch1, scratch2
-      Invariants: ptr, scratch1, scratch2
+      Assumed empty: scratch
+      Invariants: ptr, scratch
       Clears: other
       
      */
     
-    inline explicit LessOrEqual(DInt current, DInt other, DInt scratch1, DInt scratch2):
+    inline explicit LessOrEqual(DInt current, DInt other, DInt scratch):
       current(std::move(current)),
       other(std::move(other)),
-      scratch1(std::move(scratch1)),
-      scratch2(std::move(scratch2))
+      scratch(std::move(scratch))
     {}
 
     COMMON_INTERFACE;
@@ -432,7 +428,7 @@ namespace acus::primitive {
   };
 
   struct Greater: Node {
-    DInt current, other, scratch1, scratch2;
+    DInt current, other, scratch;
 
     /*
       NAND operator applied to the values stored at current and other. Overwrites
@@ -440,17 +436,16 @@ namespace acus::primitive {
       other as well (other == 0 afterwards).
       
       Assumed initial pointer position: current
-      Assumed empty: scratch1, scratch2
-      Invariants: ptr, scratch1, scratch2
+      Assumed empty: scratch
+      Invariants: ptr, scratch
       Clears: other
       
      */
     
-    inline explicit Greater(DInt current, DInt other, DInt scratch1, DInt scratch2):
+    inline explicit Greater(DInt current, DInt other, DInt scratch):
       current(std::move(current)),
       other(std::move(other)),
-      scratch1(std::move(scratch1)),
-      scratch2(std::move(scratch2))
+      scratch(std::move(scratch))
     {}
 
     COMMON_INTERFACE;
@@ -458,7 +453,7 @@ namespace acus::primitive {
   };
 
   struct GreaterOrEqual: Node {
-    DInt current, other, scratch1, scratch2;
+    DInt current, other, scratch;
 
     /*
       NAND operator applied to the values stored at current and other. Overwrites
@@ -466,17 +461,16 @@ namespace acus::primitive {
       other as well (other == 0 afterwards).
       
       Assumed initial pointer position: current
-      Assumed empty: scratch1, scratch2
-      Invariants: ptr, scratch1, scratch2
+      Assumed empty: scratch
+      Invariants: ptr, scratch
       Clears: other
       
      */
     
-    inline explicit GreaterOrEqual(DInt current, DInt other, DInt scratch1, DInt scratch2):
+    inline explicit GreaterOrEqual(DInt current, DInt other, DInt scratch):
       current(std::move(current)),
       other(std::move(other)),
-      scratch1(std::move(scratch1)),
-      scratch2(std::move(scratch2))
+      scratch(std::move(scratch))
     {}
 
     COMMON_INTERFACE;
