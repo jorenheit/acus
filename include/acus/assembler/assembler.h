@@ -475,8 +475,10 @@ namespace acus {
     void setToValue16(int value, Cell high, Temps<1>);
 
     void inc();
-    void dec();
+    void inc16();
     void inc16(Cell high, Temps<2>);
+    void dec();
+    void dec16();
     void dec16(Cell high, Temps<2>);
   
     void signBitDestructive(Temps<2>);
@@ -489,25 +491,32 @@ namespace acus {
     
     void addConst(int delta);
     void addConstAndCarry(int delta, Cell carry, Temps<2>);
+    void add16Const(int delta, Cell tmp);
     void add16Const(int delta, Cell high, Temps<3>);
     void addDestructive(Cell other);
     void addConstructive(Cell result, Cell other, Temps<2>);
+    void add16Destructive(Cell delta);
     void add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+    void add16Constructive(Cell delta, Cell result, Cell tmp);
     void add16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5>);
     void addAndCarryDestructive(Cell carry, Cell other, Temps<2>);
     void addAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
 
     void subConst(int delta);
     void subConstAndCarry(int delta, Cell carry, Temps<2>);
+    void sub16Const(int delta, Cell tmp);
     void sub16Const(int delta, Cell high, Temps<3>);
     void subDestructive(Cell other);
     void subConstructive(Cell result, Cell other, Temps<2>);
+    void sub16Destructive(Cell delta);
     void sub16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+    void sub16Constructive(Cell delta, Cell result, Cell tmp);
     void sub16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5>);
     void subAndCarryDestructive(Cell carry, Cell other, Temps<2>);
     void subAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
 
     void mulConst(int factor, Temps<3>);
+    void mul16Const(int factor, Temps<3> tmp);
     void mul16Const(int factor, Cell high, Temps<8>);
     void mulDestructive(Cell other, Temps<3>);
     void mulConstructive(Cell result, Cell factor, Temps<4>);

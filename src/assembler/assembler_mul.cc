@@ -16,21 +16,19 @@ void Assembler::mulSlotByConst(Slot lhs, int factor) {
 void Assembler::mulSlotByConstUnsigned(Slot lhs, int factor) {
   assert(types::isUnsignedInteger(lhs.type()));
   assert(factor >= 0);
-  
+
   pushPtr();
   moveTo(lhs, MacroCell::Value0);    
   if (lhs.type()->usesValue1()) {
-    Slot tmp = getTemp(ts::raw(1));
-    mul16Const(factor, Cell{lhs, MacroCell::Value1},
-	       Temps<8>::select(lhs, MacroCell::Scratch0,
-				lhs, MacroCell::Scratch1,
-				lhs, MacroCell::Payload0,
-				lhs, MacroCell::Payload1,
-				tmp, MacroCell::Scratch0,
-				tmp, MacroCell::Scratch1,
-				tmp, MacroCell::Payload0,
-				tmp, MacroCell::Payload1));
-    freeTempSlot(tmp);
+    Slot const tmp = getTemp(ts::raw(3));
+    Slot const tmp1 = tmp.sub(ts::raw(1), 0);
+    Slot const tmp2 = tmp.sub(ts::raw(1), 1);
+    Slot const tmp3 = tmp.sub(ts::raw(1), 2);
+    
+    mul16Const(factor, Temps<3>::select(tmp1, MacroCell::Value0,
+					tmp2, MacroCell::Value0,
+					tmp3, MacroCell::Value0));
+    freeSlot(tmp);
   } else {
     mulConst(factor,
 	     Temps<3>::select(lhs, MacroCell::Scratch0,
@@ -40,6 +38,35 @@ void Assembler::mulSlotByConstUnsigned(Slot lhs, int factor) {
   
   popPtr();
 }
+
+
+// void Assembler::mulSlotByConstUnsigned(Slot lhs, int factor) {
+//   assert(types::isUnsignedInteger(lhs.type()));
+//   assert(factor >= 0);
+  
+//   pushPtr();
+//   moveTo(lhs, MacroCell::Value0);    
+//   if (lhs.type()->usesValue1()) {
+//     Slot tmp = getTemp(ts::raw(1));
+//     mul16Const(factor, Cell{lhs, MacroCell::Value1},
+// 	       Temps<8>::select(lhs, MacroCell::Scratch0,
+// 				lhs, MacroCell::Scratch1,
+// 				lhs, MacroCell::Payload0,
+// 				lhs, MacroCell::Payload1,
+// 				tmp, MacroCell::Scratch0,
+// 				tmp, MacroCell::Scratch1,
+// 				tmp, MacroCell::Payload0,
+// 				tmp, MacroCell::Payload1));
+//     freeTempSlot(tmp);
+//   } else {
+//     mulConst(factor,
+// 	     Temps<3>::select(lhs, MacroCell::Scratch0,
+// 			      lhs, MacroCell::Scratch1,
+// 			      lhs, MacroCell::Payload0));
+//   }
+  
+//   popPtr();
+// }
 
 void Assembler::mulSlotByConstSigned(Slot lhs, int factor) {
   assert(types::isSignedInteger(lhs.type()));
@@ -300,7 +327,7 @@ void Assembler::mulConst(int factor, Temps<3> tmp) {
   copyField(copy1, tmp.select<2>());
   copyField(copy2, tmp.select<2>());
 
-  
+  // TODO: rewrite. Don't unroll always
   for (int i = 0; i != std::abs(factor) - 1; ++i) {
     moveTo(current);    
     addDestructive(copy1);
@@ -321,7 +348,97 @@ void Assembler::mulConst(int factor, Temps<3> tmp) {
   popPtr();
 }
 
-void Assembler::mul16Const(int factor, Cell high, Temps<8> tmp) {
+void Assembler::mul16Const(int factor, Temps<3> tmp) {
+  assert(_dp.current().field == MacroCell::Value0);
+  if (factor == 0) {
+    pushPtr();
+    zeroCell();
+    moveTo(Cell{_dp.current(), MacroCell::Value1});
+    zeroCell();
+    popPtr();
+    return;
+  }
+
+  if (factor == 1) return;
+
+  Cell const operand = _dp.current();
+  Cell const operandCopy1 = tmp.get<0>();
+  Cell const operandCopy2 = tmp.get<1>();
+  Cell const factorCell = tmp.get<2>();
+  assert(operand.field == MacroCell::Value0);
+  assert(operandCopy1.field == MacroCell::Value0);
+  assert(operandCopy2.field == MacroCell::Value0);
+  assert(factorCell.field == MacroCell::Value0);
+
+  pushPtr();
+  
+  // Initialize first copy of the operand
+  moveTo(operand, MacroCell::Value0);
+  copyField(Cell{operandCopy1, MacroCell::Value0}, Temps<1>::select(operandCopy1, MacroCell::Scratch0));
+  moveTo(operand, MacroCell::Value1);
+  copyField(Cell{operandCopy1, MacroCell::Value1}, Temps<1>::select(operandCopy1, MacroCell::Scratch0));
+  int const count = std::abs(factor) - 1;
+  int const lowCount  = count & 0xff;
+  int const highCount = (count >> 8) & 0xff;
+
+  // ------------------------------------------------
+  // lowCount * operand
+  // ------------------------------------------------
+
+  moveTo(factorCell, MacroCell::Value0);
+  setToValue(lowCount);
+
+  loopOpen(); {
+    // Make destructive copy of original operand
+    moveTo(operandCopy1, MacroCell::Value0);
+    copyField(Cell{operandCopy2, MacroCell::Value0}, Temps<1>::select(operandCopy2, MacroCell::Scratch0));
+
+    moveTo(operandCopy1, MacroCell::Value1);
+    copyField(Cell{operandCopy2, MacroCell::Value1}, Temps<1>::select(operandCopy2, MacroCell::Scratch0));
+
+    moveTo(operand);
+    add16Destructive(operandCopy2);
+
+    moveTo(factorCell, MacroCell::Value0);
+    dec();
+  } loopClose();
+
+  // ------------------------------------------------
+  // highCount * (256 * operand)
+  //
+  // 256 * operand mod 65536 == operand.low << 8
+  // ------------------------------------------------
+
+  moveTo(factorCell, MacroCell::Value1);
+  setToValue(highCount);
+
+  loopOpen(); {
+    // We only need a copy of the original low byte
+    moveTo(operandCopy1, MacroCell::Value0);
+    copyField(Cell{operandCopy2, MacroCell::Value0}, Temps<1>::select(operandCopy2, MacroCell::Scratch0));
+
+    moveTo(operand, MacroCell::Value1);
+    addDestructive(Cell{operandCopy2, MacroCell::Value0});
+
+    moveTo(factorCell, MacroCell::Value1);
+    dec();    
+  } loopClose();
+
+  if (factor < 0) {
+    moveTo(operand);
+    negate16Destructive(Cell{operand, MacroCell::Value1},
+			Temps<5>::select( operand, MacroCell::Scratch0,
+					 operand, MacroCell::Scratch1,
+					 operand, MacroCell::Flag,
+					 operand, MacroCell::Payload0,
+					 operand, MacroCell::Payload1));
+  }
+
+  popPtr();
+}
+
+
+[[deprecated]] void Assembler::mul16Const(int factor, Cell high, Temps<8> tmp) {
   if (factor == 0) {
     pushPtr();
     zeroCell();

@@ -11,12 +11,7 @@ void Assembler::addSlotToSlot(Slot lhs, Slot rhs) {
   assignSlot(rhsCopy, rhs);
   moveTo(lhs, MacroCell::Value0);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    add16Destructive(Cell{lhs, MacroCell::Value1},
-		     Cell{rhsCopy, MacroCell::Value0},
-		     Cell{rhsCopy, MacroCell::Value1},
-		     Temps<3>::select(lhs, MacroCell::Scratch0,
-				      lhs, MacroCell::Scratch1,
-				      rhsCopy, MacroCell::Scratch0));
+    add16Destructive(Cell{rhsCopy, MacroCell::Value0});
   } else {
     addDestructive(Cell{rhsCopy, MacroCell::Value0});
   }
@@ -25,17 +20,17 @@ void Assembler::addSlotToSlot(Slot lhs, Slot rhs) {
 }
 
 void Assembler::addConstToSlot(Slot lhs, int delta) {
+  Slot const tmp = getTemp(ts::raw(1));
+  
   pushPtr();
   moveTo(lhs, MacroCell::Value0);    
   (lhs.type()->usesValue1())
-    ? add16Const(delta, Cell{lhs, MacroCell::Value1},
-		 Temps<3>::select(lhs, MacroCell::Scratch0,
-				  lhs, MacroCell::Scratch1,
-				  lhs, MacroCell::Payload0))
+    ? add16Const(delta, Cell{tmp, MacroCell::Value0})
     : addConst(delta);
   popPtr();
-}
 
+  freeSlot(tmp);
+}
 
 void Assembler::addConst(int delta) {
   emit<primitive::ChangeBy>(delta);
@@ -88,7 +83,33 @@ void Assembler::addAndCarryConstructive(Cell result, Cell carry, Cell other, Tem
   popPtr();
 }
 
-void Assembler::add16Const(int delta, Cell high, Temps<3> tmp) {
+void Assembler::add16Const(int delta, Cell tmp) {
+  // Assumes the pointer is currently pointing to the low byte with the high
+  // byte right next to it, followed by at least 3 empty scratch cells. The same
+  // holds for the tmp cell. It should be a Value0 cell where we can utilize its
+  // entire macrocell.
+  assert(_dp.current().field == MacroCell::Value0);
+  assert(tmp.field == MacroCell::Value0);
+  
+  if (delta == 0) return;
+  if (delta < 0) {
+    sub16Const(-delta, tmp);
+    return;
+  }
+
+  pushPtr();
+  Cell const operand = _dp.current();
+    
+  moveTo(tmp, MacroCell::Value0);
+  setToValue16(delta, Cell{tmp, static_cast<MacroCell::Field>(tmp.field + 1)}, 
+	       Temps<1>::select(tmp, MacroCell::Scratch0));
+
+  moveTo(operand);
+  add16Destructive(tmp);
+  popPtr();
+}
+
+[[deprecated]] void Assembler::add16Const(int delta, Cell high, Temps<3> tmp) {
   if (delta == 0) return;
   if (delta < 0) {
     sub16Const(-delta, high, tmp);
@@ -122,7 +143,33 @@ void Assembler::addConstructive(Cell result, Cell other, Temps<2> tmp) {
   popPtr();
 }
 
-void Assembler::add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
+void Assembler::add16Destructive(Cell delta) {
+  // This algorithm assumes that the value currently pointed to is the low byte,
+  // with the high byte right next to it, followed by at least 3 empty scratch cells.
+  // The same constraint holds for the delta-cell. The delta is destroyed.
+  assert(_dp.current().field == MacroCell::Value0);
+  assert(delta.field == MacroCell::Value0);
+  
+  Cell const operand = _dp.current();
+  pushPtr();
+
+  // Add low byte
+  moveTo(delta);
+  loopOpen(); {
+    dec();
+    moveTo(operand);
+    inc16();
+    moveTo(delta);
+  } loopClose();
+
+  // Add high byte
+  moveTo(operand, MacroCell::Value1);
+  addDestructive(Cell{delta, MacroCell::Value1});
+  
+  popPtr();
+}
+
+[[deprecated]] void Assembler::add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
 
   pushPtr();
   Cell const &low   = _dp.current();
@@ -148,7 +195,30 @@ void Assembler::add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps
   popPtr();
 }
 
-void Assembler::add16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5> tmp) {
+void Assembler::add16Constructive(Cell delta, Cell result, Cell tmp) {
+  assert(_dp.current().field == MacroCell::Value0);
+  assert(result.field == MacroCell::Value0);
+  assert(tmp.field == MacroCell::Value0);
+
+  pushPtr();
+  // Copy current into result
+  copyField(Cell{result, MacroCell::Value0}, Temps<1>::select(tmp, MacroCell::Scratch0));
+  switchField(MacroCell::Value1);
+  copyField(Cell{result, MacroCell::Value1}, Temps<1>::select(tmp, MacroCell::Scratch0));
+  
+  // Copy delta into tmp
+  moveTo(delta);
+  copyField(Cell{tmp, MacroCell::Value0}, Temps<1>::select(tmp, MacroCell::Scratch0));
+  moveTo(delta, MacroCell::Value1);
+  copyField(Cell{tmp, MacroCell::Value1}, Temps<1>::select(tmp, MacroCell::Scratch0));
+
+  // Perform destructive algorithm
+  moveTo(result);
+  add16Destructive(tmp);
+  popPtr();
+}
+
+[[deprecated]] void Assembler::add16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5> tmp) {
 
   Cell const & low      = _dp.current();
   Cell const & otherLowCopy  = tmp.get<0>();

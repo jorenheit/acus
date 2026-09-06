@@ -100,6 +100,12 @@ namespace acus::primitive {
     MERGABLE;
   };
 
+  struct Inline : Node {
+    std::string code;
+    inline explicit Inline(std::string code) : code(std::move(code)) {}
+    COMMON_INTERFACE;
+  };
+
   struct MovePointerRelative: Node {
     DInt amount = 0;
 

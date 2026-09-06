@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include <algorithm>
 
 namespace acus::util {
 
@@ -36,6 +37,29 @@ namespace acus::util {
     }
   };
 
+  namespace constraint {
+
+    template <typename T>
+    struct Consecutive {
+      template <typename ... Args> requires (std::is_same_v<T, Args> && ...)
+      static auto test(Args ... args) -> std::optional<std::array<T, sizeof ... (Args)>> {
+	static constexpr size_t N = sizeof ... (Args);
+	std::array<T, N> arr{args ...};
+	std::sort(arr.begin(), arr.end());
+	for (size_t i = 1; i != N; ++i) {
+	  if (arr[i] != arr[i - 1] + 1) return std::nullopt;
+	}
+	
+	return arr;
+      }
+    };
+    
+    
+
+
+    
+  }
+  
   namespace math {
     inline int div(int num, int denom) {
       if (denom != 0) return num / denom;

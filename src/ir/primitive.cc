@@ -603,6 +603,10 @@ GEN(LoopClose) {
   return "]";
 }
 
+GEN(Inline) {
+  return code;
+}
+
 GEN(MovePointerRelative) {
   return Algorithm::movePtr(amount.resolve(ctx));
 }
@@ -867,10 +871,12 @@ MERGE(GreaterOrEqual) {
 
 
 // Textual representation (TODO)
-#define TXT(Name) std::string primitive::Name::text(Context const &ctx) const 
+#define TXT(Name) std::string primitive::Name::text(Context const &ctx) const
 
-TXT(Comment) {
-  return txt;
+TXT(Comment) { return txt; }
+
+TXT(Inline) {
+  return "INLINE(" + code + ")";
 }
 
 TXT(LoopOpen) {
