@@ -83,7 +83,8 @@ void Assembler::inc16() {
   // followed by (at least) 3 empty scrach cells. If that is not guaranteed, call the
   // overload below.
   assert(_dp.current().field == MacroCell::Value0);
-  emit<primitive::Inline>(">>>>+<<<<+[>>]>+>[<-<]>>-<<<<");
+//  emit<primitive::Inline>(">>>>+<<<<+[>>]>+>[<-<]>>-<<<<");
+  emit<primitive::Inline>(">>>>+<<<+<+[>->]>>[<<]>>-<<<<");
 }
 
 void Assembler::inc16(Cell high, Temps<2> tmp) {
@@ -100,7 +101,9 @@ void Assembler::dec16() {
   // This overload assumes that the high cell is right next to the current (low) cell,
   // followed by (at least) 3 empty scrach cells. If that is not guaranteed, call the
   // overload below.
-  emit<primitive::Inline>(">>>>+<<<<[->>]->->[<+<+]>>-<<<<");
+  assert(_dp.current().field == MacroCell::Value0);
+//  emit<primitive::Inline>(">>>>+<<<<[->>]->->[<+<+]>>-<<<<");
+  emit<primitive::Inline>(">>>>+<<<-<[>+>]>>[<<]>>-<<<<-");
 }
 
 void Assembler::dec16(Cell high, Temps<2> tmp) {
@@ -129,39 +132,6 @@ void Assembler::copyField(Cell dest, Temps<1> tmp) {
 void Assembler::copyOrMoveField(TransferMode mode, Cell dest, Temps<1> tmp) {
   if (mode == TransferMode::Move) moveField(dest);
   else copyField(dest, tmp);
-}
-
-void Assembler::compareToConstDestructive(int value, Temps<1> tmp) {
-  auto [cur, tmp0] = getFieldIndices(_dp.current(), tmp.get<0>());
-  emit<primitive::Cmp>(value, cur, tmp0);
-}
-
-void Assembler::compareToConstConstructive(int value, Cell result, Temps<1> tmp) {
-  pushPtr();
-  copyField(result, tmp);
-  moveTo(result);
-  compareToConstDestructive(value, tmp);
-  popPtr();
-}
-    
-void Assembler::compare16ToConstDestructive(int value, Cell high, Temps<1> tmp) {
-  pushPtr();
-  compareToConstDestructive(value & 0xff, tmp);
-  moveTo(high);
-  compareToConstDestructive((value >> 8) & 0xff, tmp);
-  popPtr();
-
-  andDestructive(high, tmp);
-}
-
-void Assembler::compare16ToConstConstructive(int value, Cell high, Cell result, Temps<2> tmp) {
-  pushPtr();
-  copyField(result, tmp.get<1>());
-  moveTo(high);
-  copyField(tmp.get<0>(), tmp.get<1>());
-  moveTo(result);
-  compare16ToConstDestructive(value, tmp.get<0>(), tmp.select<1>());
-  popPtr();
 }
 
 void Assembler::moveToDynamicOffset(Cell offsetLow, Cell offsetHigh, TransferMode mode) {

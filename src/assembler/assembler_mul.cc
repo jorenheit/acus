@@ -119,14 +119,114 @@ void Assembler::mulSlotBySlot(Slot lhs, Slot rhs) {
   std::unreachable();
 }
 
-
+#if 1
 void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {
   assert(types::isUnsignedInteger(lhs.type()));
   assert(types::isUnsignedInteger(rhs.type()));
 
+  assert(lhs != rhs);
+  
+  // TODO: what if lhs and rhs are aliases?
+  Slot const &consumed = destroyRhs ? rhs : lhs;
+  Slot const &preserved = destroyRhs ? lhs : rhs;
+  constexpr auto Low  = static_cast<MacroCell::Field>(MacroCell::Value0);
+  constexpr auto High = static_cast<MacroCell::Field>(Low + 1);
+  constexpr auto Temp = static_cast<MacroCell::Field>(Low + 2);
+  constexpr auto Zero = static_cast<MacroCell::Field>(Low + 3);
+  constexpr auto ResultLow = static_cast<MacroCell::Field>(Low + 4);
+  constexpr auto ResultHigh = static_cast<MacroCell::Field>(Low + 5);
+  // Assume: rhs_low | rhs_high | temp | zero | result_low | result_high
+  
+  pushPtr();
+  if (lhs.type()->usesValue1()) {
+    
+    moveTo(consumed, Low);
+    loopOpen(); {
+      dec();
+      if (preserved.type()->usesValue1()) {
+	// Add rhs_high into result_high, ignore overflow
+	moveTo(preserved, High);	
+	emit<primitive::Inline>("[>+>>>+<<<<-]>[<+>-]<");
+      }
+      // Add rhs_low into result_low, overflow into result_high,
+      // keep a copy in temp.
+      moveTo(preserved, Low);
+      emit<primitive::Inline>("[>>+>>>+<+[>-<<]<[>]<<<-]");
+      // move temp back into rhs_low to reconstruct it
+      switchField(Temp);
+      emit<primitive::Inline>("[<<+>>-]");
+      moveTo(consumed, Low);
+    } loopClose();
+
+    if (consumed.type()->usesValue1()) {
+      moveTo(consumed, High);
+      loopOpen(); {
+	dec();
+      
+	// Add rhs_low to result_high, keeping a copy in rhs_temp
+	moveTo(preserved, Low);
+	loopOpen(); {
+	  switchField(Temp);        inc();
+	  switchField(ResultHigh);  inc();
+	  switchField(Low);         dec();	  
+	} loopClose();
+	
+	// move temp back into rhs_low to reconstruct it
+	switchField(Temp);
+	loopOpen(); {
+	  switchField(Low);  inc();
+	  switchField(Temp); dec();
+	} loopClose();
+
+	moveTo(consumed, High);
+      } loopClose();
+    }
+    
+    moveTo(preserved, ResultLow);
+    moveField(Cell{lhs, Low});
+    moveTo(preserved, ResultHigh);
+    moveField(Cell{lhs, High});
+    
+  } else {
+
+    moveTo(consumed, Low);
+    loopOpen(); {
+      dec();
+      
+      // Add rhs_low to result_high, keeping a copy in rhs_temp
+      moveTo(preserved, Low);
+      loopOpen(); {
+	switchField(Temp);        inc();
+	switchField(ResultLow);  inc();
+	switchField(Low);         dec();	  
+      } loopClose();
+	
+      // move temp back into rhs_low to reconstruct it
+      switchField(Temp);
+      loopOpen(); {
+	switchField(Low);  inc();
+	switchField(Temp); dec();
+      } loopClose();
+
+      moveTo(consumed, Low);
+    } loopClose();
+
+    moveTo(preserved, ResultLow);
+    moveField(Cell{lhs, Low});
+  }
+  popPtr();
+}
+
+#else 
+void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {
+  assert(types::isUnsignedInteger(lhs.type()));
+  assert(types::isUnsignedInteger(rhs.type()));
+
+  // TODO: what if lhs and rhs are aliases?
+  
   pushPtr();
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    
+
     /*
       a = a0 + a1 * 256
       b = b0 + b1 * 256
@@ -137,12 +237,12 @@ void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs)
 
       Given a naive 8-bit and 16-bit algorithm that simply do repeated addition,
       we can therefore implement a 16 bit multiplication as follows:
-       -> tmp1 = mul16(a0, b0)
-       -> c0 = tmp1.low
-       -> tmp2 = mul8(a0, b1) + mul8(a1, b0)
-       -> c1 = add8(tmp2.low, tmp1.high)
-       -> c = (c0, c1)
-     */
+      -> tmp1 = mul16(a0, b0)
+      -> c0 = tmp1.low
+      -> tmp2 = mul8(a0, b1) + mul8(a1, b0)
+      -> c1 = add8(tmp2.low, tmp1.high)
+      -> c = (c0, c1)
+    */
 
     constexpr auto Low  = MacroCell::Value0;
     constexpr auto High = MacroCell::Value1;
@@ -248,356 +348,361 @@ void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs)
   }
   popPtr();
 }
-
-void Assembler::mulSlotBySlotSigned(Slot lhs, Slot rhs) {
-  assert(types::isSignedInteger(lhs.type()));
-  assert(types::isSignedInteger(rhs.type()));
-
-  pushPtr();
-  moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(Cell{lhs, MacroCell::Flag},
-		      Temps<3>::select(lhs, MacroCell::Scratch0,
-				       lhs, MacroCell::Scratch1,
-				       lhs, MacroCell::Payload0));
-
-  Slot tmp = getTemp(ts::raw(2));
-  Cell const resultNegative { tmp, MacroCell::Flag };
-  moveTo(lhs, MacroCell::Flag);
-  loopOpen(); {    
-    // lhs < 0  ==>  negate LHS and set negative flag
-    zeroCell();      
-    negateSlot(lhs);
-    moveTo(resultNegative);
-    setToValue(1);
-    moveTo(lhs, MacroCell::Flag);
-  } loopClose();
+#endif
 
 
-  Slot const rhsCopy = tmp.sub(rhs.type(), 1);
-  assignSlot(rhsCopy, rhs);
-  
-  moveTo(rhsCopy, rhsCopy.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(Cell{rhsCopy, MacroCell::Flag},
-		      Temps<3>::select(rhsCopy, MacroCell::Scratch0,
-				       rhsCopy, MacroCell::Scratch1,
-				       rhsCopy, MacroCell::Payload0));
+  void Assembler::mulSlotBySlotSigned(Slot lhs, Slot rhs) {
+    assert(types::isSignedInteger(lhs.type()));
+    assert(types::isSignedInteger(rhs.type()));
 
-  
-  moveTo(rhsCopy, MacroCell::Flag);
-  loopOpen(); {
-    zeroCell();      
-    negateSlot(rhsCopy);
-    // rhs < 0  ==> set tmp flag only if it was not already set and negate rhs
-    moveTo(resultNegative);
-    notDestructive(Cell{tmp, MacroCell::Scratch0});
-    moveTo(rhsCopy, MacroCell::Flag);
-  } loopClose();
-
-  // Both operands are now positive and the resultNegative cell holds the sign bit for the result.  
-  mulSlotBySlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
-  
-  // Correct the sign
-  moveTo(resultNegative);
-  loopOpen(); {
-    zeroCell();
-    negateSlot(lhs);
-  } loopClose();
-
-  popPtr();
-  freeTempSlot(tmp);
-}
-
-// Implementations of mul algorithms
-
-void Assembler::mulConst(int factor, Temps<3> tmp) {
-  // TODO: optimize for powers of 2
-  // TODO: big factors should have runtime implementation
-  
-  if (factor == 0) {
-    zeroCell();
-    return;
-  }
-  if (factor == 1) return;
-
-  pushPtr();
-  Cell const current = _dp.current();
-  Cell const copy1 = tmp.get<0>();
-  Cell const copy2 = tmp.get<1>();
-  
-  copyField(copy1, tmp.select<2>());
-  copyField(copy2, tmp.select<2>());
-
-  // TODO: rewrite. Don't unroll always
-  for (int i = 0; i != std::abs(factor) - 1; ++i) {
-    moveTo(current);    
-    addDestructive(copy1);
-    moveTo(copy2);
-    copyField(copy1, tmp.select<2>());
-  }
-
-  // Clear temporary copies
-  moveTo(copy1); zeroCell();
-  moveTo(copy2); zeroCell();
-  
-  // All temps have been cleared by this point
-  if (factor < 0) {
-    moveTo(current);
-    negateDestructive(tmp.select<0, 1>());
-  }
-  
-  popPtr();
-}
-
-void Assembler::mul16Const(int factor, Temps<3> tmp) {
-  assert(_dp.current().field == MacroCell::Value0);
-  if (factor == 0) {
     pushPtr();
-    zeroCell();
-    moveTo(Cell{_dp.current(), MacroCell::Value1});
-    zeroCell();
+    moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
+    signBitConstructive(Cell{lhs, MacroCell::Flag},
+			Temps<3>::select(lhs, MacroCell::Scratch0,
+					 lhs, MacroCell::Scratch1,
+					 lhs, MacroCell::Payload0));
+
+    Slot tmp = getTemp(ts::raw(2));
+    Cell const resultNegative { tmp, MacroCell::Flag };
+    moveTo(lhs, MacroCell::Flag);
+    loopOpen(); {    
+      // lhs < 0  ==>  negate LHS and set negative flag
+      zeroCell();      
+      negateSlot(lhs);
+      moveTo(resultNegative);
+      setToValue(1);
+      moveTo(lhs, MacroCell::Flag);
+    } loopClose();
+
+
+    Slot const rhsCopy = tmp.sub(rhs.type(), 1);
+    assignSlot(rhsCopy, rhs);
+  
+    moveTo(rhsCopy, rhsCopy.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
+    signBitConstructive(Cell{rhsCopy, MacroCell::Flag},
+			Temps<3>::select(rhsCopy, MacroCell::Scratch0,
+					 rhsCopy, MacroCell::Scratch1,
+					 rhsCopy, MacroCell::Payload0));
+
+  
+    moveTo(rhsCopy, MacroCell::Flag);
+    loopOpen(); {
+      zeroCell();      
+      negateSlot(rhsCopy);
+      // rhs < 0  ==> set tmp flag only if it was not already set and negate rhs
+      moveTo(resultNegative);
+      notDestructive(Cell{tmp, MacroCell::Scratch0});
+      moveTo(rhsCopy, MacroCell::Flag);
+    } loopClose();
+
+    // Both operands are now positive and the resultNegative cell holds the sign bit for the result.  
+    mulSlotBySlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
+  
+    // Correct the sign
+    moveTo(resultNegative);
+    loopOpen(); {
+      zeroCell();
+      negateSlot(lhs);
+    } loopClose();
+
     popPtr();
-    return;
+    freeTempSlot(tmp);
   }
 
-  if (factor == 1) return;
+  // Implementations of mul algorithms
 
-  Cell const operand = _dp.current();
-  Cell const operandCopy1 = tmp.get<0>();
-  Cell const operandCopy2 = tmp.get<1>();
-  Cell const factorCell = tmp.get<2>();
-  assert(operand.field == MacroCell::Value0);
-  assert(operandCopy1.field == MacroCell::Value0);
-  assert(operandCopy2.field == MacroCell::Value0);
-  assert(factorCell.field == MacroCell::Value0);
-
-  pushPtr();
+  void Assembler::mulConst(int factor, Temps<3> tmp) {
+    // TODO: optimize for powers of 2
+    // TODO: big factors should have runtime implementation
   
-  // Initialize first copy of the operand
-  moveTo(operand, MacroCell::Value0);
-  copyField(Cell{operandCopy1, MacroCell::Value0}, Temps<1>::select(operandCopy1, MacroCell::Scratch0));
-  moveTo(operand, MacroCell::Value1);
-  copyField(Cell{operandCopy1, MacroCell::Value1}, Temps<1>::select(operandCopy1, MacroCell::Scratch0));
-  int const count = std::abs(factor) - 1;
-  int const lowCount  = count & 0xff;
-  int const highCount = (count >> 8) & 0xff;
+    if (factor == 0) {
+      zeroCell();
+      return;
+    }
+    if (factor == 1) return;
 
-  // ------------------------------------------------
-  // lowCount * operand
-  // ------------------------------------------------
+    pushPtr();
+    Cell const current = _dp.current();
+    Cell const copy1 = tmp.get<0>();
+    Cell const copy2 = tmp.get<1>();
+  
+    copyField(copy1, tmp.select<2>());
+    copyField(copy2, tmp.select<2>());
 
-  moveTo(factorCell, MacroCell::Value0);
-  setToValue(lowCount);
+    // TODO: rewrite. Don't unroll always
+    for (int i = 0; i != std::abs(factor) - 1; ++i) {
+      moveTo(current);    
+      addDestructive(copy1);
+      moveTo(copy2);
+      copyField(copy1, tmp.select<2>());
+    }
 
-  loopOpen(); {
-    // Make destructive copy of original operand
-    moveTo(operandCopy1, MacroCell::Value0);
-    copyField(Cell{operandCopy2, MacroCell::Value0}, Temps<1>::select(operandCopy2, MacroCell::Scratch0));
+    // Clear temporary copies
+    moveTo(copy1); zeroCell();
+    moveTo(copy2); zeroCell();
+  
+    // All temps have been cleared by this point
+    if (factor < 0) {
+      moveTo(current);
+      negateDestructive(tmp.select<0, 1>());
+    }
+  
+    popPtr();
+  }
 
-    moveTo(operandCopy1, MacroCell::Value1);
-    copyField(Cell{operandCopy2, MacroCell::Value1}, Temps<1>::select(operandCopy2, MacroCell::Scratch0));
+  void Assembler::mul16Const(int factor, Temps<3> tmp) {
+    assert(_dp.current().field == MacroCell::Value0);
+    if (factor == 0) {
+      pushPtr();
+      zeroCell();
+      moveTo(Cell{_dp.current(), MacroCell::Value1});
+      zeroCell();
+      popPtr();
+      return;
+    }
 
-    moveTo(operand);
-    add16Destructive(operandCopy2);
+    if (factor == 1) return;
+
+    Cell const operand = _dp.current();
+    Cell const operandCopy1 = tmp.get<0>();
+    Cell const operandCopy2 = tmp.get<1>();
+    Cell const factorCell = tmp.get<2>();
+    assert(operand.field == MacroCell::Value0);
+    assert(operandCopy1.field == MacroCell::Value0);
+    assert(operandCopy2.field == MacroCell::Value0);
+    assert(factorCell.field == MacroCell::Value0);
+
+    pushPtr();
+  
+    // Initialize first copy of the operand
+    moveTo(operand, MacroCell::Value0);
+    copyField(Cell{operandCopy1, MacroCell::Value0}, Temps<1>::select(operandCopy1, MacroCell::Scratch0));
+    moveTo(operand, MacroCell::Value1);
+    copyField(Cell{operandCopy1, MacroCell::Value1}, Temps<1>::select(operandCopy1, MacroCell::Scratch0));
+    int const count = std::abs(factor) - 1;
+    int const lowCount  = count & 0xff;
+    int const highCount = (count >> 8) & 0xff;
+
+    // ------------------------------------------------
+    // lowCount * operand
+    // ------------------------------------------------
 
     moveTo(factorCell, MacroCell::Value0);
-    dec();
-  } loopClose();
+    setToValue(lowCount);
 
-  // ------------------------------------------------
-  // highCount * (256 * operand)
-  //
-  // 256 * operand mod 65536 == operand.low << 8
-  // ------------------------------------------------
+    loopOpen(); {
+      // Make destructive copy of original operand
+      moveTo(operandCopy1, MacroCell::Value0);
+      copyField(Cell{operandCopy2, MacroCell::Value0}, Temps<1>::select(operandCopy2, MacroCell::Scratch0));
 
-  moveTo(factorCell, MacroCell::Value1);
-  setToValue(highCount);
+      moveTo(operandCopy1, MacroCell::Value1);
+      copyField(Cell{operandCopy2, MacroCell::Value1}, Temps<1>::select(operandCopy2, MacroCell::Scratch0));
 
-  loopOpen(); {
-    // We only need a copy of the original low byte
-    moveTo(operandCopy1, MacroCell::Value0);
-    copyField(Cell{operandCopy2, MacroCell::Value0}, Temps<1>::select(operandCopy2, MacroCell::Scratch0));
+      moveTo(operand);
+      add16Destructive(operandCopy2);
 
-    moveTo(operand, MacroCell::Value1);
-    addDestructive(Cell{operandCopy2, MacroCell::Value0});
+      moveTo(factorCell, MacroCell::Value0);
+      dec();
+    } loopClose();
+
+    // ------------------------------------------------
+    // highCount * (256 * operand)
+    //
+    // 256 * operand mod 65536 == operand.low << 8
+    // ------------------------------------------------
 
     moveTo(factorCell, MacroCell::Value1);
-    dec();    
-  } loopClose();
+    setToValue(highCount);
 
-  if (factor < 0) {
-    moveTo(operand);
-    negate16Destructive(Cell{operand, MacroCell::Value1},
-			Temps<5>::select( operand, MacroCell::Scratch0,
-					 operand, MacroCell::Scratch1,
-					 operand, MacroCell::Flag,
-					 operand, MacroCell::Payload0,
-					 operand, MacroCell::Payload1));
-  }
+    loopOpen(); {
+      // We only need a copy of the original low byte
+      moveTo(operandCopy1, MacroCell::Value0);
+      copyField(Cell{operandCopy2, MacroCell::Value0}, Temps<1>::select(operandCopy2, MacroCell::Scratch0));
 
-  popPtr();
-}
+      moveTo(operand, MacroCell::Value1);
+      addDestructive(Cell{operandCopy2, MacroCell::Value0});
 
+      moveTo(factorCell, MacroCell::Value1);
+      dec();    
+    } loopClose();
 
-[[deprecated]] void Assembler::mul16Const(int factor, Cell high, Temps<8> tmp) {
-  if (factor == 0) {
-    pushPtr();
-    zeroCell();
-    moveTo(high);
-    zeroCell();
+    if (factor < 0) {
+      moveTo(operand);
+      negate16Destructive(Cell{operand, MacroCell::Value1},
+			  Temps<5>::select( operand, MacroCell::Scratch0,
+					    operand, MacroCell::Scratch1,
+					    operand, MacroCell::Flag,
+					    operand, MacroCell::Payload0,
+					    operand, MacroCell::Payload1));
+    }
+
     popPtr();
-    return;
   }
 
-  if (factor == 1) return;
 
-  pushPtr();
-  Cell const current     = _dp.current();
-  Cell const copy1low  = tmp.get<0>();
-  Cell const copy1high = tmp.get<1>();
-  Cell const copy2low  = tmp.get<2>();
-  Cell const copy2high = tmp.get<3>();
+  // [[deprecated]] void Assembler::mul16Const(int factor, Cell high, Temps<8> tmp) {
+  //   if (factor == 0) {
+  //     pushPtr();
+  //     zeroCell();
+  //     moveTo(high);
+  //     zeroCell();
+  //     popPtr();
+  //     return;
+  //   }
 
-  moveTo(current);
-  copyField(copy1low,  tmp.select<4>());
-  copyField(copy2low,  tmp.select<4>());
+  //   if (factor == 1) return;
 
-  moveTo(high);
-  copyField(copy1high, tmp.select<4>());
-  copyField(copy2high, tmp.select<4>());
+  //   pushPtr();
+  //   Cell const current     = _dp.current();
+  //   Cell const copy1low  = tmp.get<0>();
+  //   Cell const copy1high = tmp.get<1>();
+  //   Cell const copy2low  = tmp.get<2>();
+  //   Cell const copy2high = tmp.get<3>();
 
-  for (int i = 0; i != std::abs(factor) - 1; ++i) {
-    moveTo(current);
-    add16Destructive(high, copy1low, copy1high, tmp.select<4, 5, 6>());
-    moveTo(copy2low);
-    copyField(copy1low, tmp.select<4>());
-    moveTo(copy2high);
-    copyField(copy1high, tmp.select<4>());      
-  }
+  //   moveTo(current);
+  //   copyField(copy1low,  tmp.select<4>());
+  //   copyField(copy2low,  tmp.select<4>());
 
-  // Clear temporary copies
-  moveTo(copy1low); zeroCell();
-  moveTo(copy1high); zeroCell();
-  moveTo(copy2low); zeroCell();
-  moveTo(copy2high); zeroCell();
+  //   moveTo(high);
+  //   copyField(copy1high, tmp.select<4>());
+  //   copyField(copy2high, tmp.select<4>());
+
+  //   for (int i = 0; i != std::abs(factor) - 1; ++i) {
+  //     moveTo(current);
+  //     add16Destructive(high, copy1low, copy1high, tmp.select<4, 5, 6>());
+  //     moveTo(copy2low);
+  //     copyField(copy1low, tmp.select<4>());
+  //     moveTo(copy2high);
+  //     copyField(copy1high, tmp.select<4>());      
+  //   }
+
+  //   // Clear temporary copies
+  //   moveTo(copy1low); zeroCell();
+  //   moveTo(copy1high); zeroCell();
+  //   moveTo(copy2low); zeroCell();
+  //   moveTo(copy2high); zeroCell();
   
-  // All tmp cells have been cleared by this point and can be reused 
-  if (factor < 0) {
-    moveTo(current);
-    negate16Destructive(high, tmp.select<0, 1, 2, 3, 4>());
-  }
+  //   // All tmp cells have been cleared by this point and can be reused 
+  //   if (factor < 0) {
+  //     moveTo(current);
+  //     negate16Destructive(high, tmp.select<0, 1, 2, 3, 4>());
+  //   }
   
-  popPtr();
-}
+  //   popPtr();
+  // }
 
 
-void Assembler::mulDestructive(Cell factor, Temps<3> tmp) {
-  pushPtr();
+
+
+  void Assembler::mulDestructive(Cell factor, Temps<3> tmp) {
+    pushPtr();
   
-  Cell const current = _dp.current();
-  Cell const copy1 = tmp.get<0>();
-  Cell const copy2 = tmp.get<1>();
+    Cell const current = _dp.current();
+    Cell const copy1 = tmp.get<0>();
+    Cell const copy2 = tmp.get<1>();
   
-  copyField(copy1, tmp.select<2>());
-  copyField(copy2, tmp.select<2>());
-  zeroCell();
-  
-  moveTo(factor);
-  loopOpen(); {
-    dec();
-    moveTo(current);
-    addDestructive(copy1);
-    moveTo(copy2);
     copyField(copy1, tmp.select<2>());
+    copyField(copy2, tmp.select<2>());
+    zeroCell();
+  
     moveTo(factor);
-  } loopClose();
+    loopOpen(); {
+      dec();
+      moveTo(current);
+      addDestructive(copy1);
+      moveTo(copy2);
+      copyField(copy1, tmp.select<2>());
+      moveTo(factor);
+    } loopClose();
 
-  moveTo(copy1); zeroCell();
-  moveTo(copy2); zeroCell();
+    moveTo(copy1); zeroCell();
+    moveTo(copy2); zeroCell();
 
-  popPtr();
-}
+    popPtr();
+  }
 
-// TODO: make a 16-bit version that uses the 8-bit version of mul rather than brute force repeat the addition.
-void Assembler::mul16Destructive(Cell high, Cell factorLow, Cell factorHigh, Temps<9> tmp) {
 
-  pushPtr();
+// // TODO: make a 16-bit version that uses the 8-bit version of mul rather than brute force repeat the addition.
+// void Assembler::mul16Destructive(Cell high, Cell factorLow, Cell factorHigh, Temps<9> tmp) {
+
+//   pushPtr();
   
-  Cell const current   = _dp.current();
-  Cell const copy1low  = tmp.get<0>();
-  Cell const copy2low  = tmp.get<1>();
-  Cell const copy1high = tmp.get<2>();
-  Cell const copy2high = tmp.get<3>();
-  Cell const factorNonzero = tmp.get<4>();
+//   Cell const current   = _dp.current();
+//   Cell const copy1low  = tmp.get<0>();
+//   Cell const copy2low  = tmp.get<1>();
+//   Cell const copy1high = tmp.get<2>();
+//   Cell const copy2high = tmp.get<3>();
+//   Cell const factorNonzero = tmp.get<4>();
 
-  moveTo(current);
-  copyField(copy1low, tmp.select<5>());
-  copyField(copy2low, tmp.select<5>());
-  zeroCell();
+//   moveTo(current);
+//   copyField(copy1low, tmp.select<5>());
+//   copyField(copy2low, tmp.select<5>());
+//   zeroCell();
 
-  moveTo(high);
-  copyField(copy1high, tmp.select<5>());
-  copyField(copy2high, tmp.select<5>());
-  zeroCell();
+//   moveTo(high);
+//   copyField(copy1high, tmp.select<5>());
+//   copyField(copy2high, tmp.select<5>());
+//   zeroCell();
 
-  auto computeFactorNonzero = [&]() {
-    moveTo(factorNonzero);
-    zeroCell(); // TODO: this is superfluous right?
-    moveTo(factorLow);
-    orConstructive(factorNonzero, factorHigh, tmp.select<5, 6>());
-    moveTo(factorNonzero);
-  };
+//   auto computeFactorNonzero = [&]() {
+//     moveTo(factorNonzero);
+//     zeroCell(); // TODO: this is superfluous right?
+//     moveTo(factorLow);
+//     orConstructive(factorNonzero, factorHigh, tmp.select<5, 6>());
+//     moveTo(factorNonzero);
+//   };
   
-  computeFactorNonzero();  
-  loopOpen(); {
-    moveTo(factorLow);
-    dec16(factorHigh, tmp.select<5, 6>());
+//   computeFactorNonzero();  
+//   loopOpen(); {
+//     moveTo(factorLow);
+//     dec16(factorHigh, tmp.select<5, 6>());
 
-    moveTo(current);
-    add16Destructive(high, copy1low, copy1high, tmp.select<5, 6, 7>());
+//     moveTo(current);
+//     add16Destructive(high, copy1low, copy1high, tmp.select<5, 6, 7>());
 
-    moveTo(copy2low);
-    copyField(copy1low, tmp.select<5>());
-    moveTo(copy2high);
-    copyField(copy1high, tmp.select<5>());
+//     moveTo(copy2low);
+//     copyField(copy1low, tmp.select<5>());
+//     moveTo(copy2high);
+//     copyField(copy1high, tmp.select<5>());
 
-    computeFactorNonzero();
-  } loopClose();
+//     computeFactorNonzero();
+//   } loopClose();
 
 
-  moveTo(copy1low);  zeroCell();
-  moveTo(copy1high); zeroCell();
-  moveTo(copy2low);  zeroCell();
-  moveTo(copy2high); zeroCell();
+//   moveTo(copy1low);  zeroCell();
+//   moveTo(copy1high); zeroCell();
+//   moveTo(copy2low);  zeroCell();
+//   moveTo(copy2high); zeroCell();
   
-  popPtr();
-}
+//   popPtr();
+// }
 
-void Assembler::mulConstructive(Cell result, Cell factor, Temps<4> tmp) {
-  Cell const factorCopy = tmp.get<0>();
+  // void Assembler::mulConstructive(Cell result, Cell factor, Temps<4> tmp) {
+  //   Cell const factorCopy = tmp.get<0>();
 
-  pushPtr();
-  copyField(result, tmp.get<1>());
-  moveTo(factor);
-  copyField(factorCopy, tmp.get<1>());
-  moveTo(result);
-  mulDestructive(factorCopy, tmp.select<1, 2, 3>());
-  popPtr();
-}
+  //   pushPtr();
+  //   copyField(result, tmp.get<1>());
+  //   moveTo(factor);
+  //   copyField(factorCopy, tmp.get<1>());
+  //   moveTo(result);
+  //   mulDestructive(factorCopy, tmp.select<1, 2, 3>());
+  //   popPtr();
+  // }
 
 
-void Assembler::mul16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell factorLow, Cell factorHigh, Temps<11> tmp) {
+  // void Assembler::mul16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell factorLow, Cell factorHigh, Temps<11> tmp) {
 
-  Cell const & low      = _dp.current();
-  Cell const & factorLowCopy  = tmp.get<0>();
-  Cell const & factorHighCopy = tmp.get<1>();
+  //   Cell const & low      = _dp.current();
+  //   Cell const & factorLowCopy  = tmp.get<0>();
+  //   Cell const & factorHighCopy = tmp.get<1>();
   
-  pushPtr();
-  moveTo(low);       copyField(resultLow, tmp.select<2>());
-  moveTo(high);      copyField(resultHigh, tmp.select<2>());
-  moveTo(factorLow);  copyField(factorLowCopy, tmp.select<2>());
-  moveTo(factorHigh); copyField(factorHighCopy, tmp.select<2>());
+  //   pushPtr();
+  //   moveTo(low);       copyField(resultLow, tmp.select<2>());
+  //   moveTo(high);      copyField(resultHigh, tmp.select<2>());
+  //   moveTo(factorLow);  copyField(factorLowCopy, tmp.select<2>());
+  //   moveTo(factorHigh); copyField(factorHighCopy, tmp.select<2>());
 
-  moveTo(resultLow);
-  mul16Destructive(resultHigh, factorLowCopy, factorHighCopy, tmp.select<2, 3, 4, 5, 6, 7, 8, 9, 10>());
-  popPtr();
-}
+  //   moveTo(resultLow);
+  //   mul16Destructive(resultHigh, factorLowCopy, factorHighCopy, tmp.select<2, 3, 4, 5, 6, 7, 8, 9, 10>());
+  //   popPtr();
+  // }

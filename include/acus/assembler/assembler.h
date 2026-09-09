@@ -492,13 +492,13 @@ namespace acus {
     void addConst(int delta);
     void addConstAndCarry(int delta, Cell carry, Temps<2>);
     void add16Const(int delta, Cell tmp);
-    void add16Const(int delta, Cell high, Temps<3>);
+    // void add16Const(int delta, Cell high, Temps<3>);
     void addDestructive(Cell other);
     void addConstructive(Cell result, Cell other, Temps<2>);
     void add16Destructive(Cell delta);
     void add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
     void add16Constructive(Cell delta, Cell result, Cell tmp);
-    void add16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5>);
+    // void add16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5>);
     void addAndCarryDestructive(Cell carry, Cell other, Temps<2>);
     void addAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
 
@@ -517,11 +517,12 @@ namespace acus {
 
     void mulConst(int factor, Temps<3>);
     void mul16Const(int factor, Temps<3> tmp);
-    void mul16Const(int factor, Cell high, Temps<8>);
+    // void mul16Const(int factor, Cell high, Temps<8>);
     void mulDestructive(Cell other, Temps<3>);
-    void mulConstructive(Cell result, Cell factor, Temps<4>);
+    // void mulConstructive(Cell result, Cell factor, Temps<4>);
+    // void mul16Destructive(Cell factor, bool const operandUsesValue1, bool const factorUsesValue1);
     void mul16Destructive(Cell high, Cell factorLow, Cell factorHigh, Temps<9>);
-    void mul16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell factorLow, Cell factorHigh, Temps<11>);
+    // void mul16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell factorLow, Cell factorHigh, Temps<11>);
 
     void divModConst(int denom, Cell modResult, Temps<5>);
     void divMod16Const(int denom, Cell high, Cell modResultLow, Cell modResultHigh, Temps<8>);
