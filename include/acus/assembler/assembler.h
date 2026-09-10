@@ -337,8 +337,12 @@ namespace acus {
 
   
     // Slot operations
+    // template <typename TrueBranch, typename FalseBranch>
+    // void branchOnSignBit(Slot slot, Cell const &flagCell, TrueBranch&& trueBranch, FalseBranch&& falseBranch);
+
     template <typename TrueBranch, typename FalseBranch>
-    void branchOnSignBit(Slot slot, Cell const &flagCell, TrueBranch&& trueBranch, FalseBranch&& falseBranch);
+    void branchOnSignBit(Slot slot, TrueBranch&& trueBranch, FalseBranch&& falseBranch);
+
     void setSlotToBool(Slot slot, bool val);
 
     std::optional<Slot> localSlot(std::string const &varName) const;
@@ -486,6 +490,7 @@ namespace acus {
     void dec16();
     void dec16(Cell high, Temps<2>);
   
+    void signBitDestructive();
     void signBitDestructive(Temps<2>);
     void signBitConstructive(Cell result, Temps<3>);
     

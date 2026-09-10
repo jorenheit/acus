@@ -213,17 +213,37 @@ void Assembler::absSlot(Slot rhs) {
 
 void Assembler::signBitSlot(Slot rhs) {
   assert(types::isSignedInteger(rhs.type()));
-  
-  pushPtr();
-  moveTo(rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitDestructive(Temps<2>::select(rhs, MacroCell::Scratch0,
-				      rhs, MacroCell::Scratch1));
 
+  pushPtr();
+  
+  moveTo(rhs, MacroCell::Value1);
   if (rhs.type()->usesValue1()) {
     moveField(Cell{rhs, MacroCell::Value0});
+  } else {
+    zeroCell();
   }
+
+  moveTo(rhs, MacroCell::Value0);
+  signBitDestructive();
+  
   popPtr();
 }
+
+void Assembler::signBitDestructive() {
+  // Assumes the 4 cells next to it are zeroed and available
+  const auto Current = _dp.current().field;
+  const auto Counter = static_cast<MacroCell::Field>(Current + 1);
+  const auto Result = static_cast<MacroCell::Field>(Current + 2);
+
+  pushPtr();
+  switchField(Counter);
+  setToValue(128);
+  emit<primitive::Inline>("[->+<<+[>>-]>>[<[-]>>>]<<<]");
+  switchField(Result);
+  moveField(Cell{_dp.current().offset, Current});
+  popPtr();
+}
+
 
 void Assembler::signBitDestructive(Temps<2> tmp) {
   Cell const current = _dp.current();

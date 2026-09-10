@@ -96,16 +96,18 @@ void Assembler::slotLessConstSigned(Slot lhs, int val) {
   else if (val > 0) {
     // If sign bit is set, return 1
     // If no sign bit, do normal unsigned comparison
-    branchOnSignBit(lhs, Cell{lhs, MacroCell::Flag},
+    branchOnSignBit(lhs, // Cell{lhs, MacroCell::Flag},
 		    [&] /* lhs  < 0 */ { setSlotToBool(lhs, true); },
 		    [&] /* lhs >= 0 */ { slotLessConstUnsigned(lhs.unsignedView(), val); });
+
 		    
   }
   else if (val < 0) {
     // If no sign bit, return 0
     // If sign bit is set, take absolute value and do unsigned comparison between absolute values,
     // but use greater-than algorithm.
-    branchOnSignBit(lhs, Cell{lhs, MacroCell::Flag},
+
+    branchOnSignBit(lhs, // Cell{lhs, MacroCell::Flag},
 		    [&] /* lhs < 0 */ {
 		      negateSlot(lhs);
 		      slotGreaterConstUnsigned(lhs.unsignedView(), std::abs(val));
@@ -169,9 +171,9 @@ void Assembler::slotLessSlotSigned(Slot lhs, Slot rhs) {
   // lhs positive, rhs negative -> return 0
   // both negative -> use unsigned greater on absolute values
   
-  branchOnSignBit(lhs, Cell{lhs, MacroCell::Flag},
+  branchOnSignBit(lhs,// Cell{lhs, MacroCell::Flag},
 		  [&] /* lhs < 0 */ { 
-		    branchOnSignBit(rhs, Cell{rhs, MacroCell::Flag},
+		    branchOnSignBit(rhs,// Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned greater-than
 				      negateSlot(lhs);
@@ -187,7 +189,7 @@ void Assembler::slotLessSlotSigned(Slot lhs, Slot rhs) {
 				    });
 		  },
 		  [&] /* lhs >= 0 */ {
-		    branchOnSignBit(rhs, Cell{rhs, MacroCell::Flag},
+		    branchOnSignBit(rhs, // Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
 				      // lhs is positive while rhs is negative, so lhs is never less
 				      setSlotToBool(lhs, false);
@@ -236,7 +238,7 @@ void Assembler::slotLessEqualConstSigned(Slot lhs, int val) {
     // if sign bit is set -> return 1
     // if not, use unsigned version
     
-    branchOnSignBit(lhs, Cell{lhs, MacroCell::Flag},
+    branchOnSignBit(lhs, //Cell{lhs, MacroCell::Flag},
 		    [&] /* lhs  < 0 */ { setSlotToBool(lhs, true); },
 		    [&] /* lhs >= 0 */ { slotLessEqualConstUnsigned(lhs.unsignedView(), val); });
   }
@@ -244,7 +246,7 @@ void Assembler::slotLessEqualConstSigned(Slot lhs, int val) {
   if (val < 0) {
     // if sign bit is set -> return abs(lhs) >= abs(val)
     // if not, return 0
-    branchOnSignBit(lhs, Cell{lhs, MacroCell::Flag},
+    branchOnSignBit(lhs,// Cell{lhs, MacroCell::Flag},
 		    [&] /* lhs < 0 */ {
 		      negateSlot(lhs);
 		      slotGreaterEqualConstUnsigned(lhs.unsignedView(), std::abs(val));
@@ -307,9 +309,9 @@ void Assembler::slotLessEqualSlotSigned(Slot lhs, Slot rhs) {
   // if lhs >= 0 and rhs < 0, return false
   // if both are negative, negate and use unsigned greaterEqual
 
-  branchOnSignBit(lhs, Cell{lhs, MacroCell::Flag},
+  branchOnSignBit(lhs,// Cell{lhs, MacroCell::Flag},
 		  [&] /* lhs < 0 */ { 
-		    branchOnSignBit(rhs, Cell{rhs, MacroCell::Flag},
+		    branchOnSignBit(rhs, //Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned greater-equal
 				      negateSlot(lhs);
@@ -324,7 +326,7 @@ void Assembler::slotLessEqualSlotSigned(Slot lhs, Slot rhs) {
 				    });
 		  },
 		  [&] /* lhs >= 0 */ {
-		    branchOnSignBit(rhs, Cell{rhs, MacroCell::Flag},
+		    branchOnSignBit(rhs, //Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
 				      setSlotToBool(lhs, false);
 				    },
@@ -424,9 +426,9 @@ void Assembler::slotGreaterSlotSigned(Slot lhs, Slot rhs) {
   // if lhs >= 0 and rhs < 0, return true
   // if both are negative, negate and use unsigned less
 
-  branchOnSignBit(lhs, Cell{lhs, MacroCell::Flag},
+  branchOnSignBit(lhs,// Cell{lhs, MacroCell::Flag},
 		  [&] /* lhs < 0 */ { 
-		    branchOnSignBit(rhs, Cell{rhs, MacroCell::Flag},
+		    branchOnSignBit(rhs, //Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned greater-equal
 				      negateSlot(lhs);
@@ -441,7 +443,7 @@ void Assembler::slotGreaterSlotSigned(Slot lhs, Slot rhs) {
 				    });
 		  },
 		  [&] /* lhs >= 0 */ {
-		    branchOnSignBit(rhs, Cell{rhs, MacroCell::Flag},
+		    branchOnSignBit(rhs, //Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
 				      setSlotToBool(lhs, true);
 				    },
@@ -542,9 +544,9 @@ void Assembler::slotGreaterEqualSlotSigned(Slot lhs, Slot rhs) {
   // if lhs >= 0 and rhs < 0, return true
   // if both are negative, negate and use unsigned less-equal
 
-  branchOnSignBit(lhs, Cell{lhs, MacroCell::Flag},
+  branchOnSignBit(lhs,// Cell{lhs, MacroCell::Flag},
 		  [&] /* lhs < 0 */ { 
-		    branchOnSignBit(rhs, Cell{rhs, MacroCell::Flag},
+		    branchOnSignBit(rhs, //Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned greater-equal
 				      negateSlot(lhs);
@@ -559,7 +561,7 @@ void Assembler::slotGreaterEqualSlotSigned(Slot lhs, Slot rhs) {
 				    });
 		  },
 		  [&] /* lhs >= 0 */ {
-		    branchOnSignBit(rhs, Cell{rhs, MacroCell::Flag},
+		    branchOnSignBit(rhs,// Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
 				      setSlotToBool(lhs, true);
 				    },
