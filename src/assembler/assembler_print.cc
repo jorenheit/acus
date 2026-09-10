@@ -225,8 +225,10 @@ void Assembler::printStringConst(std::string const &str) {
   Slot ch = getTemp(ts::u8());
   
   pushPtr();
+  // moveTo(ch);
+  // setToValue(str[0], Temps<1>::select(ch, MacroCell::Scratch0));
+  setSlotToValue(ch, str[0]);
   moveTo(ch);
-  setToValue(str[0], Temps<1>::select(ch, MacroCell::Scratch0));
   emit<primitive::Out>();
   for (size_t i = 1; i != str.size(); ++i) {
     int const diff = str[i] - str[i - 1];

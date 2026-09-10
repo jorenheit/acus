@@ -6,8 +6,7 @@
 #include "assembler.ih"
 
 void Assembler::setSlotToBool(Slot slot, bool value) {
-  moveTo(slot, MacroCell::Value0); setToValue(value);
-  moveTo(slot, MacroCell::Value1); setToValue(0);
+  setSlotToValue(slot, value);
 }
 
 void Assembler::slotEqualConst(Slot lhs, int val) {
@@ -75,10 +74,7 @@ void Assembler::slotLessConstUnsigned(Slot lhs, int val) {
   assert(val >= 0);
   
   if (val == 0) {
-    pushPtr();
-    moveTo(lhs);
-    setToValue16(0, Cell{lhs, MacroCell::Value1});
-    popPtr();
+    setSlotToValue(lhs, 0);
     return;
   }
 
@@ -218,21 +214,13 @@ void Assembler::slotLessEqualConstUnsigned(Slot lhs, int val) {
   assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
   
-  pushPtr();
-
   // If val is maximal, the result must be true
-  if (lhs.type()->usesValue1() && ((val & 0xffff) == 0xffff)) {
-    moveTo(lhs); 
-    setToValue16(1, Cell{lhs, MacroCell::Value1});
-    popPtr();
+  if ((lhs.type()->usesValue1() && (val & 0xffff) == 0xffff) || (val & 0xff) == 0xff) {
+    setSlotToValue(lhs, 1);
     return;
   }
-  else if ((val & 0xff) == 0xff) {
-    moveTo(lhs);
-    setToValue(1);
-    popPtr();
-    return;
-  }
+
+  pushPtr();
   
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotLessEqualSlotUnsigned(lhs, valSlot, true);
@@ -360,22 +348,15 @@ void Assembler::slotGreaterConstUnsigned(Slot lhs, int val) {
   assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
   
-  pushPtr();
 
   // If val is maximal, the result must be false
-  if (lhs.type()->usesValue1() && ((val & 0xffff) == 0xffff)) {
-    moveTo(lhs); 
-    setToValue16(0, Cell{lhs, MacroCell::Value1});
-    popPtr();
-    return;
-  }
-  else if ((val & 0xff) == 0xff) {
-    moveTo(lhs);
-    setToValue(0);
-    popPtr();
+  if ((lhs.type()->usesValue1() && (val & 0xffff) == 0xffff) || (val & 0xff) == 0xff) {
+    setSlotToValue(lhs, 0);
     return;
   }
 
+  pushPtr();
+  
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotGreaterSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
@@ -483,21 +464,14 @@ void Assembler::slotGreaterEqualConstUnsigned(Slot lhs, int val) {
   assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
   
-  pushPtr();
 
   // If val is 0, the result must be true
-  if (lhs.type()->usesValue1() && (val == 0)) {
-    moveTo(lhs); 
-    setToValue16(1, Cell{lhs, MacroCell::Value1});
-    popPtr();
+  if (val == 0) {
+    setSlotToValue(lhs, 1);
     return;
   }
-  else if (val == 0) {
-    moveTo(lhs);
-    setToValue(1);
-    popPtr();
-    return;
-  }
+
+  pushPtr();
 
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotGreaterEqualSlotUnsigned(lhs, valSlot, true);

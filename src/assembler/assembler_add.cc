@@ -79,9 +79,7 @@ void Assembler::add16Const(int delta, Cell tmp) {
   Cell const operand = _dp.current();
     
   moveTo(tmp, MacroCell::Value0);
-  setToValue16(delta, Cell{tmp, static_cast<MacroCell::Field>(tmp.field + 1)}, 
-	       Temps<1>::select(tmp, MacroCell::Scratch0));
-
+  setToValue16(delta);
   moveTo(operand);
   add16Destructive(tmp);
   popPtr();

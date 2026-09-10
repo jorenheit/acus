@@ -44,9 +44,39 @@ void Assembler::zeroCellPlus() {
   emit<primitive::ZeroCellPlus>();
 }
 
+// void Assembler::setToValueSimple(int value) {
+//   zeroCell();
+//   emit<primitive::ChangeBy>(value);
+// }
+
+// void Assembler::setToValue16Simple(int value) {
+//   zeroCell();
+//   emit<primitive::ChangeBy>(value & 0xff);
+//   emit<primitive::Inline>(">");
+//   emit<primitive::ChangeBy>((value >> 8) & 0xff);
+//   emit<primitive::Inline>("<");
+// }
+
+void Assembler::setSlotToValue(Slot slot, int value) {
+  assert(types::isInteger(slot.type()));
+
+  pushPtr();
+  moveTo(slot, MacroCell::Value0);
+  if (slot.type()->usesValue1()) {
+    setToValue16(value);
+  } else {
+    setToValue(value);
+    switchField(MacroCell::Value1);
+    zeroCell();
+  }
+  popPtr();
+}
+
+
 void Assembler::setToValue(int value) {
-  zeroCell();
-  addConst(value & 0xff);
+  // Normalized version: must be at a Value-cell and use Scratch0 as temp.
+  assert(_dp.current().field == MacroCell::Value0 || _dp.current().field == MacroCell::Value1);
+  emit<primitive::ConstructConstant>(value & 0xff, MacroCell::Value0, MacroCell::Scratch0);
 }
 
 void Assembler::setToValue(int value, Temps<1> tmp) {
@@ -54,11 +84,13 @@ void Assembler::setToValue(int value, Temps<1> tmp) {
   emit<primitive::ConstructConstant>(value, cur, scratch);
 }
 
-void Assembler::setToValue16(int value, Cell high) { 
+void Assembler::setToValue16(int value) {
+  // Normalized version: must be at Value0 and use Scratch0 as temp.
+  assert(_dp.current().field == MacroCell::Value0);
   pushPtr();
-  setToValue(value & 0xff);
-  moveTo(high);
-  setToValue((value >> 8) & 0xff);
+  setToValue(value);
+  switchField(MacroCell::Value1);
+  setToValue(value >> 8);
   popPtr();
 }
 

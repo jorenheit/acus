@@ -66,10 +66,8 @@ void Assembler::sub16Const(int delta, Cell tmp) {
   pushPtr();
   Cell const operand = _dp.current();
     
-  moveTo(tmp);
-  setToValue16(delta, Cell{tmp, MacroCell::Value1}, 
-	       Temps<1>::select(tmp, MacroCell::Scratch0));
-
+  moveTo(tmp, MacroCell::Value0);
+  setToValue16(delta);
   moveTo(operand);
   sub16Destructive(tmp);
   popPtr();

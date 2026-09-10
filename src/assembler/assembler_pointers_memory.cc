@@ -36,9 +36,11 @@ Slot Assembler::addressOfSlot(Slot pointeeSlot, API_CTX) {
   // Construct offset in second cell
   int const offset = pointeeSlot.offset();  
   moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value0);
-  setToValue(offset & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
-  moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value1);
-  setToValue((offset >> 8) & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
+  setToValue16(offset);
+  
+  // setToValue_(offset & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
+  // moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value1);
+  // setToValue_((offset >> 8) & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
 
   return ptrSlot;
 }
@@ -305,7 +307,7 @@ void Assembler::assignSlotBytewise(Slot dest, Slot src, TransferMode mode) {
     }
     else {
       moveTo(dest + i, MacroCell::Value1);
-      setToValue(0);
+      zeroCell();
     }
   }
   popPtr();
@@ -316,15 +318,16 @@ void Assembler::assignSlot(Slot slot, literal::Literal val) {
   pushPtr();
   if (types::isInteger(slot.type())) {
     int const x = literal::cast<types::IntegerType>(val)->encodedValue();
-    moveTo(slot, MacroCell::Value0);
-    setToValue(x & 0xff, Temps<1>::select(slot, MacroCell::Scratch0));
-    moveTo(slot, MacroCell::Value1);    
-    if (slot.type()->usesValue1()) {
-      setToValue((x >> 8) & 0xff, Temps<1>::select(slot, MacroCell::Scratch0));
-    }
-    else {
-      zeroCell();
-    }
+    setSlotToValue(slot, x);
+    // moveTo(slot, MacroCell::Value0);
+    // setToValue(x & 0xff, Temps<1>::select(slot, MacroCell::Scratch0));
+    // moveTo(slot, MacroCell::Value1);    
+    // if (slot.type()->usesValue1()) {
+    //   setToValue((x >> 8) & 0xff, Temps<1>::select(slot, MacroCell::Scratch0));
+    // }
+    // else {
+    //   zeroCell();
+    // }
   }
   else if (types::isArray(slot.type()) || types::isString(slot.type())) {
     // recursive call for each element

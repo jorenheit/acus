@@ -87,7 +87,7 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   moveTo(lhs, MacroCell::Flag);
   loopOpen(); {
     moveTo(lhsNegative);
-    setToValue(1);
+    zeroCell(); inc();
     negateSlot(lhs);
     moveTo(lhs, MacroCell::Flag);
     zeroCell();      
@@ -222,7 +222,7 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
     zeroCell();      
     negateSlot(lhs);
     moveTo(resultNegative);
-    setToValue(1);
+    zeroCell(); inc();
     moveTo(lhs, MacroCell::Flag);
   } loopClose();
 
@@ -345,7 +345,7 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   moveTo(lhs, MacroCell::Flag);
   loopOpen(); {
     moveTo(resultNegative);
-    setToValue(1);
+    zeroCell(); inc();
     negateSlot(lhs);
     moveTo(lhs, MacroCell::Flag);
     zeroCell();      
@@ -481,7 +481,7 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   moveTo(lhs, MacroCell::Flag);
   loopOpen(); {
     moveTo(resultNegative);
-    setToValue(1);
+    zeroCell(); inc();
     negateSlot(lhs);
     moveTo(lhs, MacroCell::Flag);
     zeroCell();      
@@ -513,7 +513,7 @@ void Assembler::divModConst(int denom, Cell modResult, Temps<5> tmp) {
   pushPtr();
   Cell const divResult = _dp.current();
 
-  moveTo(modResult); setToValue(0);
+  moveTo(modResult); zeroCell();
   if (denom == 1) {
     popPtr();
     return;
@@ -531,7 +531,7 @@ void Assembler::divModConst(int denom, Cell modResult, Temps<5> tmp) {
 
   moveTo(divResult);  moveField(numCopy);
   moveTo(denomCopy);  setToValue(denom & 0xff, tmp.select<4>());
-  moveTo(loopFlag);   setToValue(1);
+  moveTo(loopFlag);   zeroCell(); inc();
 
   moveTo(numCopy);
   notConstructive(numeratorIsZero, tmp.select<4>());
@@ -540,7 +540,7 @@ void Assembler::divModConst(int denom, Cell modResult, Temps<5> tmp) {
     zeroCell();
     // 0 / x -> divResult and modResult remain 0 -> return
     moveTo(loopFlag);
-    setToValue(0);
+    zeroCell();
     moveTo(numeratorIsZero);
   } loopClose();
 
@@ -575,7 +575,7 @@ void Assembler::divModConst(int denom, Cell modResult, Temps<5> tmp) {
     moveTo(numeratorIsZero);
     loopOpen(); {
       zeroCell();
-      moveTo(loopFlag); setToValue(0);
+      moveTo(loopFlag); zeroCell();
       moveTo(numeratorIsZero);
     } loopClose();
 
@@ -594,8 +594,8 @@ void Assembler::divMod16Const(int denom, Cell high, Cell modResultLow, Cell modR
   Cell const divResultLow = _dp.current();
   Cell const divResultHigh = high;
   
-  moveTo(modResultLow);  setToValue(0);
-  moveTo(modResultHigh); setToValue(0);
+  moveTo(modResultLow);  zeroCell();
+  moveTo(modResultHigh); zeroCell();
 
   if (denom == 1) {
     popPtr();
@@ -620,7 +620,7 @@ void Assembler::divMod16Const(int denom, Cell high, Cell modResultLow, Cell modR
   moveTo(divResultHigh); moveField(numCopyHigh);
   moveTo(denomCopyLow);  setToValue(denom & 0xff, tmp.select<6>());
   moveTo(denomCopyHigh); setToValue((denom >> 8) & 0xff, tmp.select<6>());
-  moveTo(loopFlag);      setToValue(1);
+  moveTo(loopFlag);      zeroCell(); inc();
 
   moveTo(numCopyLow);
   not16Constructive(numCopyHigh, numeratorIsZero, tmp.select<6, 7>());
@@ -628,7 +628,7 @@ void Assembler::divMod16Const(int denom, Cell high, Cell modResultLow, Cell modR
   loopOpen(); { // if numerator is 0, return immediately (divResult and modResult remain 0)
     zeroCell();
     moveTo(loopFlag);
-    setToValue(0);
+    zeroCell();
     moveTo(numeratorIsZero);
   } loopClose();
 
@@ -665,7 +665,7 @@ void Assembler::divMod16Const(int denom, Cell high, Cell modResultLow, Cell modR
     moveTo(numeratorIsZero);
     loopOpen(); {
       zeroCell();
-      moveTo(loopFlag); setToValue(0);
+      moveTo(loopFlag); zeroCell();
       moveTo(numeratorIsZero);
     } loopClose();
 
@@ -689,10 +689,10 @@ void Assembler::divModDestructive(Cell denom, Cell modResult, Temps<5> tmp) {
   Cell const numCopy = tmp.get<2>();
   Cell const denomCopy = tmp.get<3>();
 
-  moveTo(modResult); setToValue(0);
+  moveTo(modResult); zeroCell();
   moveTo(divResult); moveField(numCopy);
   moveTo(denom);     copyField(denomCopy, tmp.select<4>());
-  moveTo(loopFlag);  setToValue(1);
+  moveTo(loopFlag);  zeroCell(); inc();
 
   // Division by 0
   moveTo(denomCopy);
@@ -700,7 +700,7 @@ void Assembler::divModDestructive(Cell denom, Cell modResult, Temps<5> tmp) {
   moveTo(zeroFlag);
   loopOpen(); {
     moveTo(divResult); dec();
-    moveTo(loopFlag);  setToValue(0);
+    moveTo(loopFlag);  zeroCell();
     moveTo(zeroFlag);  zeroCell();
   } loopClose();
 
@@ -710,7 +710,7 @@ void Assembler::divModDestructive(Cell denom, Cell modResult, Temps<5> tmp) {
   moveTo(zeroFlag);
   loopOpen(); {
     moveTo(divResult); zeroCell();
-    moveTo(loopFlag);  setToValue(0);
+    moveTo(loopFlag);  zeroCell();
     moveTo(zeroFlag);  zeroCell();
   } loopClose();
 
@@ -740,7 +740,7 @@ void Assembler::divModDestructive(Cell denom, Cell modResult, Temps<5> tmp) {
     moveTo(zeroFlag);
     loopOpen(); {
       zeroCell();
-      moveTo(loopFlag); setToValue(0);
+      moveTo(loopFlag); zeroCell();
       moveTo(zeroFlag);
     } loopClose();
     
@@ -766,13 +766,13 @@ void Assembler::divMod16Destructive(Cell high, Cell denomLow, Cell denomHigh, Ce
   Cell const denomCopyLow  = tmp.get<4>();
   Cell const denomCopyHigh = tmp.get<5>();
 
-  moveTo(modResultLow);  setToValue(0);
-  moveTo(modResultHigh); setToValue(0);
+  moveTo(modResultLow);  zeroCell();
+  moveTo(modResultHigh); zeroCell();
   moveTo(divResultLow);  moveField(numCopyLow);
   moveTo(divResultHigh); moveField(numCopyHigh);
   moveTo(denomLow);      copyField(denomCopyLow, tmp.select<6>());
   moveTo(denomHigh);     copyField(denomCopyHigh, tmp.select<6>());
-  moveTo(loopFlag);      setToValue(1);
+  moveTo(loopFlag);      zeroCell(); inc();
 
   // Division by 0
   moveTo(denomCopyLow);
@@ -780,7 +780,7 @@ void Assembler::divMod16Destructive(Cell high, Cell denomLow, Cell denomHigh, Ce
   moveTo(zeroFlag);
   loopOpen(); {
     moveTo(divResultLow); dec16(divResultHigh, tmp.select<6, 7>());
-    moveTo(loopFlag);     setToValue(0);
+    moveTo(loopFlag);     zeroCell();
     moveTo(zeroFlag);     zeroCell();
   } loopClose();
 
@@ -791,7 +791,7 @@ void Assembler::divMod16Destructive(Cell high, Cell denomLow, Cell denomHigh, Ce
   loopOpen(); {
     moveTo(divResultLow);  zeroCellPlus();
     moveTo(divResultHigh); zeroCell();
-    moveTo(loopFlag);      setToValue(0);
+    moveTo(loopFlag);      zeroCell();
     moveTo(zeroFlag);      zeroCell();
   } loopClose();
 
@@ -820,7 +820,7 @@ void Assembler::divMod16Destructive(Cell high, Cell denomLow, Cell denomHigh, Ce
     not16Constructive(numCopyHigh, zeroFlag, tmp.select<6, 7>());
     moveTo(zeroFlag);
     loopOpen(); {
-      moveTo(loopFlag); setToValue(0);
+  moveTo(loopFlag); zeroCell();
       moveTo(zeroFlag); zeroCell();
     } loopClose();
     

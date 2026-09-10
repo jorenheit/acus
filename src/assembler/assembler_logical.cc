@@ -51,12 +51,11 @@ void Assembler::andSlotWithSlot(Slot lhs, Slot rhs) {
 
 void Assembler::nandSlotWithConst(Slot lhs, int val) {
   pushPtr();
-  moveTo(lhs);
+  moveTo(lhs, MacroCell::Value0);
 
   if (val == 0) {
-    setToValue(1);
-    moveTo(lhs, MacroCell::Value1);
-    zeroCell();
+    zeroCell(); inc();
+    switchField(MacroCell::Value1); zeroCell();
     popPtr();
     return;
   }
@@ -96,12 +95,11 @@ void Assembler::nandSlotWithSlot(Slot lhs, Slot rhs) {
 
 void Assembler::orSlotWithConst(Slot lhs, int val) {
   pushPtr();
-  moveTo(lhs);
+  moveTo(lhs, MacroCell::Value0);
 
   if (val != 0) {
-    setToValue(1);
-    moveTo(lhs, MacroCell::Value1);
-    zeroCell();
+    zeroCell(); inc();
+    switchField(MacroCell::Value1);  zeroCell();
     popPtr();
     return;
   }
@@ -136,12 +134,11 @@ void Assembler::orSlotWithSlot(Slot lhs, Slot rhs) {
 
 void Assembler::norSlotWithConst(Slot lhs, int val) {
   pushPtr();
-  moveTo(lhs);
+  moveTo(lhs, MacroCell::Value0);
 
   if (val != 0) {
-    setToValue(0);
-    moveTo(lhs, MacroCell::Value1);
     zeroCell();
+    switchField(MacroCell::Value1);    zeroCell();
     popPtr();
     return;
   }

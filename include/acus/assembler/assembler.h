@@ -350,6 +350,8 @@ namespace acus {
     void assignSlotBytewise(Slot dest, Slot src, TransferMode mode = TransferMode::Copy);
     void assignIntegerSlot(Slot dest, Slot src, TransferMode mode = TransferMode::Copy);
 
+    void setSlotToValue(Slot slot, int value);
+    
     void notSlot(Slot rhs);
     void boolSlot(Slot rhs);
     void negateSlot(Slot rhs);
@@ -470,8 +472,11 @@ namespace acus {
     void copyOrMoveField(TransferMode ode, Cell dest, Temps<1>);
     
     void setToValue(int value);
+    void setToValue16(int value);
+
+    // These should go I think
     void setToValue(int value, Temps<1>);
-    void setToValue16(int value, Cell high);    
+    // void setToValue16(int value, Cell high);    
     void setToValue16(int value, Cell high, Temps<1>);
 
     void inc();
@@ -516,7 +521,7 @@ namespace acus {
     void subAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
 
     void mulConst(int factor, Temps<3>);
-    void mul16Const(int factor, Temps<3> tmp);
+    // void mul16Const(int factor, Temps<3> tmp);
     // void mul16Const(int factor, Cell high, Temps<8>);
     void mulDestructive(Cell other, Temps<3>);
     // void mulConstructive(Cell result, Cell factor, Temps<4>);

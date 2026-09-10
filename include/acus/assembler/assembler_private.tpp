@@ -27,7 +27,7 @@ void Assembler::branchOnSignBit(Slot slot, Cell const &flagCell, TrueBranch&& tr
 				       slot, MacroCell::Scratch1,
 				       slot, MacroCell::Payload0));
   moveTo(slot, MacroCell::Scratch0);
-  setToValue(1);
+  zeroCell(); inc();
   moveTo(flagCell);
   loopOpen(); {
     moveTo(slot, MacroCell::Scratch0); zeroCell();

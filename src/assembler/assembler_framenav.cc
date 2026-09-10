@@ -28,7 +28,7 @@ void Assembler::pushFrame() {
 
   moveTo(0, MacroCell::FrameMarker);
   emit<primitive::MovePointerRelative>(currentFrameSize);
-  setToValue(1);
+  zeroCell(); inc();
   moveToOrigin();
 }
 
@@ -112,7 +112,7 @@ void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Pay
 
     if (not checkCurrent) {
       switchField(MacroCell::Flag);
-      setToValue(1);
+      zeroCell(); inc();
     }
     else {
       switchField(markerField);
@@ -140,7 +140,7 @@ void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Pay
 void Assembler::setSeekMarker() {
   pushPtr();
   switchField(MacroCell::SeekMarker);
-  setToValue(1);
+  zeroCell(); inc();
   popPtr();
 }
 

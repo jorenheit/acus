@@ -294,10 +294,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     moveTo(0, MacroCell::Value0);
     primitive::DInt const diff = currentFrameSize + paramStart + offset;
     emit<primitive::MovePointerRelative>(diff);
-    setToValue(value, Temps<1>::select(0, MacroCell::Scratch0));
-    switchField(MacroCell::Value1);
-    setToValue(val.type()->usesValue1() ? ((value >> 8) & 0xff) : 0, Temps<1>::select(0, MacroCell::Scratch0));
-    switchField(MacroCell::Value0);
+    setToValue16(value);
     emit<primitive::MovePointerRelative>(-diff);
     offset += MacroCell::FieldCount;
   };
@@ -516,13 +513,13 @@ void Assembler::branchIfSlot(Slot slot, std::string const &trueLabel, std::strin
 
   moveTo(tmp);
   switchField(MacroCell::Flag);
-  setToValue(1);
+  zeroCell(); inc();
   switchField(MacroCell::Value0);
   loopOpen(); {
     zeroCell();
     setNextBlock(_currentFunction->name, trueLabel);
     switchField(MacroCell::Flag);
-    setToValue(0);
+    zeroCell();
     switchField(MacroCell::Value0);	
   }; loopClose();
 
