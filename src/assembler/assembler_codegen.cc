@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
+#include <regex>
 #include "assembler.ih"
 
 std::string Assembler::defaultOpenTag() {
@@ -178,7 +179,9 @@ std::string Assembler::simplifyBrainfuck(std::string const &bf) {
     return result;
   };
   
-  return cancel(cancel(bf, '>', '<'), '+', '-');
+  std::string result = cancel(cancel(bf, '>', '<'), '+', '-');
+  result = std::regex_replace(result, std::regex(R"(\]\[-\])"), "]");
+  return result;
 }
 
 

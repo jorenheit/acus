@@ -1391,11 +1391,6 @@ tests.push_back(expectOutput("Integer Division i8",
 #include "tests/integer_division_i8.cc"
                              }));
 
-tests.push_back(expectOutput("Integer casts",
-			     "-20|236|65535|-1|44|-1|255|255|32767|-32768|",
-			     []() {
-#include "tests/integer_casts.cc"
-			     }));
  
 tests.push_back(expectOutput("Integer Division Mixed i16/i8",
                              "AACC", []() {
@@ -1534,7 +1529,14 @@ tests.push_back(expectOutput("Integer Decimal Print Variables",
                              "255 -3 65535 -300 127 -128 32767 -32768",
                              [] {
 #include "tests/integer_decimal_print_variables.cc"
-                             })); 
+                             }));
+
+tests.push_back(expectOutput("Integer casts",
+			     "-20|236|65535|-1|44|-1|255|255|32767|-32768|",
+			     []() {
+#include "tests/integer_casts.cc"
+			     }));
+  
 
  return tests;
 }

@@ -36,30 +36,6 @@ void Assembler::addConst(int delta) {
   emit<primitive::ChangeBy>(delta);
 }
 
-void Assembler::addConstAndCarry(int delta, Cell carry, Temps<2> tmp) {
-  pushPtr();
-
-  if (delta == 0) {
-    moveTo(carry);
-    zeroCell();
-    popPtr();
-    return;
-  }
-
-  Cell const resultCopy = tmp.get<0>();      
-  copyField(carry, tmp.select<1>());
-  addConst(delta);
-  copyField(resultCopy, tmp.select<1>());
-
-  moveTo(carry);
-  if (delta > 0) {
-    greaterDestructive(resultCopy, tmp.select<1>());
-  } else {
-    lessDestructive(resultCopy, tmp.select<1>());
-  }
-
-  popPtr();
-}  
 
 void Assembler::add16Const(int delta, Cell tmp) {
   // Assumes the pointer is currently pointing to the low byte with the high

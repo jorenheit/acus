@@ -44,19 +44,6 @@ void Assembler::zeroCellPlus() {
   emit<primitive::ZeroCellPlus>();
 }
 
-// void Assembler::setToValueSimple(int value) {
-//   zeroCell();
-//   emit<primitive::ChangeBy>(value);
-// }
-
-// void Assembler::setToValue16Simple(int value) {
-//   zeroCell();
-//   emit<primitive::ChangeBy>(value & 0xff);
-//   emit<primitive::Inline>(">");
-//   emit<primitive::ChangeBy>((value >> 8) & 0xff);
-//   emit<primitive::Inline>("<");
-// }
-
 void Assembler::setSlotToValue(Slot slot, int value) {
   assert(types::isInteger(slot.type()));
 
@@ -134,7 +121,6 @@ void Assembler::dec16() {
   // followed by (at least) 3 empty scrach cells. If that is not guaranteed, call the
   // overload below.
   assert(_dp.current().field == MacroCell::Value0);
-//  emit<primitive::Inline>(">>>>+<<<<[->>]->->[<+<+]>>-<<<<");
   emit<primitive::Inline>(">>>>+<<<-<[>+>]>>[<<]>>-<<<<-");
 }
 

@@ -5,19 +5,6 @@
 
 #include "assembler.ih"
 
-// void Assembler::subConstFromSlot(Slot lhs, int delta) {
-//   pushPtr();
-//   moveTo(lhs, MacroCell::Value0);    
-//   (lhs.type()->usesValue1())
-//     ? sub16Const(delta,
-// 		 Cell{lhs, MacroCell::Value1},
-// 		 Temps<3>::select(lhs, MacroCell::Scratch0,
-// 				  lhs, MacroCell::Scratch1,
-// 				  lhs, MacroCell::Payload0))
-//     : subConst(delta);
-//   popPtr();
-// }
-
 void Assembler::subConstFromSlot(Slot lhs, int delta) {
   Slot const tmp = getTemp(ts::raw(1));
   
@@ -88,7 +75,7 @@ void Assembler::sub16Destructive(Cell delta) {
   Cell const operand = _dp.current();
   pushPtr();
 
-  // Add low byte
+  // Subtract low byte
   moveTo(delta);
   loopOpen(); {
     dec();
@@ -97,50 +84,10 @@ void Assembler::sub16Destructive(Cell delta) {
     moveTo(delta);
   } loopClose();
 
-  // Add high byte
+  // Subtract high byte
   moveTo(operand, MacroCell::Value1);
   subDestructive(Cell{delta, MacroCell::Value1});
   
-  popPtr();
-}
-
-[[deprecated]] void Assembler::subAndCarryDestructive(Cell carry, Cell other, Temps<2> tmp) {
-  Cell resultCopy = tmp.get<0>();
-
-  pushPtr();
-  copyField(carry, tmp.get<1>());  
-  subDestructive(other);
-  copyField(resultCopy, tmp.get<1>());
-  moveTo(carry); // contains old value
-  lessDestructive(resultCopy, tmp.select<1>());
-  popPtr();
-}
-
-
-[[deprecated]] void Assembler::sub16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
-
-  Cell const &low = _dp.current();
-  Cell const &carry = tmp.get<0>();
-
-  pushPtr();
-
-  // subtract low bytes and get the carry
-  moveTo(low);
-  subAndCarryDestructive(carry, otherLow, tmp.select<1, 2>());
-
-  // if carry -> increment high byte
-  moveTo(carry);
-  loopOpen(); {
-    zeroCell(); // reset carry
-    moveTo(high);
-    dec();
-    moveTo(carry);
-  } loopClose();
-  
-  // subtract high bytes, ignore carry
-  moveTo(high);  
-  subDestructive(otherHigh);
-
   popPtr();
 }
 

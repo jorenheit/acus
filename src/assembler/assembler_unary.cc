@@ -166,26 +166,25 @@ void Assembler::boolSlot(Slot rhs) {
 }
 
 void Assembler::negateSlot(Slot rhs) {
-  assert(rhs.size() == 1);
+  assert(types::isInteger(rhs.type()));
 
+  Slot const copy = getTemp(rhs.type());
+
+  // Move the original value out, leaving rhs zero.
+  assignSlot(copy, rhs, TransferMode::Move);
+
+  // rhs = 0 - original
   pushPtr();
-
   moveTo(rhs, MacroCell::Value0);
+
   if (rhs.type()->usesValue1()) {
-    Slot tmp = getTemp(ts::raw(1));
-    negate16Destructive(Cell{rhs, MacroCell::Value1},
-			Temps<5>::select(rhs, MacroCell::Scratch0,
-					 rhs, MacroCell::Scratch1,
-					 tmp, MacroCell::Scratch0,
-					 tmp, MacroCell::Scratch1,
-					 tmp, MacroCell::Payload0));
-    freeTempSlot(tmp);
+    sub16Destructive(Cell{copy, MacroCell::Value0});
   } else {
-    negateDestructive(Temps<2>::select(rhs, MacroCell::Scratch0,
-				       rhs, MacroCell::Scratch1));
+    subDestructive(Cell{copy, MacroCell::Value0});
   }
 
   popPtr();
+  freeTempSlot(copy);
 }
 
 void Assembler::absSlot(Slot rhs) {
@@ -212,8 +211,8 @@ void Assembler::absSlot(Slot rhs) {
 }
 
 void Assembler::signBitSlot(Slot rhs) {
-  assert(types::isSignedInteger(rhs.type()));
 
+  assert(types::isSignedInteger(rhs.type()));
   pushPtr();
   
   moveTo(rhs, MacroCell::Value1);
@@ -230,7 +229,7 @@ void Assembler::signBitSlot(Slot rhs) {
 }
 
 void Assembler::signBitDestructive() {
-  // Assumes the 4 cells next to it are zeroed and available
+  // Assumes the 3 cells next to it are zeroed and available
   const auto Current = _dp.current().field;
   const auto Counter = static_cast<MacroCell::Field>(Current + 1);
   const auto Result = static_cast<MacroCell::Field>(Current + 2);
@@ -326,53 +325,53 @@ void Assembler::not16Constructive(Cell high, Cell result, Temps<2> tmp) {
   popPtr();  
 }
 
-void Assembler::negateDestructive(Temps<2> tmp) {
-  Cell const copy = tmp.get<0>();
+// void Assembler::negateDestructive(Temps<2> tmp) {
+//   Cell const copy = tmp.get<0>();
 
-  pushPtr();
-  copyField(copy, tmp.select<1>());
-  zeroCell();
-  subDestructive(copy);
-  popPtr();
-}
+//   pushPtr();
+//   copyField(copy, tmp.select<1>());
+//   zeroCell();
+//   subDestructive(copy);
+//   popPtr();
+// }
 
 
-void Assembler::negateConstructive(Cell result, Temps<2> tmp) {
-  pushPtr();
-  copyField(result, tmp.select<0>());
-  moveTo(result);
-  negateDestructive(tmp);
-  popPtr();
-}
+// void Assembler::negateConstructive(Cell result, Temps<2> tmp) {
+//   pushPtr();
+//   copyField(result, tmp.select<0>());
+//   moveTo(result);
+//   negateDestructive(tmp);
+//   popPtr();
+// }
 
-void Assembler::negate16Destructive(Cell high, Temps<5> tmp) {
-  Cell const currentLow = _dp.current();
-  Cell const currentHigh = high;
-  Cell const copyLow = tmp.get<0>();
-  Cell const copyHigh = tmp.get<1>();
+// void Assembler::negate16Destructive(Cell high, Temps<5> tmp) {
+//   Cell const currentLow = _dp.current();
+//   Cell const currentHigh = high;
+//   Cell const copyLow = tmp.get<0>();
+//   Cell const copyHigh = tmp.get<1>();
 
-  pushPtr();
-  moveTo(currentLow);
-  copyField(copyLow, tmp.select<2>());
-  zeroCell();
-  moveTo(currentHigh);
-  copyField(copyHigh, tmp.select<2>());
-  zeroCell();
+//   pushPtr();
+//   moveTo(currentLow);
+//   copyField(copyLow, tmp.select<2>());
+//   zeroCell();
+//   moveTo(currentHigh);
+//   copyField(copyHigh, tmp.select<2>());
+//   zeroCell();
 
-  moveTo(currentLow);
-  sub16Destructive(currentHigh, copyLow, copyHigh, tmp.select<2, 3, 4>());
-  popPtr();
-}
+//   moveTo(currentLow);
+//   sub16Destructive(currentHigh, copyLow, copyHigh, tmp.select<2, 3, 4>());
+//   popPtr();
+// }
 
-void Assembler::negate16Constructive(Cell high, Cell result, Temps<6> tmp) {
-  Cell const resultHigh = tmp.get<0>();
+// void Assembler::negate16Constructive(Cell high, Cell result, Temps<6> tmp) {
+//   Cell const resultHigh = tmp.get<0>();
   
-  pushPtr();
-  copyField(result, tmp.select<1>());
-  moveTo(high);
-  copyField(resultHigh, tmp.select<1>());
-  moveTo(result);
-  negate16Destructive(resultHigh, tmp.select<1, 2, 3, 4, 5>());
-  popPtr();  
-}
+//   pushPtr();
+//   copyField(result, tmp.select<1>());
+//   moveTo(high);
+//   copyField(resultHigh, tmp.select<1>());
+//   moveTo(result);
+//   negate16Destructive(resultHigh, tmp.select<1, 2, 3, 4, 5>());
+//   popPtr();  
+// }
 

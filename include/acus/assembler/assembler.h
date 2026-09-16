@@ -473,7 +473,7 @@ namespace acus {
   
     void moveField(Cell dest);
     void copyField(Cell dest, Temps<1>);
-    void copyOrMoveField(TransferMode ode, Cell dest, Temps<1>);
+    void copyOrMoveField(TransferMode mode, Cell dest, Temps<1>);
     
     void setToValue(int value);
     void setToValue16(int value);
@@ -489,57 +489,60 @@ namespace acus {
     void dec();
     void dec16();
     void dec16(Cell high, Temps<2>);
-  
+
+    // TODO: only destructive algorithms -> remove that from the name for brevity
+    // TODO: these functions make assumptions about the environment of the current
+    // cell and the cell(s) passed to them. Encode these assumptions in a type
+    // that needs to be passed in and a type that is returned instead of void.
     void signBitDestructive();
     void signBitDestructive(Temps<2>);
     void signBitConstructive(Cell result, Temps<3>);
     
-    void negateDestructive(Temps<2>);
-    void negateConstructive(Cell result, Temps<2>);
-    void negate16Destructive(Cell high, Temps<5>);
-    void negate16Constructive(Cell high, Cell result, Temps<6>);
+//    void negateDestructive(Temps<2>);
+    //  void negateConstructive(Cell result, Temps<2>);
+    // void negate16Destructive(Cell high, Temps<5>);
+    // void negate16Constructive(Cell high, Cell result, Temps<6>);
     
     void addConst(int delta);
-    void addConstAndCarry(int delta, Cell carry, Temps<2>);
+//    void addConstAndCarry(int delta, Cell carry, Temps<2>);
     void add16Const(int delta, Cell tmp);
-    // void add16Const(int delta, Cell high, Temps<3>);
     void addDestructive(Cell other);
-    void addConstructive(Cell result, Cell other, Temps<2>);
+//    void addConstructive(Cell result, Cell other, Temps<2>);
     void add16Destructive(Cell delta);
-    void add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
-    void add16Constructive(Cell delta, Cell result, Cell tmp);
-    // void add16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5>);
-    void addAndCarryDestructive(Cell carry, Cell other, Temps<2>);
-    void addAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
+//    void add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+//    void add16Constructive(Cell delta, Cell result, Cell tmp);
+    // void addAndCarryDestructive(Cell carry, Cell other, Temps<2>);
+    // void addAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
 
     void subConst(int delta);
-    void subConstAndCarry(int delta, Cell carry, Temps<2>);
+//    void subConstAndCarry(int delta, Cell carry, Temps<2>);
     void sub16Const(int delta, Cell tmp);
-    void sub16Const(int delta, Cell high, Temps<3>);
+//    void sub16Const(int delta, Cell high, Temps<3>);
     void subDestructive(Cell other);
-    void subConstructive(Cell result, Cell other, Temps<2>);
+//    void subConstructive(Cell result, Cell other, Temps<2>);
     void sub16Destructive(Cell delta);
-    void sub16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
-    void sub16Constructive(Cell delta, Cell result, Cell tmp);
-    void sub16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5>);
-    void subAndCarryDestructive(Cell carry, Cell other, Temps<2>);
-    void subAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
+//    void sub16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+    // void sub16Constructive(Cell delta, Cell result, Cell tmp);
+    // void sub16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5>);
+    // void subAndCarryDestructive(Cell carry, Cell other, Temps<2>);
+    // void subAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
 
-    void mulConst(int factor, Temps<3>);
-    // void mul16Const(int factor, Temps<3> tmp);
-    // void mul16Const(int factor, Cell high, Temps<8>);
-    void mulDestructive(Cell other, Temps<3>);
-    // void mulConstructive(Cell result, Cell factor, Temps<4>);
-    // void mul16Destructive(Cell factor, bool const operandUsesValue1, bool const factorUsesValue1);
-    void mul16Destructive(Cell high, Cell factorLow, Cell factorHigh, Temps<9>);
-    // void mul16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell factorLow, Cell factorHigh, Temps<11>);
+    // void mulConst(int factor, Temps<3>);
+    // void mulDestructive(Cell other, Temps<3>);
+    // void mul16Destructive(Cell high, Cell factorLow, Cell factorHigh, Temps<9>);
 
-    void divModConst(int denom, Cell modResult, Temps<5>);
+//    void divModConst(int denom, Cell modResult, Temps<5>);
     void divMod16Const(int denom, Cell high, Cell modResultLow, Cell modResultHigh, Temps<8>);
-    void divModDestructive(Cell denom, Cell modResult, Temps<5>);
-    void divModConstructive(Cell result, Cell denom, Cell modResult, Temps<6>);
-    void divMod16Destructive(Cell high, Cell denomLow, Cell denomHigh, Cell modResultLow, Cell modResultHigh, Temps<8>);
-    void divMod16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell denomLow, Cell denomHigh, Cell modResultLow, Cell modResultHigh, Temps<12>);
+//    void divModDestructive(int denom);
+    void divModDestructive(Cell denom, TransferMode rhsMode);
+    void divModDestructiveKernel();
+
+    void divMod16Destructive(Cell denom);
+    void divMod16DestructiveGuaranteed8BitResult(Cell denom);
+    
+    
+//    void divModDestructive(Cell denom, Cell modResult, Temps<5>);
+    // void divMod16Destructive(Cell high, Cell denomLow, Cell denomHigh, Cell modResultLow, Cell modResultHigh, Temps<8>);
 
     void boolDestructive(Temps<1>);
     void boolConstructive(Cell result, Temps<1>);
