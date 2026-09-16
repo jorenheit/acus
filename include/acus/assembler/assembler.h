@@ -480,15 +480,12 @@ namespace acus {
 
     // These should go I think
     void setToValue(int value, Temps<1>);
-    // void setToValue16(int value, Cell high);    
     void setToValue16(int value, Cell high, Temps<1>);
 
     void inc();
     void inc16();
-    void inc16(Cell high, Temps<2>);
     void dec();
     void dec16();
-    void dec16(Cell high, Temps<2>);
 
     // TODO: only destructive algorithms -> remove that from the name for brevity
     // TODO: these functions make assumptions about the environment of the current
@@ -498,52 +495,22 @@ namespace acus {
     void signBitDestructive(Temps<2>);
     void signBitConstructive(Cell result, Temps<3>);
     
-//    void negateDestructive(Temps<2>);
-    //  void negateConstructive(Cell result, Temps<2>);
-    // void negate16Destructive(Cell high, Temps<5>);
-    // void negate16Constructive(Cell high, Cell result, Temps<6>);
-    
     void addConst(int delta);
-//    void addConstAndCarry(int delta, Cell carry, Temps<2>);
     void add16Const(int delta, Cell tmp);
     void addDestructive(Cell other);
-//    void addConstructive(Cell result, Cell other, Temps<2>);
     void add16Destructive(Cell delta);
-//    void add16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
-//    void add16Constructive(Cell delta, Cell result, Cell tmp);
-    // void addAndCarryDestructive(Cell carry, Cell other, Temps<2>);
-    // void addAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
 
     void subConst(int delta);
-//    void subConstAndCarry(int delta, Cell carry, Temps<2>);
     void sub16Const(int delta, Cell tmp);
-//    void sub16Const(int delta, Cell high, Temps<3>);
     void subDestructive(Cell other);
-//    void subConstructive(Cell result, Cell other, Temps<2>);
     void sub16Destructive(Cell delta);
-//    void sub16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
-    // void sub16Constructive(Cell delta, Cell result, Cell tmp);
-    // void sub16Constructive(Cell high, Cell resultLow, Cell resultHigh, Cell otherLow, Cell otherHigh, Temps<5>);
-    // void subAndCarryDestructive(Cell carry, Cell other, Temps<2>);
-    // void subAndCarryConstructive(Cell result, Cell carry, Cell other, Temps<3>);
-
-    // void mulConst(int factor, Temps<3>);
-    // void mulDestructive(Cell other, Temps<3>);
-    // void mul16Destructive(Cell high, Cell factorLow, Cell factorHigh, Temps<9>);
-
-//    void divModConst(int denom, Cell modResult, Temps<5>);
+    
     void divMod16Const(int denom, Cell high, Cell modResultLow, Cell modResultHigh, Temps<8>);
-//    void divModDestructive(int denom);
     void divModDestructive(Cell denom, TransferMode rhsMode);
     void divModDestructiveKernel();
-
     void divMod16Destructive(Cell denom);
     void divMod16DestructiveGuaranteed8BitResult(Cell denom);
     
-    
-//    void divModDestructive(Cell denom, Cell modResult, Temps<5>);
-    // void divMod16Destructive(Cell high, Cell denomLow, Cell denomHigh, Cell modResultLow, Cell modResultHigh, Temps<8>);
-
     void boolDestructive(Temps<1>);
     void boolConstructive(Cell result, Temps<1>);
     void bool16Destructive(Cell high);
@@ -583,11 +550,6 @@ namespace acus {
     void xnorConstructive(Cell result, Cell other, Temps<2>);
     void xnor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
     void xnor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
-
-    void compareToConstDestructive(int value, Temps<1>);
-    void compareToConstConstructive(int value, Cell result, Temps<1>);    
-    void compare16ToConstDestructive(int value, Cell high, Temps<1>);
-    void compare16ToConstConstructive(int value, Cell high, Cell result, Temps<2>);    
 
     void eqDestructive(Cell other, Temps<1>);
     void eqConstructive(Cell result, Cell other, Temps<1>);

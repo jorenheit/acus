@@ -106,34 +106,12 @@ void Assembler::inc16() {
   emit<primitive::Inline>(">>>>+<<<+<+[>->]>>[<<]>>-<<<<");
 }
 
-void Assembler::inc16(Cell high, Temps<2> tmp) {
-  pushPtr();
-  Cell const carry = tmp.get<0>();
-  inc();
-  notConstructive(carry, tmp.select<1>());
-  moveTo(high);
-  addDestructive(carry);
-  popPtr();
-}
-
 void Assembler::dec16() {
   // This overload assumes that the high cell is right next to the current (low) cell,
   // followed by (at least) 3 empty scrach cells. If that is not guaranteed, call the
   // overload below.
   assert(_dp.current().field == MacroCell::Value0);
   emit<primitive::Inline>(">>>>+<<<-<[>+>]>>[<<]>>-<<<<-");
-}
-
-void Assembler::dec16(Cell high, Temps<2> tmp) {
-  pushPtr();
-  Cell const borrow = tmp.get<0>();
-  copyField(borrow, tmp.select<1>());
-  dec();
-  moveTo(borrow);
-  notDestructive(tmp.select<1>());
-  moveTo(high);
-  subDestructive(borrow);
-  popPtr();
 }
 
 void Assembler::moveField(Cell dest) {
