@@ -457,6 +457,7 @@ namespace acus {
     Slot addressOfSlot(Slot slot, API_CTX);
   
     // Algorithms: all applied to the current DP (assembler_algorithms.cc)
+    void literalBf(Cell start, std::string const &bf);
     void moveTo(Cell cell);
     void moveTo(int offset, MacroCell::Field field = MacroCell::Value0);
     void moveToOrigin();
@@ -464,6 +465,8 @@ namespace acus {
     void switchField(MacroCell::Field field);  
     void zeroCell();
     void zeroCellPlus();
+    void zeroCell(Cell target);
+    void zeroCellPlus(Cell target);
     void loopOpen(std::string const &tag = defaultOpenTag());
     void loopClose(std::string const &tag = defaultCloseTag());
 
@@ -472,43 +475,126 @@ namespace acus {
 				TransferMode dataTransferMode, TransferMode offsetTransferMode);
   
     void moveField(Cell dest);
+    void moveField(Cell from, Cell to);
     void copyField(Cell dest, Temps<1>);
+    void copyField(Cell from, Cell to, Cell tmp);
     void copyOrMoveField(TransferMode mode, Cell dest, Temps<1>);
+    void copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp);
     
     void setToValue(int value);
+
     void setToValue16(int value);
 
     // These should go I think
     void setToValue(int value, Temps<1>);
     void setToValue16(int value, Cell high, Temps<1>);
 
-    void inc();
-    void inc16();
-    void dec();
-    void dec16();
 
-    // TODO: only destructive algorithms -> remove that from the name for brevity
-    // TODO: these functions make assumptions about the environment of the current
-    // cell and the cell(s) passed to them. Encode these assumptions in a type
-    // that needs to be passed in and a type that is returned instead of void.
+
+    using SingleCell = ws::Workspace<ws::Data>;
+    using DoubleCell = ws::Workspace<ws::Data, ws::Data>;
+    using Clean8 = ws::Workspace<ws::Data, ws::Clobber, ws::ZeroCells<5>>;
+    using Clean16 = ws::Workspace<ws::DataCells<2>, ws::ZeroCells<5>>;
+    using Inc16Operand = ws::Workspace<ws::DataCells<2>, ws::Zero, ws::DoNotTouch, ws::Zero>;
+    using Add16Operand = ws::Workspace<ws::DataCells<2>, ws::ZeroCells<3>>;
+
+    template <size_t ScratchOffset>
+    using SingleAndScratch = ws::Workspace<ws::Data, ws::DoNotTouchCells<ScratchOffset - 1>, ws::Zero>;
+
+    template <size_t ScratchOffset>
+    using DoubleAndScratch = ws::Workspace<ws::Data, ws::Data, ws::DoNotTouchCells<ScratchOffset - 2>, ws::Zero>;
+    
+    using DivModNum = ws::Workspace<ws::Data, ws::Clobber, ws::ZeroCells<5>>;
+    using DivMod16Num = ws::Workspace<ws::DataCells<2>, ws::ZeroCells<5>>;
+    using DivMod16Denom = ws::Workspace<ws::DataCells<2>, ws::ZeroCells<3>>;
+
+    using DivMod16DigitResult = ws::Workspace<ws::Prepared<ws::Role::RemainderLow>,
+					      ws::Prepared<ws::Role::RemainderHigh>,
+					      ws::ZeroCells<3>,
+					      ws::Prepared<ws::Role::QuotientLow>,
+					      ws::ZeroCells<1>>;
+
+    using DivModPrepared = ws::Workspace<ws::Prepared<ws::Role::NumeratorLow>,
+					 ws::Prepared<ws::Role::DenominatorLow>,
+					 ws::ZeroCells<4>>;
+
+    using DivModResult = ws::Workspace<ws::Prepared<ws::Role::QuotientLow>,
+				       ws::Prepared<ws::Role::RemainderLow>,
+				       ws::ZeroCells<4>>;
+
+    using DivMod16Result = ws::Workspace<ws::Prepared<ws::Role::QuotientLow>,
+					 ws::Prepared<ws::Role::QuotientHigh>,
+					 ws::Prepared<ws::Role::RemainderLow>,
+					 ws::Prepared<ws::Role::RemainderHigh>,
+					 ws::ZeroCells<3>
+					 >;
+    
+    SingleCell inc();
+    SingleCell inc(SingleCell const &);
+    SingleCell dec();
+    SingleCell dec(SingleCell const &);
+    Inc16Operand inc16(Inc16Operand const &);
+    Inc16Operand dec16(Inc16Operand const &);
+    SingleCell addConst(int delta);
+    SingleCell addConst(SingleCell const &, int delta);    
+    SingleCell subConst(int delta);
+    SingleCell subConst(SingleCell const &, int delta);
+
+    template <size_t ScratchOffset> requires (ScratchOffset > 0)
+    SingleAndScratch<ScratchOffset> addConst(SingleAndScratch<ScratchOffset> const &lhs, int delta);
+
+    template <typename W, size_t ScratchOffset = ws::firstZeroCell<W, 1>()>
+    requires (ScratchOffset != ws::impl::npos)
+    auto addConst(W const &lhs, int delta) {
+      return addConst<ws::firstZeroCell<W, 1>()>(lhs, delta);
+    }
+
+    template <size_t ScratchOffset> requires (ScratchOffset > 0)
+    SingleAndScratch<ScratchOffset> subConst(SingleAndScratch<ScratchOffset> const &lhs, int delta);
+
+    template <typename W, size_t ScratchOffset = ws::firstZeroCell<W, 1>()>
+    requires (ScratchOffset != ws::impl::npos)
+    auto subConst(W const &lhs, int delta) {
+      return subConst<ws::firstZeroCell<W, 1>()>(lhs, delta);
+    }
+    template <size_t ScratchOffset> requires (ScratchOffset > 0)
+    SingleAndScratch<ScratchOffset> setToValue(SingleAndScratch<ScratchOffset> const &target, int value);
+
+    template <size_t ScratchOffset> requires (ScratchOffset > 0)
+    DoubleAndScratch<ScratchOffset> setToValue16(DoubleAndScratch<ScratchOffset> const &target, int value);
+
+    template <typename W, size_t ScratchOffset = ws::firstZeroCell<W, 1>()>
+    requires (ScratchOffset != ws::impl::npos)
+    auto setToValue(W const &target, int value) {
+      return setToValue<ScratchOffset>(target, value);
+    }
+
+    template <typename W, size_t ScratchOffset = ws::firstZeroCell<W, 1>()>
+    requires (ScratchOffset != ws::impl::npos)
+    auto setToValue16(W const &target, int value) {
+      return setToValue16<ScratchOffset>(target, value);
+    }
+    
     void signBitDestructive();
     void signBitDestructive(Temps<2>);
     void signBitConstructive(Cell result, Temps<3>);
     
-    void addConst(int delta);
-    void add16Const(int delta, Cell tmp);
-    void addDestructive(Cell other);
-    void add16Destructive(Cell delta);
+    Add16Operand add16Const(Add16Operand const &lhs, Add16Operand const &tmp, int delta);
+    Add16Operand sub16Const(Add16Operand const &lhs, Add16Operand const &tmp, int delta);
+    
+    SingleCell addDestructive(SingleCell const &op, SingleCell const &delta);
+    SingleCell subDestructive(SingleCell const &op, SingleCell const &delta);
+    Add16Operand add16Destructive(Add16Operand const &op, DoubleCell const &delta);
+    Add16Operand sub16Destructive(Add16Operand const &op, DoubleCell const &delta);
 
-    void subConst(int delta);
-    void sub16Const(int delta, Cell tmp);
-    void subDestructive(Cell other);
-    void sub16Destructive(Cell delta);
     
     void divMod16Const(int denom, Cell high, Cell modResultLow, Cell modResultHigh, Temps<8>);
-    void divModDestructive(Cell denom, TransferMode rhsMode);
-    void divModDestructiveKernel();
-    void divMod16Destructive(Cell denom);
+    DivModResult divModDestructive(DivModNum const &num, SingleCell const &denom, TransferMode rhsMode);
+    DivModResult divModDestructiveKernel(DivModPrepared const &prep);
+    DivMod16Result divMod16Destructive(DivMod16Num const &num, DivMod16Denom const &denom);
+
+    DivMod16DigitResult divMod16Digit(DivMod16Num const &num, DivMod16Denom const &denom);
+    
     void divMod16DestructiveGuaranteed8BitResult(Cell denom);
     
     void boolDestructive(Temps<1>);
@@ -759,6 +845,9 @@ namespace acus {
 #undef SWAPPABLE_OPERATOR
     
     // General helpers (inline definitions, assembler_private.tpp)
+    void loop(Cell flag, auto&& body);
+
+    
     template <typename Primitive, typename ... Args>
     void emit(Args&& ... args);
 

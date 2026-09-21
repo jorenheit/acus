@@ -178,9 +178,11 @@ void Assembler::negateSlot(Slot rhs) {
   moveTo(rhs, MacroCell::Value0);
 
   if (rhs.type()->usesValue1()) {
-    sub16Destructive(Cell{copy, MacroCell::Value0});
+    sub16Destructive(ws::promise(rhs, ws::Layout<ws::ZeroCells<7>>{}),
+		     ws::promiseClean16(copy));
   } else {
-    subDestructive(Cell{copy, MacroCell::Value0});
+    subDestructive(ws::promise(rhs, ws::Layout<ws::Zero> {}),
+		   ws::promiseClean8(copy));
   }
 
   popPtr();

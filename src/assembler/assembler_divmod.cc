@@ -20,43 +20,38 @@ void Assembler::divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
     if (!rhs.type()->usesValue1() || !destroyRhs) {
       rhsWork = getTemp(ts::u16());
       assignSlot(rhsWork, rhs,
-		 destroyRhs ? TransferMode::Move : TransferMode::Copy);
+                 destroyRhs ? TransferMode::Move : TransferMode::Copy);
       freeRhsWork = true;
     }
 
-    moveTo(lhs, MacroCell::Value0);
-    divMod16Destructive(Cell{rhsWork, MacroCell::Value0});
+    [[maybe_unused]] auto const [qlo, qhi, rlo, rhi] =
+      divMod16Destructive(ws::promiseClean16(lhs),
+                          ws::promiseClean16(rhsWork)).cells<4>();
 
     if (modSlot.has_value()) {
-      moveTo(lhs, MacroCell::Scratch0);
-      moveField(Cell{*modSlot, MacroCell::Value0});
-      moveTo(lhs, MacroCell::Scratch1);
-      moveField(Cell{*modSlot, MacroCell::Value1});
+      moveField(rlo, Cell{*modSlot, MacroCell::Value0});
+      moveField(rhi, Cell{*modSlot, MacroCell::Value1});
     } else {
-      moveTo(lhs, MacroCell::Scratch0);
-      zeroCell();
-      moveTo(lhs, MacroCell::Scratch1);
-      zeroCell();
+      zeroCell(rlo);
+      zeroCell(rhi);
     }
 
     if (freeRhsWork)
       freeTempSlot(rhsWork);
   } else {
-    moveTo(lhs, MacroCell::Value0);
-    divModDestructive(Cell{rhs, MacroCell::Value0},
-		      destroyRhs ? TransferMode::Move : TransferMode::Copy);
-
-    moveTo(lhs, MacroCell::Value1);
+    [[maybe_unused]] auto const [quotient, remainder] =
+      divModDestructive(ws::promiseClean8(lhs),
+                        ws::promiseClean8(rhs),
+                        destroyRhs ? TransferMode::Move : TransferMode::Copy).cells<2>();
     if (modSlot.has_value()) {
-      moveField(Cell{*modSlot, MacroCell::Value0});
+      moveField(remainder, Cell{*modSlot, MacroCell::Value0});
     } else {
-      zeroCell();
+      zeroCell(remainder);
     }
   }
-  
+
   popPtr();
 }
-
 
 void Assembler::divSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> const &modSlot) {
   assert(types::isUnsignedInteger(lhs.type()));
@@ -83,59 +78,57 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   assert(types::isSignedInteger(rhs.type()));
 
   pushPtr();
+
+  Cell const lhsFlag { lhs, MacroCell::Flag };
   moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(Cell{lhs, MacroCell::Flag},
-		      Temps<3>::select(lhs, MacroCell::Scratch0,
-				       lhs, MacroCell::Scratch1,
-				       lhs, MacroCell::Payload0));
+  signBitConstructive(lhsFlag,
+                      Temps<3>::select(lhs, MacroCell::Scratch0,
+                                       lhs, MacroCell::Scratch1,
+                                       lhs, MacroCell::Payload0));
 
   Slot tmp = getTemp(ts::raw(2));
   Cell const resultNegative { tmp, MacroCell::Flag };
-  moveTo(lhs, MacroCell::Flag);
-  loopOpen(); {    
-    // lhs < 0  ==>  negate LHS and set negative flag
-    zeroCell();      
-    negateSlot(lhs);
-    moveTo(resultNegative);
-    zeroCell(); inc();
-    moveTo(lhs, MacroCell::Flag);
-  } loopClose();
 
+  loop(lhsFlag, [&] {
+    // lhs < 0  ==> negate LHS and set negative flag
+    zeroCell(lhsFlag);
+    negateSlot(lhs);
+    zeroCell(resultNegative);
+    inc(resultNegative);
+  });
 
   Slot const rhsCopy = tmp.sub(rhs.type(), 1);
   assignSlot(rhsCopy, rhs);
-  
-  moveTo(rhsCopy, rhsCopy.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(Cell{rhsCopy, MacroCell::Flag},
-		      Temps<3>::select(rhsCopy, MacroCell::Scratch0,
-				       rhsCopy, MacroCell::Scratch1,
-				       rhsCopy, MacroCell::Payload0));
 
-  
-  moveTo(rhsCopy, MacroCell::Flag);
-  loopOpen(); {
-    zeroCell();      
+  Cell const rhsFlag { rhsCopy, MacroCell::Flag };
+  moveTo(rhsCopy, rhsCopy.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
+  signBitConstructive(rhsFlag,
+                      Temps<3>::select(rhsCopy, MacroCell::Scratch0,
+                                       rhsCopy, MacroCell::Scratch1,
+                                       rhsCopy, MacroCell::Payload0));
+
+  loop(rhsFlag, [&] {
+    zeroCell(rhsFlag);
     negateSlot(rhsCopy);
-    // rhs < 0  ==> set tmp flag only if it was not already set and negate rhs
+
+    // rhs < 0 ==> toggle resultNegative.
+    // notDestructive still operates on the current cell.
     moveTo(resultNegative);
     notDestructive(Cell{tmp, MacroCell::Scratch0});
-    moveTo(rhsCopy, MacroCell::Flag);
-  } loopClose();
+  });
 
-  // Both operands are now positive and the resultNegative cell holds the sign bit for the result.  
+  // Both operands are now positive and resultNegative holds the sign bit.
   divSlotBySlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), modSlot, true);
-  
-  // Correct the sign
-  moveTo(resultNegative);
-  loopOpen(); {
-    zeroCell();
+
+  // Correct the sign.
+  loop(resultNegative, [&] {
+    zeroCell(resultNegative);
     negateSlot(lhs);
-  } loopClose();
+  });
 
   popPtr();
   freeTempSlot(tmp);
 }
-
 
 void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> const &modSlot) {
   assert(types::isSignedInteger(lhs.type()));
@@ -156,74 +149,65 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
     }
     return;
   }
-  
+
   // For signed integers, check if the value is negative. If so, take the
   // absolute value but remember the sign.
   pushPtr();
 
   Slot signBit = getTemp(ts::u8());
-  moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  copyField(Cell{signBit, MacroCell::Value0},
-	    Temps<1>::select(signBit, MacroCell::Scratch0));
-  moveTo(signBit, MacroCell::Value1);
-  zeroCell(); // needs explicit zero (not a scratch field)
-  moveTo(signBit, MacroCell::Value0);
+  auto const [S, SCopy1, SCopy2] = ws::promiseClean8(signBit).cells<3>();
+  
+  Cell const lhsSignByte {
+    lhs,
+    lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0
+  };
+
+  zeroCell(SCopy1); // Value1 is not a scratch field and must be cleared explicitly.
+  copyField(lhsSignByte, S, SCopy1);
+
+  moveTo(S);
   signBitDestructive();
 
-  
-  // Copy signbit to 2 adjacent cells so we have 3 copies in total
-  auto constexpr S1 = MacroCell::Value0; // holds sign bit currently
-  auto constexpr S2 = static_cast<MacroCell::Field>(S1 + 1); // copy 1
-  auto constexpr S3 = static_cast<MacroCell::Field>(S1 + 2); // copy 2 (only if modresult is needed)
+  // Copy sign bit to adjacent cells so we have enough independent copies.
+  literalBf(S, modSlot
+	       ? "[->+>+>+<<<]>>>[-<<<+>>>]<<<" // copy to SCopy1 and SCopy2
+	       : "[->+>+<<]>>[-<<+>>]<<");      // only to SCopy1
 
-  if (modSlot) {
-    // 2 copies
-    emit<primitive::Inline>("[->+>+>+<<<]>>>[-<<<+>>>]<<<");
-  } else {
-    // 1 copy
-    emit<primitive::Inline>("[->+>+<<]>>[-<<+>>]<<");
-  }
-  
-  // If the lhs was negative, negate it before passing it to the unsigned algorithm
-  // Use first signbit-copy
-  moveTo(signBit, S1);
-  loopOpen(); {
-    zeroCell();
+  // If lhs was negative, negate it before passing it to the unsigned algorithm.
+  loop(S, [&] {
+    zeroCell(S);
     negateSlot(lhs);
-  } loopClose();
+  });
 
   divSlotByConstUnsigned(lhs.unsignedView(), std::abs(denom), modSlot);
 
-  // Fix div sign
-  moveTo(signBit, S2);
+  // Fix division sign.
   if (denom < 0) {
-    notDestructive(Temps<1>::select(signBit, S1)); // Reuse S1 (already zero by this point)
-  }
-  loopOpen(); {
-    zeroCell();
-    negateSlot(lhs);
-  } loopClose();
-
-  // Fix mod sign
-  if (modSlot) {
-    // Need the mod-result -> has same sign as lhs (= signbit)
-    moveTo(signBit, S3);
-    loopOpen(); {
-      zeroCell();
-      negateSlot(*modSlot);
-    } loopClose();
+    moveTo(SCopy1);
+    notDestructive(Temps<1>(S)); // Reuse S, already zero.
   }
   
+  loop(SCopy1, [&] {
+    zeroCell(SCopy1);
+    negateSlot(lhs);
+  });
+
+  // Fix remainder sign: it has the same sign as lhs.
+  if (modSlot) {
+    loop(SCopy2, [&] {
+      zeroCell(SCopy2);
+      negateSlot(*modSlot);
+    });
+  }
+
   popPtr();
   freeSlot(signBit);
 }
 
-
-
 void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot, bool const destroyRhs) {
   assert(types::isUnsignedInteger(lhs.type()));
   assert(types::isUnsignedInteger(rhs.type()));
-  
+
   pushPtr();
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
@@ -235,40 +219,36 @@ void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
     if (!rhs.type()->usesValue1() || !destroyRhs) {
       rhsWork = getTemp(ts::u16());
       assignSlot(rhsWork, rhs,
-		 destroyRhs ? TransferMode::Move
-		 : TransferMode::Copy);
+                 destroyRhs ? TransferMode::Move
+                            : TransferMode::Copy);
       freeRhsWork = true;
     }
 
-    moveTo(lhs, MacroCell::Value0);
-    divMod16Destructive(Cell{rhsWork, MacroCell::Value0});
+    auto const [qlo, qhi, rlo, rhi] =
+      divMod16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsWork)).cells<4>();
 
     if (divSlot.has_value()) {
-      moveTo(lhs, MacroCell::Value0);
-      moveField(Cell{*divSlot, MacroCell::Value0});
-      moveTo(lhs, MacroCell::Value1);
-      moveField(Cell{*divSlot, MacroCell::Value1});
+      moveField(qlo, Cell{*divSlot, MacroCell::Value0});
+      moveField(qhi, Cell{*divSlot, MacroCell::Value1});
     }
 
-    moveTo(lhs, MacroCell::Scratch0);
-    moveField(Cell{lhs, MacroCell::Value0});
-    moveTo(lhs, MacroCell::Scratch1);
-    moveField(Cell{lhs, MacroCell::Value1});
+    moveField(rlo, qlo);
+    moveField(rhi, qhi);
 
     if (freeRhsWork)
       freeTempSlot(rhsWork);
-    
+
   } else {
-    moveTo(lhs, MacroCell::Value0);
-    divModDestructive(Cell{rhs, MacroCell::Value0},
-		      destroyRhs ? TransferMode::Move : TransferMode::Copy);
+    auto const [quotient, remainder] =
+      divModDestructive(ws::promiseClean8(lhs),
+			ws::promiseClean8(rhs),
+			destroyRhs ? TransferMode::Move : TransferMode::Copy).cells<2>();;
 
     if (divSlot.has_value()) {
-      moveField(Cell{*divSlot, MacroCell::Value0});
+      moveField(quotient, Cell{*divSlot, MacroCell::Value0});
     }
-    
-    moveTo(lhs, MacroCell::Value1);
-    moveField(Cell{lhs, MacroCell::Value0});
+
+    moveField(remainder, quotient);
   }
 
   popPtr();
@@ -280,24 +260,23 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
 
   pushPtr();
 
-  // For signed integers, the sign of the result is equal to the sign of the LHS
+  // For signed integers, the sign of the result is equal to the sign of lhs.
+  Cell const lhsFlag { lhs, MacroCell::Flag };
   moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(Cell{lhs, MacroCell::Flag},
-		      Temps<3>::select(lhs, MacroCell::Scratch0,
-				       lhs, MacroCell::Scratch1,
-				       lhs, MacroCell::Payload0));
+  signBitConstructive(lhsFlag,
+                      Temps<3>::select(lhs, MacroCell::Scratch0,
+                                       lhs, MacroCell::Scratch1,
+                                       lhs, MacroCell::Payload0));
 
   Slot tmp = getTemp(ts::raw(2));
   Cell const resultNegative { tmp, MacroCell::Flag };
-  moveTo(lhs, MacroCell::Flag);
-  loopOpen(); {
-    moveTo(resultNegative);
-    zeroCell(); inc();
-    negateSlot(lhs);
-    moveTo(lhs, MacroCell::Flag);
-    zeroCell();      
-  } loopClose();
 
+  loop(lhsFlag, [&] {
+    zeroCell(lhsFlag);
+    zeroCell(resultNegative);
+    inc(resultNegative);
+    negateSlot(lhs);
+  });
 
   Slot const rhsCopy = tmp.sub(rhs.type(), 1);
   assignSlot(rhsCopy, rhs);
@@ -306,12 +285,11 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   }
 
   modSlotBySlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), divSlot, true);
-  
-  moveTo(resultNegative);
-  loopOpen(); {
-    zeroCell();
+
+  loop(resultNegative, [&] {
+    zeroCell(resultNegative);
     negateSlot(lhs);
-  } loopClose();
+  });
 
   popPtr();
   freeTempSlot(tmp);
@@ -358,73 +336,66 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
     if (divSlot.has_value()) {
       assignSlot(*divSlot, lhs);
       if (denom == -1)
-	negateSlot(*divSlot);
+        negateSlot(*divSlot);
     }
 
     setSlotToValue(lhs, 0);
     return;
   }
-  
+
   // For signed integers, check if the value is negative. If so, take the
   // absolute value but remember the sign.
   pushPtr();
 
-  // Copy the lhs into a temp and reduce it to its sign bit
+  // Copy lhs into a temp and reduce it to its sign bit.
   Slot signBit = getTemp(ts::u8());
-  moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  copyField(Cell{signBit, MacroCell::Value0},
-	    Temps<1>::select(signBit, MacroCell::Scratch0));
-  moveTo(signBit, MacroCell::Value1);
-  zeroCell(); // needs explicit zero (not a scratch field)
-  moveTo(signBit, MacroCell::Value0);
+  auto const [S, SCopy1, SCopy2] = ws::promiseClean8(signBit).cells<3>();
+
+  Cell const lhsSignByte {
+    lhs,
+    lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0
+  };
+  
+  zeroCell(SCopy1); // Value1 is not a scratch field and must be cleared explicitly.
+  copyField(lhsSignByte, S, SCopy1);
+
+  moveTo(S);
   signBitDestructive();
 
-  // Copy signbit to 1 or 2 adjacent cells so we have 2 or 3 copies in total
-  auto constexpr S1 = MacroCell::Value0; // holds sign bit currently
-  auto constexpr S2 = static_cast<MacroCell::Field>(S1 + 1); // copy 1
-  auto constexpr S3 = static_cast<MacroCell::Field>(S1 + 2); // copy 2 (only if modresult is needed)
+  // Copy sign bit to adjacent cells so we have enough independent copies.
+  literalBf(S, divSlot
+	       ? "[->+>+>+<<<]>>>[-<<<+>>>]<<<" // copy to SCopy1 and SCopy2
+	       : "[->+>+<<]>>[-<<+>>]<<");      // only to SCopy1
 
-  if (divSlot) {
-    // 2 copies
-    emit<primitive::Inline>("[->+>+>+<<<]>>>[-<<<+>>>]<<<");
-  } else {
-    // 1 copy
-    emit<primitive::Inline>("[->+>+<<]>>[-<<+>>]<<");
-  }
-  
-  // If the lhs was negative, negate it before passing it to the unsigned algorithm
-  // Use first signbit-copy
-  moveTo(signBit, S1);
-  loopOpen(); {
-    zeroCell();
+  // If lhs was negative, negate it before passing it to the unsigned algorithm.
+  loop(S, [&] {
+    zeroCell(S);
     negateSlot(lhs);
-  } loopClose();
+  });
 
   modSlotByConstUnsigned(lhs.unsignedView(), std::abs(denom), divSlot);
 
-  // Fix mod sign (same sign as lhs)
-  moveTo(signBit, S2);
-  loopOpen(); {
-    zeroCell();
+  // Fix remainder sign (same sign as lhs).
+  loop(SCopy1, [&] {
+    zeroCell(SCopy1);
     negateSlot(lhs);
-  } loopClose();
+  });
 
-  // Fix div sign
+  // Fix division sign.
   if (divSlot) {
-    moveTo(signBit, S3);
     if (denom < 0) {
-      notDestructive(Temps<1>::select(signBit, S2)); // Reuse S2 (already zero by this point)
+      moveTo(SCopy2);
+      notDestructive(Temps<1>{SCopy1}); // Reuse S2, already zero.
     }
-    loopOpen(); {
-      zeroCell();
+    loop(SCopy1, [&] {
+      zeroCell(SCopy1);
       negateSlot(*divSlot);
-    } loopClose();
+    });
   }
-  
+
   popPtr();
   freeSlot(signBit);
 }
-
 
 void Assembler::divSlotBySlot(Slot lhs, Slot rhs) {
   assert(types::isInteger(lhs.type()));
@@ -502,419 +473,320 @@ void Assembler::modSlotBySlot(Slot lhs, Slot rhs) {
 }
 
 
-// Implementations of the divmod algorithms
+Assembler::DivModResult Assembler::divModDestructive(DivModNum const &num, SingleCell const &denom, TransferMode rhsMode) {
+  auto v = num.view("N", "D", "CopyTemp", "", "", "", "ZeroFlag");
 
-void Assembler::divModDestructive(Cell denom, TransferMode rhsMode) {
-  // Prepare the current cell and pass it to divModDestructiveKernel
-  assert(_dp.current().field == MacroCell::Value0);
-  const auto current = _dp.current();
   pushPtr();
-  
-  moveTo(denom);
-  copyOrMoveField(rhsMode, Cell{current, MacroCell::Value1},
-		  Temps<1>::select(current, MacroCell::Scratch0));
 
-  // Make a disposable copy of D in Scratch0 so we can branch on
-  // D != 0 without consuming the actual denominator.
-  moveTo(current, MacroCell::Value1);
-  copyField(Cell{current, MacroCell::Scratch0},
-	    Temps<1>::select(current, MacroCell::Scratch1));
+  // Bring the denominator into this workspace.
+  copyOrMoveField(rhsMode, denom, v["D"], v["CopyTemp"]);
 
-  // Assume D == 0.
-  // Payload1 is not touched by the normal 8-bit kernel.
-  auto constexpr ZeroFlag = MacroCell::Payload1;
-  moveTo(current, ZeroFlag);
-  inc();
+  // Reuse the CopyTemp field for DTest and pick a new CopyTemp field
+  v.rename("CopyTemp", "DTest");
+  v.rename<3>("CopyTemp");
+  copyField(v["D"], v["DTest"], v["CopyTemp"]);
 
-  // D != 0
-  moveTo(current, MacroCell::Scratch0);
-  loopOpen(); {
-    zeroCell();
+  // Assume denominator == 0.
+  inc(v["ZeroFlag"]);
+  loop(v["DTest"], [&] {
+    // If D != 0
+    zeroCell(v["DTest"]);
+    dec(v["ZeroFlag"]);
 
-    // Not the zero-denominator path.
-    moveTo(current, ZeroFlag);
-    zeroCell();
-  
-    moveTo(current, MacroCell::Value0);
-    divModDestructiveKernel();
-    moveTo(current, MacroCell::Scratch0);
-  } loopClose();
+    auto prepared = ws::promise(v["N"], ws::Layout<
+				ws::Prepared<ws::Role::NumeratorLow>,
+				ws::Prepared<ws::Role::DenominatorLow>,
+				ws::ZeroCells<4>>{});
 
-  // D == 0
-  moveTo(current, ZeroFlag);
-  loopOpen(); {
-    zeroCell();
+    v = divModDestructiveKernel(prepared).view("Q", "R"); 
+  });
 
-    // quotient = 0xff
-    moveTo(current, MacroCell::Value0);
-    zeroCell();
-    dec();
+  loop(v["ZeroFlag"], [&] {
+    // Else D == 0
+    dec(v["ZeroFlag"]);
 
-    // remainder = 0
-    switchField(MacroCell::Value1);
-    zeroCell();
-
-    moveTo(current, ZeroFlag);
-  } loopClose();
+    // quotient = 0xff, remainder = 0
+    zeroCell(v["Q"]); dec(v["Q"]);
+    zeroCell(v["R"]);
+  });
 
   popPtr();
-  
+
+  return ws::promise(
+    num.start(),
+    ws::Layout<
+      ws::Prepared<ws::Role::QuotientLow>,
+      ws::Prepared<ws::Role::RemainderLow>,
+      ws::ZeroCells<5>
+    >{}
+  );
 }
 
-void Assembler::divModDestructiveKernel() {
+Assembler::DivModResult Assembler::divModDestructiveKernel(DivModPrepared const &prep) {
 
-  // This algorithm assumes that the cell pointed to is the first in
-  // an already prepared block. When calculating n/d, the memory
-  // layout at this point should be:
+  auto const [N, D, Q, CopyTemp, DCopy, RestoreFlag] = prep.cells<6>();
+
+  pushPtr();
+
+  // Initial layout:
   //
-  // N | D | R | S1 | S2 | S3
-  // n | d | 0 | 0  | 0  | 0
-  
-  const auto current = _dp.current();
-  const auto N = MacroCell::Value0;
-  const auto D = static_cast<MacroCell::Field>(N + 1);
-  const auto R = static_cast<MacroCell::Field>(N + 2);
-  const auto S1 = static_cast<MacroCell::Field>(N + 3);
-  const auto S2 = static_cast<MacroCell::Field>(N + 4);
-  const auto S3 = static_cast<MacroCell::Field>(N + 5);
+  // N | D | Q | CopyTemp | DCopy | RestoreFlag
+  // n | d | 0 |    0     |   0   |     0
 
-  assert(current.field == N);
-  pushPtr();
-  
-  // Further prepare the memory, such that S2 holds a copy of d and
-  // S3 is set:
-  // N | D | R | S1 | S2 | S3
-  // n | d | 0 | 0  | d  | 1
+  // Preserve D and initialize the restore flag.
+  copyField(D, DCopy, Q);
+  inc(RestoreFlag);
 
-  // Move or copy the denominator cell into both D and S2, depending on the
-  // transfer mode for the rhs (= denominator).
+  // N | D | Q | CopyTemp | DCopy | RestoreFlag
+  // n | d | 0 |    0     |   d   |     1
 
-  // Copy D into S2 and set S3
-  moveTo(current, D);
-  emit<primitive::Inline>("[->+>>+<<<]>[-<+>]>>>+<<<<");
+  loop(N, [&] {
+    // Consume one numerator unit and one denominator unit.
+    // Q is incremented provisionally; the raw fragment undoes that
+    // increment when D has not yet reached zero.
+    dec(N);
+    inc(Q);
+    dec(D);
 
-  switchField(N);
-  loopOpen(); {
-  // First, unconditionally decrement N and D, while incrementing R
-    dec();
-    switchField(R); inc();
-    switchField(D); dec();
+    // If D is still nonzero, undo the provisional Q increment.
+    // Both control paths synchronize back on D.
+    literalBf(D,
+              "[>->]"    // D != 0: --Q and land on the zero CopyTemp cell
+              ">>[-<<]"  // D != 0: clear RestoreFlag and return to CopyTemp
+              "<<");     // both paths converge back on D
 
-    // Now, if D is still nonzero, we undo the increment of R and move two 
-    // cells to the right. This lands us on S1 if D != 0 or D if D == 0. Sync
-    // the pointer locations by moving another two cells and conditionally
-    // moving back from S3 if that was hit. We also reset S3 in the process
-    // and end back on D (which is where the compiler thinks we are).
-    emit<primitive::Inline>("[>->]>>[-<<]<<");
+    // If D reached zero, RestoreFlag is still set.
+    // Restore D from its persistent copy.
+    loop(RestoreFlag, [&] {
+      dec(RestoreFlag);
+      copyField(DCopy, D, CopyTemp);
+    });
 
-    // We're now always at D. If D was zero, S3 is still set, which we use
-    // to decide if we need to restore D from its copy in S2.
-    switchField(S3);
-    loopOpen(); {
-      dec();
-      switchField(S2);
-      copyField(Cell{current, D}, Temps<1>::select(current, S1));
-      switchField(S3);
-    } loopClose();
-    inc(); // Restore S3 flag
-  
-    // Close the outer loop
-    switchField(N);
-  } loopClose();
+    // Prepare the flag for the next iteration.
+    inc(RestoreFlag);
+  });
 
-  // Clear S3, not necessary anymore
-  switchField(S3);
-  dec();
-  
-  // At this point, the memory layout is:
-  // N | D | R   | S1 | S2 | S3
-  // 0 | c | n/d | 0  | d  | 0
-  // Where the remainder is d - c -> construct this value in S2
-  switchField(S2);
-  subDestructive(Cell{current, D});
+  // The outer loop has finished; this flag is no longer needed.
+  dec(RestoreFlag);
 
-  // Now move the result back into N and the remainder into D. Both
-  // are now known zeroes so we simply add to them.
-  switchField(D);
-  addDestructive(Cell{current, S2});
-  switchField(N);
-  addDestructive(Cell{current, R});
-  
+  // Current layout:
+  //
+  // N | D | Q   | CopyTemp | DCopy | RestoreFlag
+  // 0 | c | n/d |    0     |   d   |     0
+  //
+  // remainder = d - c
+  subDestructive(DCopy, D);
+
+  // D and N are now both zero, so place the final results there.
+  moveField(DCopy, D); // TODO: known zero move optimization
+  moveField(Q, N);
+
+  // Final layout:
+  //
+  // Q | R | 0 | 0 | 0 | 0
   popPtr();
+
+  return ws::promise(
+    prep.start(),
+    ws::Layout<
+      ws::Prepared<ws::Role::QuotientLow>,
+      ws::Prepared<ws::Role::RemainderLow>,
+      ws::ZeroCells<4>
+    >{}
+  );
 }
 
-void Assembler::divMod16DestructiveGuaranteed8BitResult(Cell denom) {
-  // TODO: document contract for calling this function and the resulting
-  // layout after it returns.
+Assembler::DivMod16DigitResult Assembler::divMod16Digit(DivMod16Num const &num, DivMod16Denom const &den) {
+
+  using Dec17Operand = ws::Workspace<ws::DataCells<3>,
+				     ws::Zero,
+				     ws::DoNotTouch,
+				     ws::ZeroCells<2>>;
   
-  assert(_dp.current().field == MacroCell::Value0);
-  pushPtr();
-  Cell const num = _dp.current();
-
-  // Use the cells beyond the denominator as scratch space to hold a copy of D
-  // This assumes that these cells are available as scratch
-  auto constexpr D0 = MacroCell::Value0;
-  auto constexpr D1 = static_cast<MacroCell::Field>(D0 + 1);
-  auto constexpr D0c = static_cast<MacroCell::Field>(D0 + 2);
-  auto constexpr D1c = static_cast<MacroCell::Field>(D0 + 3);
-  auto constexpr Temp = static_cast<MacroCell::Field>(D0 + 4);
-  
-  moveTo(denom, D0);
-  copyField(Cell{denom, D0c}, Temps<1>::select(denom, Temp));
-  moveTo(denom, D1);
-  copyField(Cell{denom, D1c}, Temps<1>::select(denom, Temp));
-
-  auto constexpr R0 = MacroCell::Value0;
-  auto constexpr R1 = static_cast<MacroCell::Field>(R0 + 1);
-  auto constexpr G = static_cast<MacroCell::Field>(R0 + 2);
-  //  auto constexpr S1 = static_cast<MacroCell::Field>(R0 + 3);
-  auto constexpr S2 = static_cast<MacroCell::Field>(R0 + 4);
-  //  auto constexpr S3 = static_cast<MacroCell::Field>(R0 + 5);
-  //  auto constexpr S4 = static_cast<MacroCell::Field>(R0 + 6);
-
-  // Both kernels initialize and clear their own synchronization flags.
-  // DEC16 starts and ends on R1.
-  // DEC17 starts and ends on R0.
-  // Both leave S2 untouched.  
-  static constexpr char const *DEC16 =
-    ">>>>+<<<"
-    "-<[>+>]>>[<<]>>-<<<<-";
-  static constexpr char const *DEC17 =
-    ">>>>>+>+<<<<"
-    "-<[>+>]>>[-<<]<<"
-    "-<[>+>>>>[-<<<+>>>]<<]"
-    ">>>[-<<<]>>>[-]<[-]<<<<<-";
-
-  moveTo(num, S2); dec(); // This will hold the quotient Q
-  switchField(G); inc();
-  loopOpen(); {
-    // 17-bit subtraction: R|G -= D
-    {
-      // Subtract from the low byte, borrow from high and G
-      moveTo(denom, D0);
-      loopOpen(); {
-	dec();
-	// 17 bit dec, double borrow. First prepare S3 and S4 which will be used
-	// as sync flags
-	moveTo(num, R0);
-	emit<primitive::Inline>(DEC17);
-	moveTo(denom, D0);
-      } loopClose();
-
-      // Subtract high byte
-      moveTo(denom, D1);
-      loopOpen(); {
-	dec();
-	moveTo(num, R1);
-	emit<primitive::Inline>(DEC16);
-	moveTo(denom, D1);
-      } loopClose();
-    }
-
-    // Restore D0 and D1
-    moveTo(denom, D0c);
-    copyField(Cell{denom, D0}, Temps<1>::select(denom, Temp));
-    moveTo(denom, D1c);
-    copyField(Cell{denom, D1}, Temps<1>::select(denom, Temp));
+  auto const dec17 = [&](Dec17Operand const &op) -> Dec17Operand {
+    auto const [low, high, guard, sentinel, _, highBorrow, lowBorrow] = op.cells();
     
-    // Increment Q and loop
-    moveTo(num, S2);
-    inc();
-    switchField(G);
-  } loopClose();
+    pushPtr();
 
-  switchField(R0);
-  add16Destructive(Cell{denom, D0});
+    // Start by assuming that both lower bytes will borrow.
+    // These flags are cleared below when that assumption proves false.
+    inc(highBorrow);
+    inc(lowBorrow);
 
-  // State at this point:
-  // D0 | D1 | G | S1 | S2 | S3 | S4
-  // R0 | R1 | 0 |  0 | Q | 0  | 0
-  
-  // Clear D0c and D1c (D0 and D1 already destroyed by this point
-  moveTo(denom, D0c); zeroCell();
-  moveTo(denom, D1c); zeroCell();
+    // Speculatively propagate borrow through high into guard.
+    dec(guard);
+    literalBf(high, "[>+>]"    // high != 0: cancel guard borrow
+	            ">>[-<<]"  // clear highBorrow and sync pointer on sentinel
+	            "<<-");     // return from sentinel to high and decrement that
 
-  popPtr();
-}
+    // If low != 0, no borrow was necessary at all: restore high and,
+    // if necessary, guard.
+    literalBf(low, "[>+>>>>[-<<<+>>>]<<]" // low != 0: restore high; if highBorrow, restore guard
+	           ">>>[-<<<]"            // clear lowBorrow if set and synchronize on sentinel
+	           "<<<-");                // return from sentinel to low and decrement that
 
-void Assembler::divMod16Destructive(Cell denom) {
-  assert(_dp.current().field == MacroCell::Value0);
-
-  Cell const num = _dp.current();
-  Slot const tmp = getTemp(ts::raw(1));
+    zeroCell(highBorrow);
+    zeroCell(lowBorrow);
+    popPtr();
+    return op;
+  };
 
   pushPtr();
 
-  // Preserve a copy of the denominator for branching.
-  moveTo(denom, MacroCell::Value0);
-  copyField(Cell{tmp, MacroCell::Value0},
-	    Temps<1>::select(tmp, MacroCell::Scratch0));
+  [[maybe_unused]] auto const [Rlo, Rhi, G, scratch, Qinitial, Qfinal] = num.cells<6>();
+  auto const [Dlo, Dhi, DloCopy, DhiCopy, CopyTemp] = den.cells<5>();
 
-  moveTo(denom, MacroCell::Value1);
-  copyField(Cell{tmp, MacroCell::Value1},
-	    Temps<1>::select(tmp, MacroCell::Scratch0));
+  // Preserve the denominator. The subtraction loop consumes Dlo/Dhi
+  // on every iteration, so these copies are restored afterwards.
+  copyField(Dlo, DloCopy, DhiCopy);
+  copyField(Dhi, DhiCopy, CopyTemp);
 
-  // ------------------------------------------------------------------
-  // Branch 1: Dhi != 0
-  //
-  // Then D >= 256, so the complete quotient is guaranteed to fit
-  // in one byte.
-  // ------------------------------------------------------------------
 
-  // Else flag for Dhi == 0.
-  moveTo(tmp, MacroCell::Flag);
-  inc();
+  // Q starts at -1 because the loop performs one subtraction too many.
+  dec(Qinitial);
 
-  moveTo(tmp, MacroCell::Value1);
-  loopOpen(); {
-    // One-shot branch.
-    zeroCell();
+  // Extra 17th remainder bit.
+  inc(G);
+  loop(G, [&] {
+    // 17-bit subtraction: Rlo:Rhi:G -= Dlo:Dhi
+    loop(Dlo, [&] {
+      dec(Dlo);
+      dec17(ws::promise(Rlo, ws::Layout<
+			ws::DataCells<3>,
+			ws::Zero,
+			ws::DoNotTouch, // Qinitial
+			ws::ZeroCells<2>>{}));
+    });
 
-    // Disable Dhi == 0 branch.
-    switchField(MacroCell::Flag);
-    zeroCell();
+    loop(Dhi, [&] {
+      dec(Dhi);
+      dec16(ws::promise(Rhi, ws::Layout<
+			ws::DataCells<2>,
+			ws::Zero,
+			ws::DoNotTouch, // Qinitial
+			ws::ZeroCells<2>>{}));
+    });
 
-    moveTo(num, MacroCell::Value0);
-    divMod16DestructiveGuaranteed8BitResult(denom);
+    // Restore denominator for the next subtraction.
+    copyField(DloCopy, Dlo, CopyTemp);
+    copyField(DhiCopy, Dhi, CopyTemp);
 
-    // Helper returned:
-    //
-    // Rlo | Rhi | 0 | 0 | Qlo
-    //
-    // Canonical divmod layout:
-    //
-    // Qlo | Qhi | Rlo | Rhi
-    //       (=0)
+    inc(Qinitial);
+  });
 
-    moveTo(num, MacroCell::Value0);
-    moveField(Cell{num, MacroCell::Scratch0});
+  // Copies are no longer necessary. Dlo/Dhi themselves are currently
+  // restored and will be consumed by the final add-back.
+  zeroCell(DloCopy);
+  zeroCell(DhiCopy);
 
-    switchField(MacroCell::Value1);
-    moveField(Cell{num, MacroCell::Scratch1});
+  // Move Q from cell 4 to its final position at cell 5.
+  moveField(Qinitial, Qfinal);
+  
+  auto currentRemainder =
+    ws::promise(Rlo, ws::Layout<
+		ws::Prepared<ws::Role::RemainderLow>,
+		ws::Prepared<ws::Role::RemainderHigh>,
+		ws::ZeroCells<3>,
+		ws::DoNotTouch // Q
+		>{});
 
-    switchField(MacroCell::Flag);
-    moveField(Cell{num, MacroCell::Value0});
+  // The subtraction loop deliberately overshot by one denominator,
+  // so add D back to the remainder.  
+  add16Destructive(currentRemainder, den);
+  popPtr();
 
-    // Value1 is already zero => Qhi = 0.
 
-    moveTo(tmp, MacroCell::Value1);
-  } loopClose();
+  return ws::promise(num.start(), ws::Layout<
+		     ws::Prepared<ws::Role::RemainderLow>,
+		     ws::Prepared<ws::Role::RemainderHigh>,
+		     ws::ZeroCells<3>,
+		     ws::Prepared<ws::Role::QuotientLow>,
+		     ws::ZeroCells<1>
+		     >{});
+}
 
-  // ------------------------------------------------------------------
-  // Branch 2: Dhi == 0
-  // ------------------------------------------------------------------
+Assembler::DivMod16Result Assembler::divMod16Destructive(DivMod16Num const &num, DivMod16Denom const &den) {
+  Slot const tmpSlot = getTemp(ts::raw(1));
+  auto const tmp = ws::promiseClean16(tmpSlot);
 
-  moveTo(tmp, MacroCell::Flag);
-  loopOpen(); {
-    // Consume the Dhi==0 branch flag.
-    zeroCell();
+  pushPtr();
 
-    // Preserve Dlo across the destructive first radix-256 stage.
-    //
-    // denom.Scratch0 is restored to zero again below.
-    moveTo(denom, MacroCell::Value0);
-    copyField(
-        Cell{denom, MacroCell::Scratch0},
-        Temps<1>::select(denom, MacroCell::Scratch1));
+  auto nv = num.view("Nlo", "Nhi", "CopyTemp");
+  auto dv = den.view("Dlo", "Dhi", "CopyTemp");
+  auto tv = tmp.view("DloCopy", "DhiCopy", "ElseFlag");
 
-    // Assume Dlo == 0.
-    moveTo(tmp, MacroCell::Flag);
-    inc();
+  copyField(dv["Dlo"], tv["DloCopy"], dv["CopyTemp"]);
+  copyField(dv["Dhi"], tv["DhiCopy"], dv["CopyTemp"]);
 
-    // --------------------------------------------------------------
-    // Dlo != 0
-    // --------------------------------------------------------------
+  inc(tv["ElseFlag"]);
+  loop(tv["DhiCopy"], [&]{
+    zeroCell(tv["DhiCopy"]);
+    dec(tv["ElseFlag"]);
 
-    // tmp.Value0 still contains the saved Dlo, so use it directly
-    // as our one-shot condition.
-    moveTo(tmp, MacroCell::Value0);
-    loopOpen(); {
-      zeroCell();
+    nv = divMod16Digit(num, den)
+      .view("Rlo", "Rhi", ws::At<5>{"Qlo"});
 
-      // Not the zero-denominator case.
-      moveTo(tmp, MacroCell::Flag);
-      zeroCell();
+    // Move remainder to cells 2 and 3 and quotient to cell 0
+    moveField(nv["Rlo"], nv[2]);
+    moveField(nv["Rhi"], nv[3]);
+    moveField(nv["Qlo"], nv[0]);
 
-      // First radix-256 quotient digit:
-      //
-      // Qhi, carry = Nhi / Dlo
-      moveTo(num, MacroCell::Value1);
-      moveField(Cell{tmp, MacroCell::Value0});
+    nv.reset(); // Reset to initial name-state for the else-branch
+  });
 
-      moveTo(tmp, MacroCell::Value0);
-      divModDestructive(
-          Cell{denom, MacroCell::Value0},
-          TransferMode::Move);
+  loop(tv["ElseFlag"], [&] {
 
-      // tmp:
-      // Qhi | carry
+    loop(tv["DloCopy"], [&]{
+      // If Dlo != 0
 
-      // Restore Dlo for the second stage.
-      moveTo(denom, MacroCell::Scratch0);
-      moveField(Cell{denom, MacroCell::Value0});
+      zeroCell(tv["DloCopy"]);
+      zeroCell(tv["ElseFlag"]);
 
-      // Qhi is already final.
-      moveTo(tmp, MacroCell::Value0);
-      moveField(Cell{num, MacroCell::Value1});
+      // Prepare tmp for 8-bit division Nhi / Dlo
+      // All tmp cells have already been cleared at this point
+      tv.renameAll("Nhi", "", "");
+      moveField(nv["Nhi"], tv["Nhi"]);
 
-      // Bring down Nlo:
-      //
-      // partial = carry:Nlo
-      moveTo(num, MacroCell::Value0);
-      moveField(Cell{tmp, MacroCell::Value0});
+      // Calulate Nhi / Dlo
+      tv = divModDestructive(ws::promiseClean8(tv["Nhi"]), dv["Dlo"], TransferMode::Copy)
+	.view("Qhi", "Carry");
 
-      // Second quotient digit:
-      //
-      // Qlo, remainder = partial / Dlo
-      moveTo(tmp, MacroCell::Value0);
-      divMod16DestructiveGuaranteed8BitResult(
-          Cell{denom, MacroCell::Value0});
+      // The Qhi that was returned by the 8-bit algorithm is already final -> move into final position
+      moveField(tv["Qhi"], nv[1]);
 
-      // tmp now:
-      //
-      // Rlo | Rhi | 0 | 0 | Qlo
+      // Move Nlo into the tmp workspace to prepare for the calculation of
+      // (Nlo:Carry) / Dlo
+      tv.renameAll("Nlo", "Carry");
+      moveField(nv["Nlo"], tv["Nlo"]);
+      tv = divMod16Digit(ws::promiseClean16(tv["Nlo"]), ws::promiseClean16(dv["Dlo"]))
+	.view("Rlo", "Rhi", ws::At<5>("Qlo"));
 
-      moveTo(tmp, MacroCell::Value0);
-      moveField(Cell{num, MacroCell::Scratch0});
+      nv.renameAll("Qlo", "Qhi", "Rlo", "Rhi");
+      moveField(tv["Rlo"], nv["Rlo"]);
+      moveField(tv["Rhi"], nv["Rhi"]);
+      moveField(tv["Qlo"], nv["Qlo"]);
 
-      switchField(MacroCell::Value1);
-      moveField(Cell{num, MacroCell::Scratch1});
+      // tv[2] is left empty and becomes the ElseFlag again
+      tv.renameAll("", "", "ElseFlag");
+    });
 
-      switchField(MacroCell::Flag);
-      moveField(Cell{num, MacroCell::Value0});
-
-      // tmp.Value0 is zero again, which also closes this
-      // one-shot Dlo != 0 branch.
-      moveTo(tmp, MacroCell::Value0);
-    } loopClose();
-
-    // --------------------------------------------------------------
-    // Dlo == 0  => complete denominator == 0
-    // --------------------------------------------------------------
-
-    moveTo(tmp, MacroCell::Flag);
-    loopOpen(); {
-      zeroCell();
+    loop(tv["ElseFlag"], [&] {
+      // Else Dlo == 0
+      zeroCell(tv["ElseFlag"]);
 
       // quotient = 0xffff
-      moveTo(num, MacroCell::Value0);
-      zeroCell();
-      dec();
-
-      switchField(MacroCell::Value1);
-      zeroCell();
-      dec();
-
-      // remainder is already zero because Scratch0/Scratch1 have
-      // not been touched on this path.
-
-      moveTo(tmp, MacroCell::Flag);
-    } loopClose();
-
-    // Return to the outer Dhi==0 branch condition.
-    moveTo(tmp, MacroCell::Flag);
-  } loopClose();
+      zeroCell(nv["Qlo"]); dec(nv["Qlo"]);
+      zeroCell(nv["Qhi"]); dec(nv["Qhi"]);
+    });
+  });
 
   popPtr();
-  freeSlot(tmp);
+  freeSlot(tmpSlot);
+
+  return ws::promise(num.start(), ws::Layout<
+		     ws::Prepared<ws::Role::QuotientLow>,
+		     ws::Prepared<ws::Role::QuotientHigh>,
+		     ws::Prepared<ws::Role::RemainderLow>,
+		     ws::Prepared<ws::Role::RemainderHigh>,
+		     ws::ZeroCells<3>> {});
 }

@@ -186,18 +186,23 @@ void Assembler::printDecimalSlotSigned(Slot slot) {
   pushPtr();
   // Construct sign bit in the flag and use that to determine whether to print a - sign.
   moveTo(valSlot, valSlot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(Cell{valSlot, MacroCell::Flag},
+  Cell const minusSign = Cell{valSlot, MacroCell::Flag};
+  signBitConstructive(minusSign,
 		      Temps<3>::select(valSlot, MacroCell::Scratch0,
 				       valSlot, MacroCell::Scratch1,
 				       valSlot, MacroCell::Payload0));
-
-  moveTo(valSlot, MacroCell::Flag);
+  
+  moveTo(minusSign);
   loopOpen(); {
+    zeroCell();
+
     // Negate valSlot while we're here
     negateSlot(valSlot);
-    setToValue('-', Temps<1>::select(valSlot, MacroCell::Scratch0));
+    //    setToValue('-', Temps<1>::select(valSlot, MacroCell::Scratch0));
+    // Use  -cell to hold the minus sign
+    setToValue(ws::promise(minusSign, ws::Layout<ws::Data, ws::Zero>{}), '-');
     emit<primitive::Out>();
-    zeroCell();
+    zeroCell(minusSign);
   } loopClose();
   popPtr();
 

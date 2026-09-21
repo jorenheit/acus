@@ -1,0 +1,172 @@
+--- a/src/assembler/assembler_divmod.cc
++++ b/src/assembler/assembler_divmod.cc
+@@ -709,36 +709,39 @@
+     moveTo(num[N::G]);
+   } loopClose();
+ 
+-  // Clear D0c and D1c (D0 and D1 already destroyed by this point)
++  // The denominator copies are no longer needed. D0 and D1 themselves
++  // have been restored and are consumed by the final add-back.
+   moveTo(den[D::D0Copy]); zeroCell();
+   moveTo(den[D::D1Copy]); zeroCell();
+ 
+-  {
+-    auto const currentWorkspace = ws::promise<
+-      ws::Prepared<ws::Role::RemainderLow>,
+-      ws::Prepared<ws::Role::RemainderHigh>,
+-      ws::ZeroCells<2>,
+-      ws::Prepared<ws::Role::QuotientLow>,
+-      ws::ZeroCells<2>>(num.start());
+-  
+-    // add16 needs 3 zeroes, so we need to move the quotient one to the right
+-    moveTo(currentWorkspace[4]);
+-    moveField(currentWorkspace[5]);
+-  }
++  // Current layout:
++  //
++  // Rlo | Rhi | 0 | 0 | Qlo | 0 | 0
++  //
++  // add16Destructive needs three zero cells after the 16-bit value, so
++  // temporarily park Qlo one cell farther to the right.
++  moveTo(num[N::S2]);
++  moveField(num[N::S3]);
+ 
+-  {
+-    auto const currentWorkspace = ws::promise<
++  add16Destructive(
++    ws::promise<
+       ws::Prepared<ws::Role::RemainderLow>,
+       ws::Prepared<ws::Role::RemainderHigh>,
+-      ws::ZeroCells<3>,
+-      ws::Prepared<ws::Role::QuotientLow>,
+-      ws::ZeroCells<1>>(num.start());
++      ws::ZeroCells<3>>(num.start()),
++    den[D::D0]);
+ 
+-    add16Destructive(currentWorkspace, den[D::D0]);
+-  
+-    popPtr();
+-    return currentWorkspace;
+-  }
++  // Restore Qlo to the result position expected by DivMod16DigitResult.
++  moveTo(num[N::S3]);
++  moveField(num[N::S2]);
++
++  popPtr();
++
++  return ws::promise<
++    ws::Prepared<ws::Role::RemainderLow>,
++    ws::Prepared<ws::Role::RemainderHigh>,
++    ws::ZeroCells<2>,
++    ws::Prepared<ws::Role::QuotientLow>,
++    ws::ZeroCells<2>>(num.start());
+ }
+   
+ 
+@@ -774,7 +777,7 @@
+   // Else flag for Dhi == 0.
+   inc(tmp[T::ElseFlag]);
+ 
+-  // Branch on (copy of) D0
++  // Branch on the saved high byte.
+   moveTo(tmp[T::T1]);
+   loopOpen(); {
+     // One-shot branch.
+@@ -784,12 +787,11 @@
+     moveTo(tmp[T::ElseFlag]);
+     zeroCell();
+ 
+-    DivMod16DigitResult const result = divMod16Digit(num, den);
+-    auto [Rlo, Rhi, Z1, Z2, Z3, Qlo, Z4] = result.cells();
+-  
++    auto const result = divMod16Digit(num, den);
++
+     // Helper returned:
+     //
+-    // Rlo | Rhi | 0 | 0 | 0 | | Qlo | 0
++    // Rlo | Rhi | 0 | 0 | Qlo | 0 | 0
+     //
+     // Canonical divmod layout:
+     //
+@@ -797,9 +799,9 @@
+     //       (=0)
+ 
+     assert(result.start() == num.start());
+-    moveTo(Rlo); moveField(num[N::S1]); 
+-    moveTo(Rhi); moveField(num[N::S2]);
+-    moveTo(Qlo); moveField(num[N::N0]);
++    moveTo(result[0]); moveField(num[N::S1]);
++    moveTo(result[1]); moveField(num[N::S2]);
++    moveTo(result[4]); moveField(num[N::N0]);
+ 
+     // Value1 is already zero => Qhi = 0.
+ 
+@@ -839,44 +841,38 @@
+       moveField(tmp[T::T0]);
+ 
+ 	
+-      auto const partial = divModDestructive(ws::promiseClean8(tmp[T::T0]), den[D::D0], TransferMode::Move);
+-      Cell const &Qhi   = partial[0];
+-      Cell const &Carry = partial[1];
+-
+-      // Restore Dlo for the second stage.
+-      moveTo(den[D::D0Copy]);
+-      moveField(den[D::D0]);
+-
+-      // Qhi is already final.
+-      moveTo(Qhi);
+-      moveField(num[N::N1]);
+-
+-      // Bring down N0:
+-      //
+-      // partial = Nlo | Carry -> replace Qhi with Nlo
+-      moveTo(num[N::N0]);
+-      moveField(Qhi);
++      {
++        auto const partial = divModDestructive(
++          ws::promiseClean8(tmp[T::T0]), den[D::D0], TransferMode::Move);
++
++        // Restore Dlo for the second stage.
++        moveTo(den[D::D0Copy]);
++        moveField(den[D::D0]);
++
++        // Qhi is already final.
++        moveTo(partial[0]);
++        moveField(num[N::N1]);
++
++        // Bring down N0. This repurposes the cell that held Qhi, so let
++        // the partial-result workspace go out of scope immediately after.
++        moveTo(num[N::N0]);
++        moveField(partial[0]);
++      }
+ 
+       // Second quotient digit:
+       //
+-      // Qlo, remainder = partial / Dlo
+-      auto result = divMod16Digit(ws::promiseClean16(partial.start()), den);
+-      // result now:
+-      //
+-      // Rlo | Rhi | 0 | 0 | Qlo
+-      Cell const &Rlo = result[0];
+-      Cell const &Rhi = result[1];
+-      Cell const &Qlo = result[4];
++      // Qlo, remainder = (Carry:Nlo) / Dlo
++      auto const result = divMod16Digit(
++        ws::promiseClean16(tmp[T::T0]), den);
+ 
+-      // Move remainder into S1 and S2 of the resulting workspace (that of num).
+-      moveTo(Rlo);
++      // result = Rlo | Rhi | 0 | 0 | Qlo | 0 | 0
++      moveTo(result[0]);
+       moveField(num[N::S1]);
+ 
+-      moveTo(Rhi);
++      moveTo(result[1]);
+       moveField(num[N::S2]);
+ 
+-      // Move low byte of the quotient into N0
+-      moveTo(Qlo);
++      moveTo(result[4]);
+       moveField(num[N::N0]);
+ 
+       // tmp.Value0 is zero again, which also closes this

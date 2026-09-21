@@ -5,6 +5,13 @@
 
 #include "assembler.ih"
 
+void Assembler::literalBf(Cell start, std::string const &bf) {
+  pushPtr();
+  moveTo(start);
+  emit<primitive::Inline>(bf);
+  popPtr();
+}
+
 void Assembler::loopOpen(std::string const &tag) {
   emit<primitive::LoopOpen>(tag);
 }
@@ -36,8 +43,22 @@ void Assembler::moveToOrigin() {
   moveTo(0);
 }
 
+void Assembler::zeroCell(Cell target) {
+  pushPtr();
+  moveTo(target);
+  emit<primitive::ZeroCell>();
+  popPtr();
+}
+
 void Assembler::zeroCell() { 
   emit<primitive::ZeroCell>();
+}
+
+void Assembler::zeroCellPlus(Cell target) {
+  pushPtr();
+  moveTo(target);
+  emit<primitive::ZeroCellPlus>();
+  popPtr();
 }
 
 void Assembler::zeroCellPlus() { 
@@ -71,6 +92,8 @@ void Assembler::setToValue(int value, Temps<1> tmp) {
   emit<primitive::ConstructConstant>(value, cur, scratch);
 }
 
+
+
 void Assembler::setToValue16(int value) {
   // Normalized version: must be at Value0 and use Scratch0 as temp.
   assert(_dp.current().field == MacroCell::Value0);
@@ -89,35 +112,91 @@ void Assembler::setToValue16(int value, Cell high, Temps<1> tmp) {
   popPtr();
 }
 
-void Assembler::inc() {
-  addConst(1);
+
+Assembler::SingleCell Assembler::inc() {
+  return inc(_dp.current());
 }
 
-void Assembler::dec() {
-  subConst(1);
+Assembler::SingleCell Assembler::inc(SingleCell const &target) {
+  pushPtr();
+  moveTo(target[0]);
+  emit<primitive::ChangeBy>(1);
+  popPtr();
+  return target;
 }
 
-void Assembler::inc16() {
+Assembler::SingleCell Assembler::dec() {
+  return dec(_dp.current());
+}
+
+Assembler::SingleCell Assembler::dec(SingleCell const &target) {
+  pushPtr();
+  moveTo(target[0]);
+  emit<primitive::ChangeBy>(-1);
+  popPtr();
+  return target;
+}
+
+
+Assembler::Inc16Operand Assembler::inc16(Inc16Operand const &op) {
   // This overload assumes that the high cell is right next to the current (low) cell,
-  // followed by (at least) 3 empty scrach cells. If that is not guaranteed, call the
+  // followed by (at least) 3 empty scratch cells. If that is not guaranteed, call the
   // overload below.
-  assert(_dp.current().field == MacroCell::Value0);
-//  emit<primitive::Inline>(">>>>+<<<<+[>>]>+>[<-<]>>-<<<<");
-  emit<primitive::Inline>(">>>>+<<<+<+[>->]>>[<<]>>-<<<<");
+  // emit<primitive::Inline>(">>>>+<<<+<+[>->]>>[<<]>>-<<<<");
+  
+  auto const [L, H, S1, S2, S3] = op.cells();
+  pushPtr();
+  moveTo(S3); inc();
+  moveTo(H);  inc();
+  moveTo(L);  inc();
+  emit<primitive::Inline>("[>->]>>[<<]<<");
+  moveTo(S3); dec();
+  popPtr();
+
+  return op;
 }
 
-void Assembler::dec16() {
-  // This overload assumes that the high cell is right next to the current (low) cell,
-  // followed by (at least) 3 empty scrach cells. If that is not guaranteed, call the
-  // overload below.
-  assert(_dp.current().field == MacroCell::Value0);
-  emit<primitive::Inline>(">>>>+<<<-<[>+>]>>[<<]>>-<<<<-");
+Assembler::Inc16Operand Assembler::dec16(Inc16Operand const &op) {
+  auto const [L, H, S1, S2, S3] = op.cells();
+  pushPtr();
+
+  inc(S3);
+  dec(H);
+  moveTo(L);
+  emit<primitive::Inline>("[>+>]>>[<<]<<");
+  dec(S3);
+  dec(L);
+
+  popPtr();
+
+  return op;
+}
+
+
+void Assembler::moveField(Cell from, Cell to) {
+  auto [src, dst] = getFieldIndices(from, to);
+  if (src == dst) return;
+
+  pushPtr();
+  moveTo(from);
+  emit<primitive::MoveData>(src, dst);
+  popPtr();
 }
 
 void Assembler::moveField(Cell dest) {
   auto [src, dst] = getFieldIndices(_dp.current(), dest);
   if (src == dst) return;
   emit<primitive::MoveData>(src, dst);
+}
+
+void Assembler::copyField(Cell from, Cell to, Cell tmp) {
+  auto [src, dst, tmp0] = getFieldIndices(from, to, tmp);
+  if (src == dst) return;
+  
+  pushPtr();
+  moveTo(from);
+  emit<primitive::CopyData>(src, dst, tmp0);
+  popPtr();
 }
 
 void Assembler::copyField(Cell dest, Temps<1> tmp) {
@@ -128,6 +207,11 @@ void Assembler::copyField(Cell dest, Temps<1> tmp) {
 void Assembler::copyOrMoveField(TransferMode mode, Cell dest, Temps<1> tmp) {
   if (mode == TransferMode::Move) moveField(dest);
   else copyField(dest, tmp);
+}
+
+void Assembler::copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp) {
+  if (mode == TransferMode::Move) moveField(from, to);
+  else copyField(from, to, tmp);  
 }
 
 void Assembler::moveToDynamicOffset(Cell offsetLow, Cell offsetHigh, TransferMode mode) {
