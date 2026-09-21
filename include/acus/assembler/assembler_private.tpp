@@ -121,6 +121,15 @@ namespace acus {
     popPtr();
   }
   
+  template <size_t ScratchOffset> requires (ScratchOffset > 0)
+  Assembler::SingleAndScratch<ScratchOffset> Assembler::boolDestructive(SingleAndScratch<ScratchOffset> const &op) {
+    loop(op[0], [&]{
+      zeroCell(op[0]);
+      inc(op[ScratchOffset]);
+    });
+    addDestructive(op[0], op[ScratchOffset]);
+    return op;
+  }
 
   
 

@@ -598,11 +598,22 @@ namespace acus {
     DivMod16DigitResult divMod16Digit(DivMod16Num const &num, DivMod16Denom const &denom);
     
     void divMod16DestructiveGuaranteed8BitResult(Cell denom);
+
+
+    template <size_t ScratchOffset> requires (ScratchOffset > 0)
+    SingleAndScratch<ScratchOffset> boolDestructive(SingleAndScratch<ScratchOffset> const &op);
+
+    template <typename W, size_t ScratchOffset = ws::firstZeroCell<W, 1>()>
+    requires (ScratchOffset != ws::impl::npos)
+    auto boolDestructive(W const &target) {
+      return boolDestructive<ScratchOffset>(target);
+    }
     
-    void boolDestructive(Temps<1>);
-    void boolConstructive(Cell result, Temps<1>);
+
+    
+    // void boolConstructive(Cell result, Temps<1>);
     void bool16Destructive(Cell high);
-    void bool16Constructive(Cell high, Cell result, Temps<2>);
+    // void bool16Constructive(Cell high, Cell result, Temps<2>);
   
     void notDestructive(Temps<1>);
     void notConstructive(Cell result, Temps<1>);

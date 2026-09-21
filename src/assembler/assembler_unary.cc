@@ -165,7 +165,8 @@ void Assembler::boolSlot(Slot rhs) {
   if (rhs.type()->usesValue1()) {
     bool16Destructive(Cell{rhs, MacroCell::Value1});
   } else {
-    boolDestructive(Temps<1>::select(rhs, MacroCell::Scratch0));
+    zeroCell(Cell{rhs, MacroCell::Value1});
+    boolDestructive(ws::promise(rhs, ws::Layout<ws::Data, ws::Zero>{}));
   }
   
   popPtr();
@@ -209,10 +210,8 @@ void Assembler::absSlot(Slot rhs) {
   signBitDestructive(ws::promise(Cell{rhs, MacroCell::Scratch0},
 				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
   
-  Cell const signBitFlag = Cell{rhs, MacroCell::Scratch0};
-
-  
   // If the sign-bit was set, negate the slot
+  Cell const signBitFlag = Cell{rhs, MacroCell::Scratch0};
   loop(signBitFlag, [&]{
     zeroCell();
     negateSlot(rhs);
@@ -243,36 +242,9 @@ Assembler::SignBitOperand Assembler::signBitDestructive(SignBitOperand const &op
   return op;
 }
 
-
-void Assembler::boolDestructive(Temps<1> tmp) {
-  auto [current, tmp0] = getFieldIndices(_dp.current(), tmp.get<0>());
-  emit<primitive::Boolean>(current, tmp0);
-}
-
 void Assembler::bool16Destructive(Cell high) {
   orDestructive(high);
 }
-
-void Assembler::boolConstructive(Cell result, Temps<1> tmp) {
-  pushPtr();
-  copyField(result, tmp);
-  moveTo(result);
-  boolDestructive(tmp);
-  popPtr();
-}
-
-void Assembler::bool16Constructive(Cell high, Cell result, Temps<2> tmp) {
-  Cell const resultHigh = tmp.get<0>();
-  
-  pushPtr();
-  copyField(result, tmp.select<1>());
-  moveTo(high);
-  copyField(resultHigh, tmp.select<1>());
-  moveTo(result);
-  bool16Destructive(resultHigh);
-  popPtr();  
-}
-
 
 void Assembler::notDestructive(Temps<1> tmp) {
   auto [cur, tmp0] = getFieldIndices(_dp.current(), tmp.get<0>());

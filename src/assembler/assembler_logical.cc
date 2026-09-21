@@ -20,7 +20,9 @@ void Assembler::andSlotWithConst(Slot lhs, int val) {
   if (lhs.type()->usesValue1()) {
     bool16Destructive(Cell{lhs, MacroCell::Value1});
   } else {
-    boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
+    zeroCell(Cell{lhs, MacroCell::Value1});
+    boolDestructive(ws::promise(lhs, ws::Layout<ws::Data, ws::Zero>{}));
+//    boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
   }
   
   popPtr();
@@ -107,7 +109,9 @@ void Assembler::orSlotWithConst(Slot lhs, int val) {
   if (lhs.type()->usesValue1()) {
     bool16Destructive(Cell{lhs, MacroCell::Value1});
   } else {
-    boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
+    zeroCell(Cell{lhs, MacroCell::Value1});
+    boolDestructive(ws::promise(lhs, ws::Layout<ws::Data, ws::Zero>{}));
+//    boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
   }
   
   popPtr();
@@ -191,7 +195,8 @@ void Assembler::xorSlotWithConst(Slot lhs, int val) {
     if (lhs.type()->usesValue1()) {
       bool16Destructive(Cell{lhs, MacroCell::Value1});
     } else {
-      boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
+      zeroCell(Cell{lhs, MacroCell::Value1});
+      boolDestructive(ws::promise(lhs, ws::Layout<ws::Data, ws::Zero>{}));
     }
   }
 
@@ -236,7 +241,8 @@ void Assembler::xnorSlotWithConst(Slot lhs, int val) {
     if (lhs.type()->usesValue1()) {
       bool16Destructive(Cell{lhs, MacroCell::Value1});
     } else {
-      boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
+      zeroCell(Cell{lhs, MacroCell::Value1});
+      boolDestructive(ws::promise(lhs, ws::Layout<ws::Data, ws::Zero>{}));
     }
   }
 
