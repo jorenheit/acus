@@ -75,9 +75,6 @@ Assembler::SingleCell Assembler::subDestructive(SingleCell const &op, SingleCell
 }
 
 Assembler::Add16Operand Assembler::sub16Destructive(Add16Operand const &op, DoubleCell const &delta) {
-
-  pushPtr();
-
   // Subtract low byte
   loop(delta[0], [&]{
     dec(delta[0]);
@@ -86,8 +83,6 @@ Assembler::Add16Operand Assembler::sub16Destructive(Add16Operand const &op, Doub
   
   // Subtract high byte
   subDestructive(op[1], delta[1]);
-  
-  popPtr();
   return op;
 }
 

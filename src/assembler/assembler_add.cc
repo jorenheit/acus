@@ -75,24 +75,14 @@ Assembler::SingleCell Assembler::addDestructive(SingleCell const &op, SingleCell
 }
 
 Assembler::Add16Operand Assembler::add16Destructive(Add16Operand const &op, DoubleCell const &delta) {
-  // This algorithm assumes that the value currently pointed to is the low byte,
-  // with the high byte right next to it, followed by at least 3 empty scratch cells.
-  // The same constraint holds for the delta-cell. The delta is destroyed.
-  
-  pushPtr();
-
   // Add low byte
-  moveTo(delta[0]);
-  loopOpen(); {
+  loop(delta[0], [&]{
     dec();
     inc16(op);
-    moveTo(delta[0]);
-  } loopClose();
+  });
 
   // Add high byte
   addDestructive(op[1], delta[1]);
-  
-  popPtr();
   return op;
 }
 

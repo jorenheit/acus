@@ -65,6 +65,7 @@ Expression Assembler::unOpImpl(Expression obj, API_CTX) {
   return Expression { result };
 }
 
+// Explicit instantiations for all of the unary operations
 #define INSTANTIATE_FOR(op)						\
   template Expression Assembler::unOpImpl<op>(Expression, API_CTX); \
   template Expression Assembler::unOpAssignImpl<op>(Expression, API_CTX);
@@ -108,16 +109,21 @@ Expression Assembler::castImpl(Expression obj, types::TypeHandle toType, API_CTX
   }
   // If we're widening S8, we need to sign-extend
   else if (slot.type()->tag() == types::S8 && toType->usesValue1()) {
-    moveTo(slot, MacroCell::Value0);    
-    signBitConstructive(Cell{slot, MacroCell::Flag},
-			Temps<3>::select(slot, MacroCell::Scratch0,
-					 slot, MacroCell::Scratch1,
-					 slot, MacroCell::Payload0));
-    moveTo(slot, MacroCell::Flag);
-    loopOpen(); {
-      moveTo(result, MacroCell::Value1); zeroCell(); dec();
-      moveTo(slot, MacroCell::Flag);     zeroCell();
-    } loopClose();
+
+    copyField(Cell{slot, MacroCell::Value0},
+	      Cell{slot, MacroCell::Scratch0},
+	      Cell{slot, MacroCell::Scratch1});
+
+    signBitDestructive(ws::promise(Cell{slot, MacroCell::Scratch0},
+				   ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
+
+    Cell const resultHigh = {result, MacroCell::Value1};
+    Cell const signBitFlag = Cell{slot, MacroCell::Scratch0};
+    loop(signBitFlag, [&]{
+      zeroCell(signBitFlag);
+      zeroCell(resultHigh);
+      dec(resultHigh);
+    });
   }
   // All other cases, just zero the high byte
   else {
@@ -195,19 +201,22 @@ void Assembler::absSlot(Slot rhs) {
   if (types::isUnsignedInteger(rhs.type())) return;
 
   pushPtr();
-  // Construct the signbit in rhs.Flag
-  moveTo(rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(Cell{rhs, MacroCell::Flag},
-                      Temps<3>::select(rhs, MacroCell::Scratch0,
-                                       rhs, MacroCell::Scratch1,
-				       rhs, MacroCell::Payload0));
 
+  copyField(Cell{rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+	    Cell{rhs, MacroCell::Scratch0},
+	    Cell{rhs, MacroCell::Scratch1});
+
+  signBitDestructive(ws::promise(Cell{rhs, MacroCell::Scratch0},
+				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
+  
+  Cell const signBitFlag = Cell{rhs, MacroCell::Scratch0};
+
+  
   // If the sign-bit was set, negate the slot
-  moveTo(rhs, MacroCell::Flag);
-  loopOpen(); {
+  loop(signBitFlag, [&]{
     zeroCell();
     negateSlot(rhs);
-  } loopClose();
+  });
 
   popPtr();
 }
@@ -215,55 +224,23 @@ void Assembler::absSlot(Slot rhs) {
 void Assembler::signBitSlot(Slot rhs) {
 
   assert(types::isSignedInteger(rhs.type()));
-  pushPtr();
-  
-  moveTo(rhs, MacroCell::Value1);
   if (rhs.type()->usesValue1()) {
-    moveField(Cell{rhs, MacroCell::Value0});
+    moveField(Cell{rhs, MacroCell::Value1},
+	      Cell{rhs, MacroCell::Value0});
   } else {
-    zeroCell();
+    zeroCell(Cell{rhs, MacroCell::Value1});
   }
 
-  moveTo(rhs, MacroCell::Value0);
-  signBitDestructive();
-  
-  popPtr();
+  signBitDestructive(ws::promise(rhs, ws::Layout<ws::Data, ws::ZeroCells<5>>{}));
 }
 
-void Assembler::signBitDestructive() {
-  // Assumes the 3 cells next to it are zeroed and available
-  const auto Current = _dp.current().field;
-  const auto Counter = static_cast<MacroCell::Field>(Current + 1);
-  const auto Result = static_cast<MacroCell::Field>(Current + 2);
+Assembler::SignBitOperand Assembler::signBitDestructive(SignBitOperand const &op) {
+  auto const [Value, Counter, Result, Scratch] = op.cells();
 
-  pushPtr();
-  switchField(Counter);
-  setToValue(128);
-  emit<primitive::Inline>("[->+<<+[>>-]>>[<[-]>>>]<<<]");
-  switchField(Result);
-  moveField(Cell{_dp.current().offset, Current});
-  popPtr();
-}
-
-
-void Assembler::signBitDestructive(Temps<2> tmp) {
-  Cell const current = _dp.current();
-  Cell const oneTwentyEight = tmp.get<0>();
-
-  pushPtr();
-  moveTo(oneTwentyEight);
-  setToValue(128, tmp.select<1>());
-  moveTo(current);
-  greaterOrEqualDestructive(oneTwentyEight, tmp.select<1>());
-  popPtr();
-}
-
-void Assembler::signBitConstructive(Cell result, Temps<3> tmp) {
-  pushPtr();
-  copyField(result, tmp.get<0>());
-  moveTo(result);
-  signBitDestructive(tmp.select<1, 2>());
-  popPtr();
+  setToValue(ws::promise(Counter, ws::Layout<ws::Zero, ws::Zero>{}), 128);
+  literalBf(Counter, "[->+<<+[>>-]>>[<[-]>>>]<<<]");
+  moveField(Result, Value);
+  return op;
 }
 
 

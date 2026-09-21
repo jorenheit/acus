@@ -528,6 +528,8 @@ namespace acus {
 					 ws::Prepared<ws::Role::RemainderHigh>,
 					 ws::ZeroCells<3>
 					 >;
+
+    using SignBitOperand = ws::Workspace<ws::Data, ws::ZeroCells<3>>;
     
     SingleCell inc();
     SingleCell inc(SingleCell const &);
@@ -575,9 +577,9 @@ namespace acus {
       return setToValue16<ScratchOffset>(target, value);
     }
     
-    void signBitDestructive();
-    void signBitDestructive(Temps<2>);
-    void signBitConstructive(Cell result, Temps<3>);
+    SignBitOperand signBitDestructive(SignBitOperand const &op);
+    // void signBitDestructive(Temps<2>);
+    // void signBitConstructive(Cell result, Temps<3>);
     
     Add16Operand add16Const(Add16Operand const &lhs, Add16Operand const &tmp, int delta);
     Add16Operand sub16Const(Add16Operand const &lhs, Add16Operand const &tmp, int delta);

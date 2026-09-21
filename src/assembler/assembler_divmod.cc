@@ -79,50 +79,59 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
 
   pushPtr();
 
-  Cell const lhsFlag { lhs, MacroCell::Flag };
-  moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(lhsFlag,
-                      Temps<3>::select(lhs, MacroCell::Scratch0,
-                                       lhs, MacroCell::Scratch1,
-                                       lhs, MacroCell::Payload0));
+  // Construct sign-bit in lhs::Scratch0
+  copyField(Cell{lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+	    Cell{lhs, MacroCell::Scratch0},
+	    Cell{lhs, MacroCell::Scratch1});
+  
+  signBitDestructive(ws::promise(Cell{lhs, MacroCell::Scratch0},
+				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
 
   Slot tmp = getTemp(ts::raw(2));
-  Cell const resultNegative { tmp, MacroCell::Flag };
-
-  loop(lhsFlag, [&] {
-    // lhs < 0  ==> negate LHS and set negative flag
-    zeroCell(lhsFlag);
-    negateSlot(lhs);
-    zeroCell(resultNegative);
-    inc(resultNegative);
-  });
-
+  Slot const resultNegative = tmp.sub(ts::u8(), 0);
   Slot const rhsCopy = tmp.sub(rhs.type(), 1);
+  Cell const resultNegativeFlag = {tmp, MacroCell::Value0};
+  zeroCell(resultNegativeFlag);
+  
+  // Take absolute value of lhs and set the resultNegative flag if necessary
+  {
+    Cell const signBitFlag = {lhs, MacroCell::Scratch0};
+    loop(signBitFlag, [&] {
+      // lhs < 0  ==> negate LHS and set negative flag
+      zeroCell(signBitFlag);
+      negateSlot(lhs);
+      inc(resultNegativeFlag);
+    });
+  }
+
+
+  // Construct sign-bit of rhs in rhsCopy::Scratch0
   assignSlot(rhsCopy, rhs);
+  copyField(Cell{rhsCopy, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+	    Cell{rhsCopy, MacroCell::Scratch0},
+	    Cell{rhsCopy, MacroCell::Scratch1});
+  
+  signBitDestructive(ws::promise(Cell{rhsCopy, MacroCell::Scratch0},
+				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
 
-  Cell const rhsFlag { rhsCopy, MacroCell::Flag };
-  moveTo(rhsCopy, rhsCopy.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(rhsFlag,
-                      Temps<3>::select(rhsCopy, MacroCell::Scratch0,
-                                       rhsCopy, MacroCell::Scratch1,
-                                       rhsCopy, MacroCell::Payload0));
+  // Take absolute value of rhsCopy and set/adjust resultNegative flag if necessary
+  {
+    Cell const signBitFlag = {rhsCopy, MacroCell::Scratch0};
+    loop(signBitFlag, [&] {
+      zeroCell(signBitFlag);
+      negateSlot(rhsCopy);
 
-  loop(rhsFlag, [&] {
-    zeroCell(rhsFlag);
-    negateSlot(rhsCopy);
-
-    // rhs < 0 ==> toggle resultNegative.
-    // notDestructive still operates on the current cell.
-    moveTo(resultNegative);
-    notDestructive(Cell{tmp, MacroCell::Scratch0});
-  });
+      moveTo(resultNegativeFlag);
+      notDestructive(Cell{resultNegative, MacroCell::Scratch0});
+    });
+  }
 
   // Both operands are now positive and resultNegative holds the sign bit.
   divSlotBySlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), modSlot, true);
 
   // Correct the sign.
-  loop(resultNegative, [&] {
-    zeroCell(resultNegative);
+  loop(resultNegativeFlag, [&] {
+    zeroCell(resultNegativeFlag);
     negateSlot(lhs);
   });
 
@@ -154,19 +163,16 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   // absolute value but remember the sign.
   pushPtr();
 
-  Slot signBit = getTemp(ts::u8());
-  auto const [S, SCopy1, SCopy2] = ws::promiseClean8(signBit).cells<3>();
+  // Create a new slot and move the sign-byte to its Value1 field
+  Slot signBit = getTemp(ts::raw(1));
+  auto const [_, S, SCopy1, SCopy2] = ws::promiseClean16(signBit).cells<4>();
   
   Cell const lhsSignByte {
     lhs,
     lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0
   };
-
-  zeroCell(SCopy1); // Value1 is not a scratch field and must be cleared explicitly.
   copyField(lhsSignByte, S, SCopy1);
-
-  moveTo(S);
-  signBitDestructive();
+  signBitDestructive(ws::promise(S, ws::Layout<ws::Data, ws::ZeroCells<5>>{}));
 
   // Copy sign bit to adjacent cells so we have enough independent copies.
   literalBf(S, modSlot
@@ -260,25 +266,28 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
 
   pushPtr();
 
-  // For signed integers, the sign of the result is equal to the sign of lhs.
-  Cell const lhsFlag { lhs, MacroCell::Flag };
-  moveTo(lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(lhsFlag,
-                      Temps<3>::select(lhs, MacroCell::Scratch0,
-                                       lhs, MacroCell::Scratch1,
-                                       lhs, MacroCell::Payload0));
+  // Construct sign-bit in lhs::Scratch0
+  copyField(Cell{lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+	    Cell{lhs, MacroCell::Scratch0},
+	    Cell{lhs, MacroCell::Scratch1});
+  
+  signBitDestructive(ws::promise(Cell{lhs, MacroCell::Scratch0},
+				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
 
   Slot tmp = getTemp(ts::raw(2));
-  Cell const resultNegative { tmp, MacroCell::Flag };
+  Slot const resultNegative = tmp.sub(rhs.type(), 0);
+  Slot const rhsCopy = tmp.sub(rhs.type(), 1);
 
-  loop(lhsFlag, [&] {
-    zeroCell(lhsFlag);
-    zeroCell(resultNegative);
-    inc(resultNegative);
+  Cell const resultNegativeFlag = {resultNegative, MacroCell::Value0};
+  Cell const signBitFlag  = {lhs, MacroCell::Scratch0 };
+
+  zeroCell(resultNegativeFlag);
+  loop(signBitFlag, [&] {
+    zeroCell(signBitFlag);
+    inc(resultNegativeFlag);
     negateSlot(lhs);
   });
 
-  Slot const rhsCopy = tmp.sub(rhs.type(), 1);
   assignSlot(rhsCopy, rhs);
   if (types::isSignedInteger(rhs.type())) {
     absSlot(rhsCopy);
@@ -286,8 +295,8 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
 
   modSlotBySlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), divSlot, true);
 
-  loop(resultNegative, [&] {
-    zeroCell(resultNegative);
+  loop(resultNegativeFlag, [&] {
+    dec(resultNegativeFlag);
     negateSlot(lhs);
   });
 
@@ -349,18 +358,15 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
 
   // Copy lhs into a temp and reduce it to its sign bit.
   Slot signBit = getTemp(ts::u8());
-  auto const [S, SCopy1, SCopy2] = ws::promiseClean8(signBit).cells<3>();
+  auto const [_, S, SCopy1, SCopy2] = ws::promiseClean8(signBit).cells<4>();
 
   Cell const lhsSignByte {
     lhs,
     lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0
   };
-  
-  zeroCell(SCopy1); // Value1 is not a scratch field and must be cleared explicitly.
-  copyField(lhsSignByte, S, SCopy1);
 
-  moveTo(S);
-  signBitDestructive();
+  copyField(lhsSignByte, S, SCopy1);
+  signBitDestructive(ws::promise(S, ws::Layout<ws::Data, ws::ZeroCells<5>>{}));
 
   // Copy sign bit to adjacent cells so we have enough independent copies.
   literalBf(S, divSlot

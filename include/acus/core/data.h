@@ -585,7 +585,7 @@ namespace acus {
 
     template <typename ... Args>
     requires (std::is_base_of_v<impl::RegionBase, Args> && ...)
-    Workspace<Args...>  promise(int offset, MacroCell::Field field) {
+    Workspace<Args...>  promise(int offset, MacroCell::Field field = MacroCell::Value0) {
       return promise(Cell{offset, field});
     }
     

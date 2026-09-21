@@ -184,28 +184,39 @@ void Assembler::printDecimalSlotSigned(Slot slot) {
   assignSlot(valSlot, slot);
   
   pushPtr();
-  // Construct sign bit in the flag and use that to determine whether to print a - sign.
-  moveTo(valSlot, valSlot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  Cell const minusSign = Cell{valSlot, MacroCell::Flag};
-  signBitConstructive(minusSign,
-		      Temps<3>::select(valSlot, MacroCell::Scratch0,
-				       valSlot, MacroCell::Scratch1,
-				       valSlot, MacroCell::Payload0));
+
+  // Construct sign bit in the flag field
+  copyField(Cell{valSlot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+	    Cell{valSlot, MacroCell::Scratch0},
+	    Cell{valSlot, MacroCell::Scratch1});
+
+  signBitDestructive(ws::promise(Cell{valSlot, MacroCell::Scratch0},
+				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
   
-  moveTo(minusSign);
-  loopOpen(); {
-    zeroCell();
+
+  
+  // // Construct sign bit in the flag and use that to determine whether to print a - sign.
+  // moveTo(valSlot, valSlot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
+  // Cell const minusSign = Cell{valSlot, MacroCell::Flag};
+  // signBitConstructive(minusSign,
+  // 		      Temps<3>::select(valSlot, MacroCell::Scratch0,
+  // 				       valSlot, MacroCell::Scratch1,
+  // 				       valSlot, MacroCell::Payload0));
+
+  Cell const minusSignFlag = {valSlot, MacroCell::Scratch0};
+  loop(minusSignFlag, [&]{
+    zeroCell(minusSignFlag);
 
     // Negate valSlot while we're here
     negateSlot(valSlot);
     //    setToValue('-', Temps<1>::select(valSlot, MacroCell::Scratch0));
     // Use  -cell to hold the minus sign
-    setToValue(ws::promise(minusSign, ws::Layout<ws::Data, ws::Zero>{}), '-');
+    setToValue(ws::promise(minusSignFlag, ws::Layout<ws::Zero, ws::Zero>{}), '-');
     emit<primitive::Out>();
-    zeroCell(minusSign);
-  } loopClose();
-  popPtr();
+    zeroCell(minusSignFlag);
+  });
 
+  popPtr();
   printDecimalSlotUnsigned(valSlot.unsignedView(), true);
   // valSlot will already be freed
 }
