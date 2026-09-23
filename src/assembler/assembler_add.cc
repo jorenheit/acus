@@ -13,31 +13,21 @@ void Assembler::addSlotToSlot(Slot lhs, Slot rhs) {
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     add16Destructive(ws::promiseClean16(lhs),
-		     ws::promiseClean16(rhsCopy));
+                     ws::promiseClean16(rhsCopy));
   } else {
     addDestructive(ws::promiseClean8(lhs),
-		   ws::promiseClean8(rhsCopy));
+                   ws::promiseClean8(rhsCopy));
   }
   popPtr();
   freeTempSlot(rhsCopy);
 }
 
 void Assembler::addConstToSlot(Slot lhs, int delta) {
-  Slot const tmp = getTemp(ts::raw(1));
-  
-  pushPtr();
-  moveTo(lhs, MacroCell::Value0); // TODO : remove when addConst takes a ws
   if (lhs.type()->usesValue1()) {
-    add16Const(ws::promiseClean16(lhs),
-	       ws::promiseClean16(tmp),
-	       delta);
+    add16Const(ws::promiseClean16(lhs), delta);
   } else {
     addConst(ws::promiseClean8(lhs), delta);
   }
-  
-  popPtr();
-
-  freeSlot(tmp);
 }
 
 Assembler::SingleCell Assembler::addConst(int delta) {
@@ -52,14 +42,17 @@ Assembler::SingleCell Assembler::addConst(SingleCell const &target, int delta) {
   return target;
 }
 
-Assembler::Add16Operand Assembler::add16Const(Add16Operand const &lhs, Add16Operand const &tmp, int delta) {
+Assembler::Add16Operand Assembler::add16Const(Add16Operand const &lhs, int delta) {
   if (delta == 0) return lhs;
   if (delta < 0) {
-    return sub16Const(lhs, tmp, -delta);
+    return sub16Const(lhs, -delta);
   }
 
+  Slot const tmpSlot = getTemp(ts::raw(1));
+  auto const tmp = ws::promiseClean16(tmpSlot);
   setToValue16(tmp, delta);
   add16Destructive(lhs, tmp);
+  freeTempSlot(tmpSlot);
   return lhs;
 }
 

@@ -22,7 +22,6 @@ void Assembler::andSlotWithConst(Slot lhs, int val) {
   } else {
     zeroCell(Cell{lhs, MacroCell::Value1});
     boolDestructive(ws::promise(lhs, ws::Layout<ws::Data, ws::Zero>{}));
-//    boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
   }
   
   popPtr();
@@ -37,13 +36,13 @@ void Assembler::andSlotWithSlot(Slot lhs, Slot rhs) {
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     and16Destructive(Cell{lhs, MacroCell::Value1},
-		     Cell{rhsCopy, MacroCell::Value0},
-		     Cell{rhsCopy, MacroCell::Value1},
-		     Temps<1>::select(lhs, MacroCell::Scratch0));
+                     Cell{rhsCopy, MacroCell::Value0},
+                     Cell{rhsCopy, MacroCell::Value1},
+                     Temps<1>::select(lhs, MacroCell::Scratch0));
 		     
   } else {
     andDestructive(Cell{rhsCopy, MacroCell::Value0},
-		   Temps<1>::select(lhs, MacroCell::Scratch0));
+                   Temps<1>::select(lhs, MacroCell::Scratch0));
   }
 
   popPtr();
@@ -286,6 +285,33 @@ void Assembler::orConstructive(Cell result, Cell other, Temps<2> tmp) {
   orDestructive(otherCopy);
   popPtr();
 }
+
+
+/*
+std::string orValues(int current, int other) {
+  assert(util::allDifferent(current, other));
+    
+  std::ostringstream oss;
+  oss << "["
+      <<   zero()
+      <<   movePtr(other, current)
+      <<   setToValue(1)
+      <<   movePtr(current, other)
+      << "]"
+      << movePtr(other, current)
+      << "["
+      <<   zero()
+      <<   movePtr(current, other)
+      <<   "+"
+      <<   movePtr(other, current)
+      << "]"
+      <<  movePtr(current, other);
+
+  return oss.str();
+}
+  
+ */
+
 
 void Assembler::or16Destructive(Cell high, Cell otherLow, Cell otherHigh) {
 

@@ -6,34 +6,25 @@
 #include "assembler.ih"
 
 void Assembler::subConstFromSlot(Slot lhs, int delta) {
-  Slot const tmp = getTemp(ts::raw(1));
   
-  pushPtr();
-  moveTo(lhs, MacroCell::Value0);    
   if (lhs.type()->usesValue1()) {
-    sub16Const(ws::promiseClean16(lhs),
-	       ws::promiseClean16(tmp),
-	       delta);
+    sub16Const(ws::promiseClean16(lhs), delta);
   } else {
-    subConst(delta);
+    subConst(ws::promiseClean8(lhs), delta);
   }
-  popPtr();
-
-  freeSlot(tmp);
 }
 
-// TODO: do these need destroyRhs?
+// TODO: do these need destroyRhs? Even if that means API consistency this should be the case.
+// check after new API has converged.
 void Assembler::subSlotFromSlot(Slot lhs, Slot rhs) {
   pushPtr();
   Slot rhsCopy = getTemp(rhs.type());
   assignSlot(rhsCopy, rhs);
   moveTo(lhs, MacroCell::Value0);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    sub16Destructive(ws::promiseClean16(lhs),
-		     ws::promiseClean16(rhsCopy));
+    sub16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
   } else {
-    subDestructive(ws::promiseClean8(lhs),
-		   ws::promiseClean8(rhsCopy));
+    subDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
   popPtr();
   freeTempSlot(rhsCopy);
@@ -51,15 +42,19 @@ Assembler::SingleCell Assembler::subConst(SingleCell const &target, int delta) {
   return target;
 }
 
-Assembler::Add16Operand Assembler::sub16Const(Add16Operand const &lhs, Add16Operand const &tmp, int delta) {
+Assembler::Add16Operand Assembler::sub16Const(Add16Operand const &lhs, int delta) {
   
   if (delta == 0) return lhs;
   if (delta < 0) {
-    return add16Const(lhs, tmp, -delta);
+    return add16Const(lhs, -delta);
   }  
 
+  Slot const tmpSlot = getTemp(ts::raw(1));
+  auto const tmp = ws::promiseClean16(tmpSlot);
+  
   setToValue16(tmp, delta);
   sub16Destructive(lhs, tmp);
+  freeTempSlot(tmpSlot);
   return lhs;
 }
 
