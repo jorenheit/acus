@@ -6,25 +6,18 @@
 #include "assembler.ih"
 
 void Assembler::andSlotWithConst(Slot lhs, int val) {
-  pushPtr();
-  moveTo(lhs);
 
   if (val == 0) {
-    zeroCell();
-    moveTo(lhs, MacroCell::Value1);
-    zeroCell();
-    popPtr();
+    zeroCell(Cell{lhs, MacroCell::Value0});
+    zeroCell(Cell{lhs, MacroCell::Value1});
     return;
   }
 
   if (lhs.type()->usesValue1()) {
-    bool16Destructive(Cell{lhs, MacroCell::Value1});
+    bool16Destructive(ws::promiseClean16(lhs));
   } else {
-    zeroCell(Cell{lhs, MacroCell::Value1});
-    boolDestructive(ws::promise(lhs, ws::Layout<ws::Data, ws::Zero>{}));
+    boolDestructive(ws::promiseClean8(lhs));
   }
-  
-  popPtr();
 }
 
 void Assembler::andSlotWithSlot(Slot lhs, Slot rhs) {
@@ -35,14 +28,10 @@ void Assembler::andSlotWithSlot(Slot lhs, Slot rhs) {
   moveTo(lhs);
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    and16Destructive(Cell{lhs, MacroCell::Value1},
-                     Cell{rhsCopy, MacroCell::Value0},
-                     Cell{rhsCopy, MacroCell::Value1},
-                     Temps<1>::select(lhs, MacroCell::Scratch0));
+    and16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
 		     
   } else {
-    andDestructive(Cell{rhsCopy, MacroCell::Value0},
-                   Temps<1>::select(lhs, MacroCell::Scratch0));
+    andDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
 
   popPtr();
@@ -62,10 +51,9 @@ void Assembler::nandSlotWithConst(Slot lhs, int val) {
   }
 
   if (lhs.type()->usesValue1()) {
-    not16Destructive(Cell{lhs, MacroCell::Value1},
-		     Temps<1>::select(lhs, MacroCell::Scratch0));
+    not16Destructive(ws::promiseClean16(lhs));
   } else {
-    notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
+    notDestructive(ws::promiseClean8(lhs));
   }
   
   popPtr();
@@ -79,14 +67,10 @@ void Assembler::nandSlotWithSlot(Slot lhs, Slot rhs) {
   moveTo(lhs);
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    nand16Destructive(Cell{lhs, MacroCell::Value1},
-		      Cell{rhsCopy, MacroCell::Value0},
-		      Cell{rhsCopy, MacroCell::Value1},
-		      Temps<1>::select(lhs, MacroCell::Scratch0));
+    nand16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
 		     
   } else {
-    nandDestructive(Cell{rhsCopy, MacroCell::Value0},
-		    Temps<1>::select(lhs, MacroCell::Scratch0));
+    nandDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
 
   popPtr();
@@ -95,25 +79,18 @@ void Assembler::nandSlotWithSlot(Slot lhs, Slot rhs) {
 
 
 void Assembler::orSlotWithConst(Slot lhs, int val) {
-  pushPtr();
-  moveTo(lhs, MacroCell::Value0);
-
   if (val != 0) {
-    zeroCell(); inc();
-    switchField(MacroCell::Value1);  zeroCell();
-    popPtr();
+    setToValue(Cell{lhs, MacroCell::Value0}, 1);
+    zeroCell(Cell{lhs, MacroCell::Value1});
     return;
   }
 
   if (lhs.type()->usesValue1()) {
-    bool16Destructive(Cell{lhs, MacroCell::Value1});
+    bool16Destructive(ws::promiseClean16(lhs));
   } else {
     zeroCell(Cell{lhs, MacroCell::Value1});
-    boolDestructive(ws::promise(lhs, ws::Layout<ws::Data, ws::Zero>{}));
-//    boolDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
+    boolDestructive(ws::promise(lhs, ws::Layout<ws::Data<>, ws::Scratch>{}));
   }
-  
-  popPtr();
 }
 
 void Assembler::orSlotWithSlot(Slot lhs, Slot rhs) {
@@ -121,36 +98,30 @@ void Assembler::orSlotWithSlot(Slot lhs, Slot rhs) {
 
   Slot rhsCopy = getTemp(rhs.type());
   assignSlot(rhsCopy, rhs);
-  moveTo(lhs);
-
+  
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    or16Destructive(Cell{lhs, MacroCell::Value1},
-		    Cell{rhsCopy, MacroCell::Value0},
-		    Cell{rhsCopy, MacroCell::Value1});
+    or16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
   } else {
-    orDestructive(Cell{rhsCopy, MacroCell::Value0});
+    orDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
 
-  popPtr();
   freeTempSlot(rhsCopy);
 }
 
 void Assembler::norSlotWithConst(Slot lhs, int val) {
-  pushPtr();
-  moveTo(lhs, MacroCell::Value0);
-
   if (val != 0) {
-    zeroCell();
-    switchField(MacroCell::Value1);    zeroCell();
-    popPtr();
+    zeroCell(Cell{lhs, MacroCell::Value0});
+    zeroCell(Cell{lhs, MacroCell::Value1});
     return;
   }
 
+  pushPtr();
+  moveTo(lhs, MacroCell::Value0);
+
   if (lhs.type()->usesValue1()) {
-    not16Destructive(Cell{lhs, MacroCell::Value1},
-		      Temps<1>::select(lhs, MacroCell::Scratch0));
+    not16Destructive(ws::promiseClean16(lhs));
   } else {
-    notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
+    notDestructive(ws::promiseClean8(lhs));
   }
   
   popPtr();
@@ -164,14 +135,10 @@ void Assembler::norSlotWithSlot(Slot lhs, Slot rhs) {
   moveTo(lhs);
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    nor16Destructive(Cell{lhs, MacroCell::Value1},
-		     Cell{rhsCopy, MacroCell::Value0},
-		     Cell{rhsCopy, MacroCell::Value1},
-		     Temps<1>::select(lhs, MacroCell::Scratch0));
+    nor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
 		     
   } else {
-    norDestructive(Cell{rhsCopy, MacroCell::Value0},
-		   Temps<1>::select(lhs, MacroCell::Scratch0));
+    norDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
 
   popPtr();
@@ -184,18 +151,16 @@ void Assembler::xorSlotWithConst(Slot lhs, int val) {
 
   if (val != 0) {
     if (lhs.type()->usesValue1()) {
-      not16Destructive(Cell{lhs, MacroCell::Value1},
-		       Temps<1>::select(lhs, MacroCell::Scratch0));
+      not16Destructive(ws::promiseClean16(lhs));
     } else {
-      notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
+      notDestructive(ws::promiseClean8(lhs));
     }
   }
   else {
     if (lhs.type()->usesValue1()) {
-      bool16Destructive(Cell{lhs, MacroCell::Value1});
+      bool16Destructive(ws::promiseClean16(lhs));
     } else {
-      zeroCell(Cell{lhs, MacroCell::Value1});
-      boolDestructive(ws::promise(lhs, ws::Layout<ws::Data, ws::Zero>{}));
+      boolDestructive(ws::promiseClean8(lhs));
     }
   }
 
@@ -210,19 +175,16 @@ void Assembler::xorSlotWithSlot(Slot lhs, Slot rhs) {
   moveTo(lhs);
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    xor16Destructive(Cell{lhs, MacroCell::Value1},
-		     Cell{rhsCopy, MacroCell::Value0},
-		     Cell{rhsCopy, MacroCell::Value1},
-		     Temps<1>::select(lhs, MacroCell::Scratch0));
+    xor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
 		     
   } else {
-    xorDestructive(Cell{rhsCopy, MacroCell::Value0},
-		   Temps<1>::select(lhs, MacroCell::Scratch0));
+    xorDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
 
   popPtr();
   freeTempSlot(rhsCopy);
 }
+
 
 void Assembler::xnorSlotWithConst(Slot lhs, int val) {
   pushPtr();
@@ -230,18 +192,16 @@ void Assembler::xnorSlotWithConst(Slot lhs, int val) {
 
   if (val == 0) {
     if (lhs.type()->usesValue1()) {
-      not16Destructive(Cell{lhs, MacroCell::Value1},
-		       Temps<1>::select(lhs, MacroCell::Scratch0));
+      not16Destructive(ws::promiseClean16(lhs));
     } else {
-      notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
+      notDestructive(ws::promiseClean8(lhs));
     }
   }
   else {
     if (lhs.type()->usesValue1()) {
-      bool16Destructive(Cell{lhs, MacroCell::Value1});
+      bool16Destructive(ws::promiseClean16(lhs));
     } else {
-      zeroCell(Cell{lhs, MacroCell::Value1});
-      boolDestructive(ws::promise(lhs, ws::Layout<ws::Data, ws::Zero>{}));
+      boolDestructive(ws::promiseClean8(lhs));
     }
   }
 
@@ -256,267 +216,11 @@ void Assembler::xnorSlotWithSlot(Slot lhs, Slot rhs) {
   moveTo(lhs);
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    xnor16Destructive(Cell{lhs, MacroCell::Value1},
-		      Cell{rhsCopy, MacroCell::Value0},
-		      Cell{rhsCopy, MacroCell::Value1},
-		      Temps<1>::select(lhs, MacroCell::Scratch0));
+    xnor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
   } else {
-    xnorDestructive(Cell{rhsCopy, MacroCell::Value0},
-		    Temps<1>::select(lhs, MacroCell::Scratch0));
+    xnorDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
 
   popPtr();
   freeTempSlot(rhsCopy);
-}
-
-void Assembler::orDestructive(Cell other) {
-  auto [cur, oth] = getFieldIndices(_dp.current(), other);
-  emit<primitive::Or>(cur, oth);
-}
-
-void Assembler::orConstructive(Cell result, Cell other, Temps<2> tmp) {
-  Cell const &otherCopy = tmp.get<0>();
-  
-  pushPtr();
-  copyField(result, tmp.select<1>());  
-  moveTo(other);
-  copyField(otherCopy, tmp.select<1>());
-  moveTo(result);
-  orDestructive(otherCopy);
-  popPtr();
-}
-
-
-/*
-std::string orValues(int current, int other) {
-  assert(util::allDifferent(current, other));
-    
-  std::ostringstream oss;
-  oss << "["
-      <<   zero()
-      <<   movePtr(other, current)
-      <<   setToValue(1)
-      <<   movePtr(current, other)
-      << "]"
-      << movePtr(other, current)
-      << "["
-      <<   zero()
-      <<   movePtr(current, other)
-      <<   "+"
-      <<   movePtr(other, current)
-      << "]"
-      <<  movePtr(current, other);
-
-  return oss.str();
-}
-  
- */
-
-
-void Assembler::or16Destructive(Cell high, Cell otherLow, Cell otherHigh) {
-
-  pushPtr();
-  Cell const currentLow = _dp.current();
-  Cell const currentHigh = high;
-
-  // Collapse both to bool
-  moveTo(currentLow);
-  bool16Destructive(currentHigh);
-  moveTo(otherLow);
-  bool16Destructive(otherHigh);
-
-  // And results
-  moveTo(currentLow);
-  orDestructive(otherLow);
-  popPtr();
-}
-
-void Assembler::or16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) { 
-
-  Cell const currentLow = _dp.current();
-  Cell const currentHigh = high;
-  Cell const otherCopyLow = tmp.get<0>();
-  Cell const otherCopyHigh = tmp.get<1>();
-  Cell const resultHigh = tmp.get<2>();
-  
-  pushPtr();
-
-  moveTo(currentLow);  copyField(result, tmp.select<3>());
-  moveTo(currentHigh); copyField(resultHigh, tmp.select<3>());
-  moveTo(otherLow);    copyField(otherCopyLow, tmp.select<3>());
-  moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
-
-  moveTo(result);
-  or16Destructive(resultHigh, otherCopyLow, otherCopyHigh);
-  popPtr();
-}
-
-void Assembler::andDestructive(Cell other, Temps<1> tmp) {
-  auto [cur, oth, tmp0] = getFieldIndices(_dp.current(), other, tmp.get<0>());
-  emit<primitive::And>(cur, oth, tmp0);
-}
-
-void Assembler::andConstructive(Cell result, Cell other, Temps<2> tmp) { 
-  Cell const &otherCopy = tmp.get<0>();
-  pushPtr();
-  copyField(result, tmp.select<1>());  
-  moveTo(other);
-  copyField(otherCopy, tmp.select<1>());
-  moveTo(result);
-  andDestructive(otherCopy, tmp.select<1>());
-  popPtr();
-}
-
-void Assembler::and16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
-
-  pushPtr();
-  Cell const currentLow = _dp.current();
-  Cell const currentHigh = high;
-
-  // Collapse both to bool
-  moveTo(currentLow);
-  bool16Destructive(currentHigh);
-  moveTo(otherLow);
-  bool16Destructive(otherHigh);
-
-  // And results
-  moveTo(currentLow);
-  andDestructive(otherLow, tmp);
-  popPtr();
-}
-
-
-void Assembler::and16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) { 
-
-  Cell const currentLow = _dp.current();
-  Cell const currentHigh = high;
-  Cell const otherCopyLow = tmp.get<0>();
-  Cell const otherCopyHigh = tmp.get<1>();
-  Cell const resultHigh = tmp.get<2>();
-  
-  pushPtr();
-
-  moveTo(currentLow);  copyField(result, tmp.select<3>());
-  moveTo(currentHigh); copyField(resultHigh, tmp.select<3>());
-  moveTo(otherLow);    copyField(otherCopyLow, tmp.select<3>());
-  moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
-
-  moveTo(result);
-  and16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3>());
-  popPtr();
-}
-
-void Assembler::xorDestructive(Cell other, Temps<1> tmp) {
-  auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
-  emit<primitive::Xor>(cur, oth, scratch);
-}
-
-void Assembler::xorConstructive(Cell result, Cell other, Temps<2> tmp) { 
-  Cell const &otherCopy = tmp.get<0>();
-  pushPtr();
-  copyField(result, tmp.select<1>());  
-  moveTo(other);
-  copyField(otherCopy, tmp.select<1>());
-  moveTo(result);
-  xorDestructive(otherCopy, tmp.select<1>());
-  popPtr();
-}
-
-void Assembler::xor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
-  pushPtr();
-  Cell const currentLow = _dp.current();
-  Cell const currentHigh = high;
-
-  // Collapse both to bool
-  moveTo(currentLow);
-  bool16Destructive(currentHigh);
-  moveTo(otherLow);
-  bool16Destructive(otherHigh);
-
-  // And results
-  moveTo(currentLow);
-  xorDestructive(otherLow, tmp);
-  popPtr();
-}
-
-
-void Assembler::xor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) { 
-
-  Cell const currentLow = _dp.current();
-  Cell const currentHigh = high;
-  Cell const otherCopyLow = tmp.get<0>();
-  Cell const otherCopyHigh = tmp.get<1>();
-  Cell const resultHigh = tmp.get<2>();
-  
-  pushPtr();
-
-  moveTo(currentLow);  copyField(result, tmp.select<3>());
-  moveTo(currentHigh); copyField(resultHigh, tmp.select<3>());
-  moveTo(otherLow);    copyField(otherCopyLow, tmp.select<3>());
-  moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
-
-  moveTo(result);
-  xor16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3>());
-  popPtr();
-}
-
-void Assembler::nandDestructive(Cell other, Temps<1> tmp) {
-  andDestructive(other, tmp);
-  notDestructive(tmp);
-}
-
-void Assembler::nandConstructive(Cell result, Cell other, Temps<2> tmp) {
-  andConstructive(result, other, tmp);
-  notDestructive(tmp.select<0>());
-}
-
-void Assembler::nand16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
-  and16Destructive(high, otherLow, otherHigh, tmp);
-  notDestructive(tmp);
-}
-
-
-void Assembler::nand16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
-  and16Constructive(high, result, otherLow, otherHigh, tmp);
-  notDestructive(tmp.select<0>());
-}
-
-void Assembler::norDestructive(Cell other, Temps<1> tmp) {
-  orDestructive(other);
-  notDestructive(tmp);
-}
-
-void Assembler::norConstructive(Cell result, Cell other, Temps<2> tmp) {
-  orConstructive(result, other, tmp);
-  notDestructive(tmp.select<0>());
-}
-
-void Assembler::nor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
-  or16Destructive(high, otherLow, otherHigh);
-  notDestructive(tmp);
-}
-
-void Assembler::nor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
-  or16Constructive(high, result, otherLow, otherHigh, tmp);
-  notDestructive(tmp.select<0>());
-}
-
-void Assembler::xnorDestructive(Cell other, Temps<1> tmp) {
-  xorDestructive(other, tmp);
-  notDestructive(tmp.select<0>());
-}
-
-void Assembler::xnorConstructive(Cell result, Cell other, Temps<2> tmp) {
-  xorConstructive(result, other, tmp);
-  notDestructive(tmp.select<0>());
-}
-
-void Assembler::xnor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
-  xor16Destructive(high, otherLow, otherHigh, tmp);
-  notDestructive(tmp.select<0>());
-}
-
-void Assembler::xnor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
-  xor16Constructive(high, result, otherLow, otherHigh, tmp);
-  notDestructive(tmp.select<0>());
 }

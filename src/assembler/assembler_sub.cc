@@ -34,51 +34,12 @@ Assembler::SingleCell Assembler::subConst(int delta) {
   return subConst(_dp.current(), delta);
 }
 
-Assembler::SingleCell Assembler::subConst(SingleCell const &target, int delta) {
-  pushPtr();
-  moveTo(target);
-  emit<primitive::ChangeBy>(-delta);
-  popPtr();
-  return target;
+
+
+
+
+
+
+Assembler::SingleCell Assembler::subConst(Cell lhs, int delta) {
+  return subConst(SingleCell{lhs}, delta);
 }
-
-Assembler::Add16Operand Assembler::sub16Const(Add16Operand const &lhs, int delta) {
-  
-  if (delta == 0) return lhs;
-  if (delta < 0) {
-    return add16Const(lhs, -delta);
-  }  
-
-  Slot const tmpSlot = getTemp(ts::raw(1));
-  auto const tmp = ws::promiseClean16(tmpSlot);
-  
-  setToValue16(tmp, delta);
-  sub16Destructive(lhs, tmp);
-  freeTempSlot(tmpSlot);
-  return lhs;
-}
-
-Assembler::SingleCell Assembler::subDestructive(SingleCell const &op, SingleCell const &delta) {
-  auto [cur, oth] = getFieldIndices(op, delta);
-
-  pushPtr();
-  moveTo(op);
-  emit<primitive::Subtract>(cur, oth);
-  popPtr();
-  
-  return op;
-}
-
-Assembler::Add16Operand Assembler::sub16Destructive(Add16Operand const &op, DoubleCell const &delta) {
-  // Subtract low byte
-  loop(delta[0], [&]{
-    dec(delta[0]);
-    dec16(op);
-  });
-  
-  // Subtract high byte
-  subDestructive(op[1], delta[1]);
-  return op;
-}
-
-

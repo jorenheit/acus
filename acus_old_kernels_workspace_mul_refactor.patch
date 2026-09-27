@@ -1,0 +1,2141 @@
+diff --git a/include/acus/assembler/assembler.h b/include/acus/assembler/assembler.h
+index 4701250..cf857e2 100644
+--- a/include/acus/assembler/assembler.h
++++ b/include/acus/assembler/assembler.h
+@@ -567,9 +567,26 @@ private:
+   template <ws::Sub16Operand W>     Data16Result<W> sub16Const(W const &lhs, int delta);
+   template <ws::Sub16Operand W>     Data16Result<W> sub16Destructive(W const &lhs, DoubleCell const &delta);
+ 
++  // Multiplication workspace helper (assembler_mul.{cc,tpp}). The value views
++  // are deliberately normalized to one or two cells so their N encodes the
++  // arithmetic width; Work is the preserved slot that supplies clean scratch.
++  template <ws::IsWorkspace Result, ws::IsWorkspace Consumed,
++            ws::IsWorkspace Preserved, ws::IsWorkspace Work>
++  requires (
++    (Result::N == 1 || Result::N == 2) &&
++    (Consumed::N == 1 || Consumed::N == 2) &&
++    (Preserved::N == 1 || Preserved::N == 2) &&
++    Result::template Data<0, Result::N> &&
++    Consumed::template Data<0, Consumed::N> &&
++    Preserved::template Data<0, Preserved::N> &&
++    Work::template Scratch<2, 5>
++  )
++  void multiplyInto(Result const &result, Consumed const &consumed,
++                    Preserved const &preserved, Work const &work);
++
+   // DivMod (assembler_divmod.{cc,tpp})
+   template <ws::DivModNum N>      DivModResult<N> divModDestructive(N const &num, SingleCell const &denom, TransferMode rhsMode);
+-  template <ws::DivModPrepared W> DivModResult<W> divModDestructiveKernel(W const &prep);
++  template <ws::DivModPrepared W> DivModResult<W> divModPreparedDestructive(W const &prep);
+   template <ws::DivMod16Num N, ws::DivMod16Den D> DivMod16DigitResult<N> divMod16Digit(N const &num, D const &den);
+   template <ws::DivMod16Num N, ws::DivMod16Den D> DivMod16Result<N>      divMod16Destructive(N const &num, D const &den);
+ 
+@@ -596,41 +613,24 @@ private:
+   template <ws::DoubleCell W>       Bool16Result<W> nor16Destructive(W const &lhs, DoubleCell const &rhs);
+   template <ws::DoubleCell W>       Bool16Result<W> xnor16Destructive(W const &lhs, DoubleCell const &rhs);
+ 
+-  // Legacy low-level kernels still used by comparison/constructive code.
+-  // These are deliberately kept separate from the workspace-facing API.
+-  // void notKernel(Temps<1>);
+-  // void notConstructive(Cell result, Temps<1>);
+-  // void not16Kernel(Cell high, Temps<1>);
+-  // void not16Constructive(Cell high, Cell result, Temps<2>);
+-  // void andKernel(Cell other, Temps<1>);
+-  // void xorKernel(Cell other, Temps<1>);
++  template <ws::SingleCell W>       Data8Result<W>  eqDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::DoubleAndScratch L> Bool16Result<L> eq16Destructive(L const &lhs, DoubleCell const &rhs);
+ 
++  template <ws::SingleAndScratch W> Data8Result<W> lessDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::Compare16Operand L, ws::DoubleAndScratch R>
++  Bool16Result<L> less16Destructive(L const &lhs, R const &rhs);
+ 
+-  template <ws::SingleCell W>       Data8Result<W>  eqDestructive(W const &lhs, SingleCell const &rhs);
+-  template <ws::SingleAndScratch W> Data8Result<W>  lessDestructive(W const &lhs, SingleCell const &rhs);
+-  template <ws::SingleAndScratch W> Data8Result<W>  lessOrEqualDestructive(W const &lhs, SingleCell const &rhs);
+-  template <ws::SingleAndScratch W> Data8Result<W>  greaterDestructive(W const &lhs, SingleCell const &rhs);
+-  template <ws::SingleAndScratch W> Data8Result<W>  greaterOrEqualDestructive(W const &lhs, SingleCell const &rhs);
+-
+-  template <ws::Compare16Operand L, ws::Compare16Operand R> Bool16Result<L> eq16Destructive(L const &lhs, R const &rhs);
+-  template <ws::Compare16Operand L, ws::Compare16Operand R> Bool16Result<L> less16Destructive(L const &lhs, R const &rhs);
+-  template <ws::Compare16Operand L, ws::Compare16Operand R> Bool16Result<L> lessOrEqual16Destructive(L const &lhs, R const &rhs);
+-  template <ws::Compare16Operand L, ws::Compare16Operand R> Bool16Result<L> greater16Destructive(L const &lhs, R const &rhs);
+-  template <ws::Compare16Operand L, ws::Compare16Operand R> Bool16Result<L> greaterOrEqual16Destructive(L const &lhs, R const &rhs);
+-
+-  // Non-contiguous kernels used by the workspace wrappers above.
+-  void eqKernel(Cell other);
+-  void eq16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
+-  void lessKernel(Cell other, Temps<1>);
+-  void less16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
+-  void lessOrEqualKernel(Cell other, Temps<1>);
+-  void lessOrEqual16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+-  void greaterKernel(Cell other, Temps<1>);
+-  void greater16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+-  void greaterOrEqualKernel(Cell other, Temps<1>);
+-  void greaterOrEqual16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
+-  void greaterOrEqualConstructive(Cell result, Cell other, Temps<2>);
+-  void greaterOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8>);
++  template <ws::SingleAndScratch W> Data8Result<W> lessOrEqualDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::Compare16Operand L, ws::DoubleAndScratch R>
++  Bool16Result<L> lessOrEqual16Destructive(L const &lhs, R const &rhs);
++
++  template <ws::SingleAndScratch W> Data8Result<W> greaterDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::Compare16Operand L, ws::DoubleAndScratch R>
++  Bool16Result<L> greater16Destructive(L const &lhs, R const &rhs);
++
++  template <ws::SingleAndScratch W> Data8Result<W> greaterOrEqualDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::Compare16Operand L, ws::DoubleAndScratch R>
++  Bool16Result<L> greaterOrEqual16Destructive(L const &lhs, R const &rhs);
+ 
+   // Frame Navigation (assembler_framenav.cc)
+   void resetOrigin();
+@@ -834,6 +834,7 @@ private:
+ 
+ #include "../../../src/assembler/assembler_add.tpp"
+ #include "../../../src/assembler/assembler_sub.tpp"
++#include "../../../src/assembler/assembler_mul.tpp"
+ #include "../../../src/assembler/assembler_divmod.tpp"
+ #include "../../../src/assembler/assembler_algorithms.tpp"
+ #include "../../../src/assembler/assembler_unary.tpp"
+diff --git a/include/acus/ir/primitive.h b/include/acus/ir/primitive.h
+index c9edfc6..d6b46b1 100644
+--- a/include/acus/ir/primitive.h
++++ b/include/acus/ir/primitive.h
+@@ -270,308 +270,6 @@ namespace acus::primitive {
+   };
+ 
+ 
+-  struct Boolean: Node {
+-    DInt current, scratch;
+-    /*
+-      Converts 'current' to bool (destructive).
+-
+-      Assumed initial pointer position: current
+-      Assumed empty: scratch
+-      Invariants: ptr, scratch
+-     */
+-
+-    inline explicit Boolean(DInt current, DInt scratch):
+-      current(std::move(current)),
+-      scratch(std::move(scratch))
+-    {}
+-    
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-  
+-  struct Not: Node {
+-    DInt current, scratch;
+-
+-    /*
+-      Not operator applied to the value stored at 'current'. Overwrites
+-      'current' with 0 if nonzero, 1 if zero (destructive).
+-
+-      Assumed initial pointer position: current
+-      Assumed empty: scratch
+-      Invariants: ptr, scratch
+-     */
+-    
+-    inline explicit Not(DInt current, DInt scratch):
+-      current(std::move(current)),
+-      scratch(std::move(scratch))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-  
+-
+-  struct Or: Node {
+-    DInt current, other;
+-
+-    /*
+-      OR operator applied to the values stored at current and other. Overwrites
+-      the value at 'current' with the result of 'current || other'.
+-      Consumes other as well (other == 0 afterwards).
+-      
+-      Assumed initial pointer position: current
+-      Assumed empty: scratch
+-      Invariants: ptr, scratch
+-      Clears: other
+-     */
+-    
+-    inline explicit Or(DInt current, DInt other):
+-      current(std::move(current)),
+-      other(std::move(other))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-
+-  struct Xor: Node {
+-    DInt current, other, scratch;
+-
+-    /*
+-      XOR operator applied to the values stored at current and other. Overwrites
+-      the value at 'current' with the result of 'current ^ other'.
+-      Consumes other as well (other == 0 afterwards).
+-      
+-      Assumed initial pointer position: current
+-      Assumed empty: scratch
+-      Invariants: ptr, scratch
+-      Clears: other
+-     */
+-    
+-    inline explicit Xor(DInt current, DInt other, DInt scratch):
+-      current(std::move(current)),
+-      other(std::move(other)),
+-      scratch(std::move(scratch))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-  
+-  struct And: Node {
+-    DInt current, other, scratch;
+-
+-    /*
+-      AND operator applied to the values stored at current and other. Overwrites
+-      the value at 'current' with the result of 'current && other'. Consumes
+-      other as well (other == 0 afterwards).
+-      
+-      Assumed initial pointer position: current
+-      Assumed empty: scratch
+-      Invariants: ptr, scratch
+-      Clears: other
+-      
+-     */
+-    
+-    inline explicit And(DInt current, DInt other, DInt scratch):
+-      current(std::move(current)),
+-      other(std::move(other)),
+-      scratch(std::move(scratch))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-
+-  struct Less: Node {
+-    DInt current, other, scratch;
+-
+-    /*
+-      NAND operator applied to the values stored at current and other. Overwrites
+-      the value at 'current' with the result of 'current < other)'. Consumes
+-      other as well (other == 0 afterwards).
+-      
+-      Assumed initial pointer position: current
+-      Assumed empty: scratch
+-      Invariants: ptr, scratch
+-      Clears: other
+-      
+-     */
+-    
+-    inline explicit Less(DInt current, DInt other, DInt scratch):
+-      current(std::move(current)),
+-      other(std::move(other)),
+-      scratch(std::move(scratch))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-
+-  struct LessOrEqual: Node {
+-    DInt current, other, scratch;
+-
+-    /*
+-      NAND operator applied to the values stored at current and other. Overwrites
+-      the value at 'current' with the result of 'current <= other)'. Consumes
+-      other as well (other == 0 afterwards).
+-      
+-      Assumed initial pointer position: current
+-      Assumed empty: scratch
+-      Invariants: ptr, scratch
+-      Clears: other
+-      
+-     */
+-    
+-    inline explicit LessOrEqual(DInt current, DInt other, DInt scratch):
+-      current(std::move(current)),
+-      other(std::move(other)),
+-      scratch(std::move(scratch))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-
+-  struct Greater: Node {
+-    DInt current, other, scratch;
+-
+-    /*
+-      NAND operator applied to the values stored at current and other. Overwrites
+-      the value at 'current' with the result of 'current > other)'. Consumes
+-      other as well (other == 0 afterwards).
+-      
+-      Assumed initial pointer position: current
+-      Assumed empty: scratch
+-      Invariants: ptr, scratch
+-      Clears: other
+-      
+-     */
+-    
+-    inline explicit Greater(DInt current, DInt other, DInt scratch):
+-      current(std::move(current)),
+-      other(std::move(other)),
+-      scratch(std::move(scratch))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-
+-  struct GreaterOrEqual: Node {
+-    DInt current, other, scratch;
+-
+-    /*
+-      NAND operator applied to the values stored at current and other. Overwrites
+-      the value at 'current' with the result of 'current >= other)'. Consumes
+-      other as well (other == 0 afterwards).
+-      
+-      Assumed initial pointer position: current
+-      Assumed empty: scratch
+-      Invariants: ptr, scratch
+-      Clears: other
+-      
+-     */
+-    
+-    inline explicit GreaterOrEqual(DInt current, DInt other, DInt scratch):
+-      current(std::move(current)),
+-      other(std::move(other)),
+-      scratch(std::move(scratch))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-
+-
+-  struct Equal: Node {
+-    DInt current, other;
+-
+-    /*
+-      NAND operator applied to the values stored at current and other. Overwrites
+-      the value at 'current' with the result of 'current == other)'. Consumes
+-      other as well (other == 0 afterwards).
+-      
+-      Assumed initial pointer position: current
+-      Invariants: ptr
+-      Clears: other
+-      
+-     */
+-    
+-    inline explicit Equal(DInt current, DInt other):
+-      current(std::move(current)),
+-      other(std::move(other))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-    
+-  
+-  struct Cmp: Node {
+-    DInt value, current, scratch; 
+-    
+-    /*
+-      Compares the value stored at 'current' to 'value'. Stores 1 in 'result'
+-      if equal, 0 otherwise.
+-      
+-      Assumed initial pointer position: current
+-      Assumed empty: scratch
+-      Invariants: ptr, scratch
+-     */
+-    
+-    inline explicit Cmp(DInt value, DInt current, DInt scratch):
+-      value(std::move(value)),
+-      current(std::move(current)),
+-      scratch(std::move(scratch))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-
+-
+-  struct Add: Node {
+-    DInt current, other;
+-
+-    /*
+-      ADD operator: add the value stored at other to current. Overwrites
+-      the value at 'current' with the result of 'current + other' while
+-      consuming other (left 0).
+-      
+-      Assumed initial pointer position: current
+-      Clears: other
+-     */
+-    
+-    inline explicit Add(DInt current, DInt other):
+-      current(std::move(current)),
+-      other(std::move(other))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+-
+-  struct Subtract: Node {
+-    DInt current, other;
+-
+-    /*
+-      SUB operator: subtract the value stored at other from current. Overwrites
+-      the value at 'current' with the result of 'current - other' while consuming
+-      other (left 0).
+-      
+-      Assumed initial pointer position: current
+-      Clears: other
+-     */
+-    
+-    inline explicit Subtract(DInt current, DInt other):
+-      current(std::move(current)),
+-      other(std::move(other))
+-    {}
+-
+-    COMMON_INTERFACE;
+-    MERGABLE;
+-  };
+   
+ } // namespace acus::ir
+ 
+diff --git a/src/assembler/assembler_add.tpp b/src/assembler/assembler_add.tpp
+index 59755ab..5a317f1 100644
+--- a/src/assembler/assembler_add.tpp
++++ b/src/assembler/assembler_add.tpp
+@@ -35,12 +35,13 @@ Assembler::Data16Result<W> Assembler::add16Const(W const &lhs, int delta) {
+ 
+ template <ws::SingleCell W>
+ Assembler::Data8Result<W> Assembler::addDestructive(W const &lhs, SingleCell const &delta) {
+-  auto [cur, oth] = getFieldIndices(lhs[0], delta[0]);
++  Cell const x = lhs[0];
++  Cell const y = delta[0];
+ 
+-  pushPtr();
+-  moveTo(lhs[0]);
+-  emit<primitive::Add>(cur, oth);
+-  popPtr();
++  loop(y, [&] {
++    dec(y);
++    inc(x);
++  });
+ 
+   return lhs;
+ }
+diff --git a/src/assembler/assembler_calls_control.cc b/src/assembler/assembler_calls_control.cc
+index 72ff25b..ac1d743 100644
+--- a/src/assembler/assembler_calls_control.cc
++++ b/src/assembler/assembler_calls_control.cc
+@@ -447,7 +447,6 @@ void Assembler::fetchReturnData() {
+ 
+   // On Value1 field of the call-frame -> if 0, set our own Value1 field to 0 as well
+   notDestructive(ws::promise(_dp.current(), ws::Layout<ws::Data<>, ws::Scratch>{}));
+-//  notKernel(Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
+   loop([&]{
+     dec();
+     emit<primitive::MovePointerRelative>(-stackFrameSize);
+diff --git a/src/assembler/assembler_comparisons.cc b/src/assembler/assembler_comparisons.cc
+index e0de454..fd0c4ea 100644
+--- a/src/assembler/assembler_comparisons.cc
++++ b/src/assembler/assembler_comparisons.cc
+@@ -538,150 +538,3 @@ void Assembler::slotGreaterEqualSlotSigned(Slot lhs, Slot rhs) {
+ 				    });
+ 		  });   
+ }
+-
+-void Assembler::eqKernel(Cell other) {
+-  auto [cur, oth] = getFieldIndices(_dp.current(), other);
+-  emit<primitive::Equal>(cur, oth);
+-}
+-
+-void Assembler::eq16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
+-  Cell const currentLow = _dp.current();
+-  Cell const currentHigh = high;
+-
+-  pushPtr();
+-  moveTo(currentLow);
+-  eqKernel(otherLow);
+-  moveTo(currentHigh);
+-  eqKernel(otherHigh);
+-  moveTo(currentLow);
+-  andKernel(currentHigh, tmp.select<0>());
+-  popPtr();
+-}
+-
+-void Assembler::lessKernel(Cell other, Temps<1> tmp) {
+-  auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+-  emit<primitive::Less>(cur, oth, scratch);
+-}
+-
+-void Assembler::less16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
+-  // xH < yH || (xH == yH && xL < yL)
+-
+-  pushPtr();
+-  
+-  Cell const currentLow = _dp.current();
+-  Cell const currentHigh = high;
+-  Cell const currentCopyHigh = tmp.get<0>();
+-  Cell const otherCopyHigh = tmp.get<1>();
+-
+-  moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<2>());
+-  moveTo(currentHigh); copyField(currentCopyHigh, tmp.select<2>());
+-  
+-  moveTo(currentHigh);
+-  lessKernel(otherHigh, tmp.select<2>());
+-  Cell const highByteLess = currentHigh;
+-  // otherHigh cleared
+-  // currentHigh: xH < yH
+-
+-  moveTo(currentCopyHigh);
+-  eqKernel(otherCopyHigh);
+-  Cell const highByteEqual = currentCopyHigh;
+-  // otherCopyHigh cleared
+-  // currentCopyHigh: xH == yH
+-  
+-  moveTo(currentLow);
+-  lessKernel(otherLow, tmp.select<2>());
+-  Cell const lowByteLess = currentLow;
+-  // otherLow cleared
+-  // currentLow: xL < yL
+-
+-  moveTo(highByteEqual); 
+-  andKernel(lowByteLess, tmp.select<2>());
+-  // currentLow cleared
+-  // currentCopyHigh: xH == yH && xL < yL
+-  
+-  orDestructive(SingleCell{highByteEqual}, SingleCell{highByteLess});
+-  // currentHigh cleared
+-  // currentCopyHigh: xH < yH || (xH == yH && xL < yL)
+-  
+-  moveField(currentLow);
+-  // currentCopyHigh cleared
+-  // currentLow contains result
+-
+-  popPtr();
+-  
+-}
+-
+-
+-void Assembler::lessOrEqualKernel(Cell other, Temps<1> tmp) {
+-  auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+-  emit<primitive::LessOrEqual>(cur, oth, scratch);
+-}
+-
+-void Assembler::lessOrEqual16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
+-  greater16Kernel(high, otherLow, otherHigh, tmp);
+-  notKernel(tmp.select<0>());
+-}
+-
+-void Assembler::greaterKernel(Cell other, Temps<1> tmp) {
+-  auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+-  emit<primitive::Greater>(cur, oth, scratch);
+-}
+-
+-void Assembler::greater16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
+-  // xH > yH || (xH == yH && xL > yL)
+-
+-  pushPtr();
+-  
+-  Cell const currentLow = _dp.current();
+-  Cell const currentHigh = high;
+-  Cell const currentCopyHigh = tmp.get<0>();
+-  Cell const otherCopyHigh = tmp.get<1>();
+-
+-  moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<2>());
+-  moveTo(currentHigh); copyField(currentCopyHigh, tmp.select<2>());
+-  
+-  moveTo(currentHigh);
+-  greaterKernel(otherHigh, tmp.select<2>());
+-  Cell const highByteGreater = currentHigh;
+-  // otherHigh cleared
+-  // currentHigh: xH > yH
+-  
+-  moveTo(currentCopyHigh);
+-  eqKernel(otherCopyHigh);
+-  Cell const highByteEqual = currentCopyHigh;
+-  // otherCopyHigh cleared
+-  // currentCopyHigh: xH == yH
+-  
+-  moveTo(currentLow);
+-  greaterKernel(otherLow, tmp.select<2>());
+-  Cell const lowByteGreater = currentLow;
+-  // otherLow cleared
+-  // currentLow: xL > yL
+-
+-  moveTo(highByteEqual); 
+-  andKernel(lowByteGreater, tmp.select<2>());
+-  // currentLow cleared
+-  // currentCopyHigh: xH == yH && xL > yL
+-  
+-  orDestructive(SingleCell{highByteEqual}, SingleCell{highByteGreater});
+-  // currentHigh cleared
+-  // currentCopyHigh: xH > yH || (xH == yH && xL > yL)
+-  
+-  moveField(currentLow);
+-  // currentCopyHigh cleared
+-  // currentLow contains result
+-
+-  popPtr();
+-  
+-}
+-
+-void Assembler::greaterOrEqualKernel(Cell other, Temps<1> tmp) {
+-  auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+-  emit<primitive::GreaterOrEqual>(cur, oth, scratch);
+-}
+-
+-
+-void Assembler::greaterOrEqual16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
+-  less16Kernel(high, otherLow, otherHigh, tmp);
+-  notKernel(tmp.select<0>());
+-}
+diff --git a/src/assembler/assembler_comparisons.tpp b/src/assembler/assembler_comparisons.tpp
+index b15af0f..17e1d0e 100644
+--- a/src/assembler/assembler_comparisons.tpp
++++ b/src/assembler/assembler_comparisons.tpp
+@@ -3,13 +3,13 @@ Assembler::Data8Result<W> Assembler::eqDestructive(W const &lhs, SingleCell cons
+   Cell const x = lhs[0];
+   Cell const y = rhs[0];
+ 
+-  loop(x, [&]{
++  loop(x, [&] {
+     dec(x);
+     dec(y);
+   });
+   inc(x);
+ 
+-  loop(y, [&]{
++  loop(y, [&] {
+     zeroCell(y);
+     dec(x);
+   });
+@@ -17,16 +17,19 @@ Assembler::Data8Result<W> Assembler::eqDestructive(W const &lhs, SingleCell cons
+   return lhs;
+ }
+ 
+-template <ws::DoubleAndScratch L, ws::DoubleCell R>
+-Assembler::Bool16Result<L> Assembler::eq16Destructive(L const &lhs, R const &rhs) {
++template <ws::DoubleAndScratch L>
++Assembler::Bool16Result<L> Assembler::eq16Destructive(L const &lhs, DoubleCell const &rhs) {
++  eqDestructive(SingleCell{lhs[0]}, SingleCell{rhs[0]});
++  eqDestructive(SingleCell{lhs[1]}, SingleCell{rhs[1]});
+ 
+-  eqDestructive(SingleCell{lhs[0]}, rhs[0]);
+-  eqDestructive(SingleCell{lhs[1]}, rhs[1]);
++  // lhs now contains lowEqual, highEqual, ... Scratch.
++  // The high-byte result is the destructive RHS of AND and must not be
++  // borrowed as scratch by the lhs workspace.
++  andDestructive(
++    lhs.template transformed<ws::Replace<1, ws::Untouched>>(),
++    SingleCell{lhs[1]}
++  );
+ 
+-  // lhs: lowEqual, highEqual, Scratch --> do not touch the highEqual result from before!
+-  andDestructive(lhs.template transformed<ws::Replace<1, ws::Untouched<>>>(),
+-                 lhs[1]);  // this destroys highEqual value
+-  
+   return lhs.template transformed<
+     ws::Replace<0, ws::Data<>>,
+     ws::Replace<1, ws::Data<0>>
+@@ -35,92 +38,169 @@ Assembler::Bool16Result<L> Assembler::eq16Destructive(L const &lhs, R const &rhs
+ 
+ template <ws::SingleAndScratch W>
+ Assembler::Data8Result<W> Assembler::lessDestructive(W const &lhs, SingleCell const &rhs) {
+-  constexpr size_t scratch = W::template ScratchOffset<1>;
+-  pushPtr();
+-  moveTo(lhs[0]);
+-  lessKernel(rhs[0], Temps<1>{lhs[scratch]});
+-  popPtr();
++  Cell const x = lhs[0];
++  Cell const y = rhs[0];
++  Cell const tmp = lhs[W::template ScratchOffset<1>];
++
++  // Decrement x and y in lockstep. If y is still non-zero when x reaches
++  // zero, x < y. tmp temporarily holds y while forcing the inner loop to run
++  // only once per x decrement.
++  loop(x, [&] {
++    dec(x);
++    loop(y, [&] {
++      dec(y);
++      moveField(y, tmp);
++    });
++    moveField(tmp, y);
++  });
++
++  loop(y, [&] {
++    zeroCell(y);
++    inc(x);
++  });
++
+   return lhs;
+ }
+ 
+-template <ws::Compare16Operand L, ws::Compare16Operand R>
+-Assembler::Bool16Result<L> Assembler::less16Destructive(L const &lhs, R const &rhs) {
+-  
+-  pushPtr();
+-  moveTo(lhs[0]);
+-  less16Kernel(lhs[1], rhs[0], rhs[1], Temps<4>{lhs[2], lhs[3], rhs[2], rhs[3]});
+-  popPtr();
+-  return lhs.template transformed<
+-    ws::Replace<0, ws::Data<>>,
+-    ws::Replace<1, ws::Data<0>>
+-  >();
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::greaterDestructive(W const &lhs, SingleCell const &rhs) {
++  Cell const x = lhs[0];
++  Cell const y = rhs[0];
++  Cell const tmp = lhs[W::template ScratchOffset<1>];
++
++  // Decrement y while parking the remainder of x in tmp. If x has anything
++  // left when y reaches zero, x > y. The result is zero or non-zero; callers
++  // do not require it to be normalized to exactly one.
++  loop(y, [&] {
++    dec(y);
++
++    // Restore the remainder from the previous iteration. x is known zero
++    // here after the first iteration; on the first iteration tmp is zero.
++    loop(tmp, [&] {
++      dec(tmp);
++      inc(x);
++    });
++
++    loop(x, [&] {
++      dec(x);
++      moveField(x, tmp);
++    });
++  });
++
++  loop(tmp, [&] {
++    zeroCell(tmp);
++    inc(x);
++  });
++
++  return lhs;
+ }
+ 
+ template <ws::SingleAndScratch W>
+ Assembler::Data8Result<W> Assembler::lessOrEqualDestructive(W const &lhs, SingleCell const &rhs) {
+-  constexpr size_t scratch = W::template ScratchOffset<1>;
+-  pushPtr();
+-  moveTo(lhs[0]);
+-  lessOrEqualKernel(rhs[0], Temps<1>{lhs[scratch]});
+-  popPtr();
+-  return lhs;
++  auto result = greaterDestructive(lhs, rhs);
++  notDestructive(result);
++  return result;
+ }
+ 
+-template <ws::Compare16Operand L, ws::Compare16Operand R>
+-Assembler::Bool16Result<L> Assembler::lessOrEqual16Destructive(L const &lhs, R const &rhs) {
+-  
+-  pushPtr();
+-  moveTo(lhs[0]);
+-  lessOrEqual16Kernel(lhs[1], rhs[0], rhs[1], Temps<3>{lhs[2], lhs[3], rhs[2]});
+-  popPtr();
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::greaterOrEqualDestructive(W const &lhs, SingleCell const &rhs) {
++  auto result = lessDestructive(lhs, rhs);
++  notDestructive(result);
++  return result;
++}
++
++// 16-bit ordering comparisons use two lhs scratch cells to keep copies of the
++// high bytes and one rhs scratch cell as copy/comparison scratch. The low-byte
++// result is combined with the high-byte relation and the high result cell is
++// left as known-zero data.
++template <ws::Compare16Operand L, ws::DoubleAndScratch R>
++Assembler::Bool16Result<L> Assembler::less16Destructive(L const &lhs, R const &rhs) {
++  constexpr size_t rhsScratch = R::template ScratchOffset<2>;
++
++  Cell const xLow = lhs[0];
++  Cell const xHigh = lhs[1];
++  Cell const xHighCopy = lhs[2];
++  Cell const tmp = lhs[3];
++  Cell const yLow = rhs[0];
++  Cell const yHigh = rhs[1];
++  Cell const yHighCopy = rhs[rhsScratch];
++
++  copyField(yHigh, yHighCopy, tmp);
++  copyField(xHigh, xHighCopy, tmp);
++
++  lessDestructive(
++    ws::promise(xHigh, ws::Layout<ws::Data<>, ws::Data<>, ws::Scratch>{}),
++    SingleCell{yHigh}
++  );
++  eqDestructive(SingleCell{xHighCopy}, SingleCell{yHighCopy});
++
++  lessDestructive(
++    ws::promise(xLow, ws::Layout<ws::Data<>, ws::Data<>, ws::Data<>, ws::Scratch>{}),
++    SingleCell{yLow}
++  );
++
++  andDestructive(
++    ws::promise(xHighCopy, ws::Layout<ws::Data<>, ws::Scratch>{}),
++    SingleCell{xLow}
++  );
++  orDestructive(SingleCell{xHighCopy}, SingleCell{xHigh});
++  moveField(xHighCopy, xLow);
++
+   return lhs.template transformed<
+     ws::Replace<0, ws::Data<>>,
+     ws::Replace<1, ws::Data<0>>
+   >();
+ }
+ 
+-template <ws::SingleAndScratch W>
+-Assembler::Data8Result<W> Assembler::greaterDestructive(W const &lhs, SingleCell const &rhs) {
+-  constexpr size_t scratch = W::template ScratchOffset<1>;
+-  pushPtr();
+-  moveTo(lhs[0]);
+-  greaterKernel(rhs[0], Temps<1>{lhs[scratch]});
+-  popPtr();
+-  return lhs;
+-}
+-
+-template <ws::Compare16Operand L, ws::Compare16Operand R>
++template <ws::Compare16Operand L, ws::DoubleAndScratch R>
+ Assembler::Bool16Result<L> Assembler::greater16Destructive(L const &lhs, R const &rhs) {
+-  
+-  pushPtr();
+-  moveTo(lhs[0]);
+-  greater16Kernel(lhs[1], rhs[0], rhs[1], Temps<3>{lhs[2], lhs[3], rhs[2]});
+-  popPtr();
++  constexpr size_t rhsScratch = R::template ScratchOffset<2>;
++
++  Cell const xLow = lhs[0];
++  Cell const xHigh = lhs[1];
++  Cell const xHighCopy = lhs[2];
++  Cell const tmp = lhs[3];
++  Cell const yLow = rhs[0];
++  Cell const yHigh = rhs[1];
++  Cell const yHighCopy = rhs[rhsScratch];
++
++  copyField(yHigh, yHighCopy, tmp);
++  copyField(xHigh, xHighCopy, tmp);
++
++  greaterDestructive(
++    ws::promise(xHigh, ws::Layout<ws::Data<>, ws::Data<>, ws::Scratch>{}),
++    SingleCell{yHigh}
++  );
++  eqDestructive(SingleCell{xHighCopy}, SingleCell{yHighCopy});
++
++  greaterDestructive(
++    ws::promise(xLow, ws::Layout<ws::Data<>, ws::Data<>, ws::Data<>, ws::Scratch>{}),
++    SingleCell{yLow}
++  );
++
++  andDestructive(
++    ws::promise(xHighCopy, ws::Layout<ws::Data<>, ws::Scratch>{}),
++    SingleCell{xLow}
++  );
++  orDestructive(SingleCell{xHighCopy}, SingleCell{xHigh});
++  moveField(xHighCopy, xLow);
++
+   return lhs.template transformed<
+     ws::Replace<0, ws::Data<>>,
+     ws::Replace<1, ws::Data<0>>
+   >();
+ }
+ 
+-template <ws::SingleAndScratch W>
+-Assembler::Data8Result<W> Assembler::greaterOrEqualDestructive(W const &lhs, SingleCell const &rhs) {
+-  constexpr size_t scratch = W::template ScratchOffset<1>;
+-  pushPtr();
+-  moveTo(lhs[0]);
+-  greaterOrEqualKernel(rhs[0], Temps<1>{lhs[scratch]});
+-  popPtr();
+-  return lhs;
++template <ws::Compare16Operand L, ws::DoubleAndScratch R>
++Assembler::Bool16Result<L> Assembler::lessOrEqual16Destructive(L const &lhs, R const &rhs) {
++  auto result = greater16Destructive(lhs, rhs);
++  notDestructive(result);
++  return result;
+ }
+ 
+-template <ws::Compare16Operand L, ws::Compare16Operand R>
++template <ws::Compare16Operand L, ws::DoubleAndScratch R>
+ Assembler::Bool16Result<L> Assembler::greaterOrEqual16Destructive(L const &lhs, R const &rhs) {
+-  
+-  pushPtr();
+-  moveTo(lhs[0]);
+-  greaterOrEqual16Kernel(lhs[1], rhs[0], rhs[1], Temps<4>{lhs[2], lhs[3], rhs[2], rhs[3]});
+-  popPtr();
+-  return lhs.template transformed<
+-    ws::Replace<0, ws::Data<>>,
+-    ws::Replace<1, ws::Data<0>>
+-  >();
++  auto result = less16Destructive(lhs, rhs);
++  notDestructive(result);
++  return result;
+ }
+diff --git a/src/assembler/assembler_divmod.cc b/src/assembler/assembler_divmod.cc
+index e22bc14..4fa6be6 100644
+--- a/src/assembler/assembler_divmod.cc
++++ b/src/assembler/assembler_divmod.cc
+@@ -121,8 +121,10 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
+       zeroCell(signBitFlag);
+       negateSlot(rhsCopy);
+ 
+-      moveTo(resultNegativeFlag);
+-      notKernel(Temps<1>{Cell{resultNegative, MacroCell::Scratch0}});
++      notDestructive(ws::promise(
++        resultNegativeFlag,
++        ws::Layout<ws::Data<>, ws::Untouched, ws::Scratch>{}
++      ));
+     });
+   }
+ 
+@@ -189,8 +191,12 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
+ 
+   // Fix division sign.
+   if (denom < 0) {
+-    moveTo(SCopy1);
+-    notKernel(Temps<1>(S)); // Reuse S, already zero.
++    // SCopy2 may still hold the original sign for the remainder, so keep it
++    // untouched and borrow the next clean cell as scratch.
++    notDestructive(ws::promise(
++      SCopy1,
++      ws::Layout<ws::Data<>, ws::Untouched, ws::Scratch>{}
++    ));
+   }
+   
+   loop(SCopy1, [&] {
+@@ -390,8 +396,10 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
+   // Fix division sign.
+   if (divSlot) {
+     if (denom < 0) {
+-      moveTo(SCopy2);
+-      notKernel(Temps<1>{SCopy1}); // Reuse S2, already zero.
++      notDestructive(ws::promise(
++        SCopy2,
++        ws::Layout<ws::Data<>, ws::Scratch>{}
++      ));
+     }
+     loop(SCopy1, [&] {
+       zeroCell(SCopy1);
+diff --git a/src/assembler/assembler_divmod.tpp b/src/assembler/assembler_divmod.tpp
+index 32d398d..e768bae 100644
+--- a/src/assembler/assembler_divmod.tpp
++++ b/src/assembler/assembler_divmod.tpp
+@@ -25,7 +25,7 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
+ 				ws::Prepared<ws::Role::DenominatorLow>,
+ 				ws::ScratchCells<5>>{});
+ 
+-    v = divModDestructiveKernel(prepared)
++    v = divModPreparedDestructive(prepared)
+       .view("Q", "R", ws::At<6>{"ZeroFlag"});
+   });
+ 
+@@ -47,7 +47,7 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
+ }
+ 
+ template <ws::DivModPrepared W>
+-Assembler::DivModResult<W> Assembler::divModDestructiveKernel(W const &prep) {
++Assembler::DivModResult<W> Assembler::divModPreparedDestructive(W const &prep) {
+ 
+   auto const [N, D, Q, CopyTemp, DCopy, RestoreFlag] = prep.template cells<6>();
+ 
+diff --git a/src/assembler/assembler_framenav.cc b/src/assembler/assembler_framenav.cc
+index 43c8698..1dea732 100644
+--- a/src/assembler/assembler_framenav.cc
++++ b/src/assembler/assembler_framenav.cc
+@@ -110,26 +110,41 @@ void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Pay
+     // For other markers that can have values > 1, we need the more general algorithm
+     // That does a NOT operation on the marker-fields
+ 
++    auto const writeNotMarkerToFlag = [&] {
++      Cell const marker{_dp.current().offset, markerField};
++      Cell const flag{_dp.current().offset, MacroCell::Flag};
++      Cell const scratch{_dp.current().offset, MacroCell::Scratch0};
++
++      copyField(marker, flag, scratch);
++
++      // NOT(flag), using the clean scratch cell from the copy operation.
++      inc(scratch);
++      loop(flag, [&] {
++        dec(scratch);
++        zeroCell(flag);
++      });
++      loop(scratch, [&] {
++        dec(scratch);
++        inc(flag);
++      });
++
++      moveTo(flag);
++    };
++
+     if (not checkCurrent) {
+       switchField(MacroCell::Flag);
+       zeroCell(); inc();
+     }
+     else {
+-      switchField(markerField);
+-      notConstructive(Cell{_dp.current().offset, MacroCell::Flag},
+-		      Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
+-      switchField(MacroCell::Flag);
++      writeNotMarkerToFlag();
+     }
+ 
+     loopOpen(); {
+       zeroCell();
+       step();
+ 
+-      // Store NOT(marker) in Flag. A nonzero marker clears Flag and exits the loop.      
+-      switchField(markerField);
+-      notConstructive(Cell{_dp.current().offset, MacroCell::Flag},
+-		      Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
+-      switchField(MacroCell::Flag);
++      // Store NOT(marker) in Flag. A nonzero marker clears Flag and exits the loop.
++      writeNotMarkerToFlag();
+     } loopClose();
+   }
+ 
+diff --git a/src/assembler/assembler_logical.cc b/src/assembler/assembler_logical.cc
+index 70fa90b..1c03ddf 100644
+--- a/src/assembler/assembler_logical.cc
++++ b/src/assembler/assembler_logical.cc
+@@ -224,47 +224,3 @@ void Assembler::xnorSlotWithSlot(Slot lhs, Slot rhs) {
+   popPtr();
+   freeTempSlot(rhsCopy);
+ }
+-
+-// void Assembler::notKernel(Temps<1> tmp) {
+-//   auto [cur, tmp0] = getFieldIndices(_dp.current(), tmp.get<0>());
+-//   emit<primitive::Not>(cur, tmp0);
+-// }
+-
+-// void Assembler::not16Kernel(Cell high, Temps<1> tmp) {
+-//   orDestructive(SingleCell{_dp.current()}, SingleCell{high});
+-//   notKernel(tmp.select<0>());
+-// }
+-
+-// void Assembler::notConstructive(Cell result, Temps<1> tmp) {
+-//   pushPtr();
+-//   copyField(result, tmp);
+-//   moveTo(result);
+-//   notKernel(tmp);
+-//   popPtr();
+-// }
+-
+-// void Assembler::not16Constructive(Cell high, Cell result, Temps<2> tmp) {
+-//   Cell const resultHigh = tmp.get<0>();
+-  
+-//   pushPtr();
+-//   copyField(result, tmp.select<1>());
+-//   moveTo(high);
+-//   copyField(resultHigh, tmp.select<1>());
+-//   moveTo(result);
+-//   not16Kernel(resultHigh, tmp.select<1>());
+-//   popPtr();  
+-// }
+-
+-
+-// // Low-level kernels retained for comparison and constructive algorithms that
+-// // still work with non-contiguous temporary cells. Workspace-facing logical
+-// // operations live in assembler_logical.tpp.
+-// void Assembler::andKernel(Cell other, Temps<1> tmp) {
+-//   auto [cur, oth, tmp0] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+-//   emit<primitive::And>(cur, oth, tmp0);
+-// }
+-
+-// void Assembler::xorKernel(Cell other, Temps<1> tmp) {
+-//   auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+-//   emit<primitive::Xor>(cur, oth, scratch);
+-// }
+diff --git a/src/assembler/assembler_logical.tpp b/src/assembler/assembler_logical.tpp
+index 9b7a3bf..429d328 100644
+--- a/src/assembler/assembler_logical.tpp
++++ b/src/assembler/assembler_logical.tpp
+@@ -38,7 +38,8 @@ Assembler::Data8Result<W> Assembler::notDestructive(W const &op) {
+ template <ws::DoubleCell W>
+ Assembler::Bool16Result<W> Assembler::not16Destructive(W const &op) {
+   auto result = bool16Destructive(op);
+-  return notDestructive(result.template transformed<ws::Replace<1, ws::Scratch>>());
++  notDestructive(result.template transformed<ws::Replace<1, ws::Scratch>>());
++  return result;
+ }
+ 
+ template <ws::SingleCell W>
+@@ -64,7 +65,8 @@ template <ws::DoubleCell W>
+ Assembler::Bool16Result<W> Assembler::or16Destructive(W const &lhs, DoubleCell const &rhs) {
+   auto result = bool16Destructive(lhs);
+   auto rhsBool = bool16Destructive(rhs);
+-  return orDestructive(SingleCell{result}, SingleCell{rhsBool});
++  orDestructive(SingleCell{result[0]}, SingleCell{rhsBool[0]});
++  return result;
+ }
+ 
+ template <ws::SingleAndScratch W>
+@@ -97,8 +99,11 @@ template <ws::DoubleCell W>
+ Assembler::Bool16Result<W> Assembler::and16Destructive(W const &lhs, DoubleCell const &rhs) {
+   auto result = bool16Destructive(lhs);
+   auto rhsBool = bool16Destructive(rhs);
+-  return andDestructive(result.template transformed<ws::Replace<1, ws::Scratch>>(),
+-                        SingleCell{rhsBool});
++  andDestructive(
++    result.template transformed<ws::Replace<1, ws::Scratch>>(),
++    SingleCell{rhsBool[0]}
++  );
++  return result;
+ }
+ 
+ template <ws::SingleAndScratch W>
+@@ -130,8 +135,11 @@ template <ws::DoubleCell W>
+ Assembler::Bool16Result<W> Assembler::xor16Destructive(W const &lhs, DoubleCell const &rhs) {
+   auto result = bool16Destructive(lhs);
+   auto rhsBool = bool16Destructive(rhs);
+-  return xorDestructive(result.template transformed<ws::Replace<1, ws::Scratch>>(),
+-                        SingleCell{rhsBool});
++  xorDestructive(
++    result.template transformed<ws::Replace<1, ws::Scratch>>(),
++    SingleCell{rhsBool[0]}
++  );
++  return result;
+ }
+ 
+ template <ws::SingleAndScratch W>
+@@ -164,8 +172,11 @@ template <ws::DoubleCell W>
+ Assembler::Bool16Result<W> Assembler::nand16Destructive(W const &lhs, DoubleCell const &rhs) {
+   auto result = bool16Destructive(lhs);
+   auto rhsBool = bool16Destructive(rhs);
+-  return nandDestructive(result.template transformed<ws::Replace<1, ws::Scratch>>(),
+-                         SingleCell{rhsBool});
++  nandDestructive(
++    result.template transformed<ws::Replace<1, ws::Scratch>>(),
++    SingleCell{rhsBool[0]}
++  );
++  return result;
+ }
+ 
+ template <ws::SingleCell W>
+@@ -192,7 +203,8 @@ template <ws::DoubleCell W>
+ Assembler::Bool16Result<W> Assembler::nor16Destructive(W const &lhs, DoubleCell const &rhs) {
+   auto result  = bool16Destructive(lhs);
+   auto rhsBool = bool16Destructive(rhs);
+-  return norDestructive(SingleCell{result}, SingleCell{rhsBool});
++  norDestructive(SingleCell{result[0]}, SingleCell{rhsBool[0]});
++  return result;
+ }
+ 
+ template <ws::SingleAndScratch W>
+@@ -205,6 +217,6 @@ Assembler::Data8Result<W> Assembler::xnorDestructive(W const &lhs, SingleCell co
+ template <ws::DoubleCell W>
+ Assembler::Bool16Result<W> Assembler::xnor16Destructive(W const &lhs, DoubleCell const &rhs) {
+   auto result = xor16Destructive(lhs, rhs);
+-  notDestructive(result);
++  notDestructive(result.template transformed<ws::Replace<1, ws::Scratch>>());
+   return result;
+ }
+diff --git a/src/assembler/assembler_mul.cc b/src/assembler/assembler_mul.cc
+index 8eb08bf..8b38b30 100644
+--- a/src/assembler/assembler_mul.cc
++++ b/src/assembler/assembler_mul.cc
+@@ -58,114 +58,31 @@ void Assembler::mulSlotBySlot(Slot lhs, Slot rhs) {
+   popPtr();
+ }
+ 
+-// TODO: factor out mul and mul16 kernels
+ void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {
+-  // assert(types::isUnsignedInteger(lhs.type()));
+-  // assert(types::isUnsignedInteger(rhs.type()));
+-
+   assert(lhs != rhs);
+-  
+-  // TODO: what if lhs and rhs are aliases?
+-  Slot const &consumed = destroyRhs ? rhs : lhs;
+-  Slot const &preserved = destroyRhs ? lhs : rhs;
+-  constexpr auto Low  = static_cast<MacroCell::Field>(MacroCell::Value0);
+-  constexpr auto High = static_cast<MacroCell::Field>(Low + 1);
+-  constexpr auto Temp = static_cast<MacroCell::Field>(Low + 2);
+-  //  constexpr auto Zero = static_cast<MacroCell::Field>(Low + 3);
+-  constexpr auto ResultLow = static_cast<MacroCell::Field>(Low + 4);
+-  constexpr auto ResultHigh = static_cast<MacroCell::Field>(Low + 5);
+-  // Assume: rhs_low | rhs_high | temp | zero | result_low | result_high
+-  
+-  pushPtr();
+-  if (lhs.type()->usesValue1()) {
+-    
+-    moveTo(consumed, Low);
+-    loopOpen(); {
+-      dec();
+-      if (preserved.type()->usesValue1()) {
+-	// TODO: make this idiom a primitive: move/copy to multiple targets
+-	// Add rhs_high into result_high, ignore overflow
+-	moveTo(preserved, High);
+-	loopOpen(); {
+-	  switchField(Temp); inc();
+-	  switchField(ResultHigh); inc();
+-	  switchField(High); dec();
+-	} loopClose();
+-	switchField(Temp);
+-	loopOpen(); {
+-	  switchField(High); inc();
+-	  switchField(Temp); dec();
+-	} loopClose();
+-      }
+-      // Add rhs_low into result_low, overflow into result_high,
+-      // keep a copy in temp.
+-      moveTo(preserved, Low);
+-      emit<primitive::Inline>("[>>+>>>+<+[>-<<]<[>]<<<-]");
+-      // move temp back into rhs_low to reconstruct it
+-      switchField(Temp);
+-      loopOpen(); {
+-	switchField(Low); inc();
+-	switchField(Temp); dec();
+-      } loopClose();
+-      moveTo(consumed, Low);
+-    } loopClose();
+-
+-    if (consumed.type()->usesValue1()) {
+-      moveTo(consumed, High);
+-      loopOpen(); {
+-	dec();
+-      
+-	// Add rhs_low to result_high, keeping a copy in rhs_temp
+-	moveTo(preserved, Low);
+-	loopOpen(); {
+-	  switchField(Temp);        inc();
+-	  switchField(ResultHigh);  inc();
+-	  switchField(Low);         dec();	  
+-	} loopClose();
+-	
+-	// move temp back into rhs_low to reconstruct it
+-	switchField(Temp);
+-	loopOpen(); {
+-	  switchField(Low);  inc();
+-	  switchField(Temp); dec();
+-	} loopClose();
+-
+-	moveTo(consumed, High);
+-      } loopClose();
++
++  auto const withValueWorkspace = [&](Slot slot, auto &&action) {
++    if (slot.type()->usesValue1()) {
++      auto const work = ws::promiseClean16(slot);
++      action(DoubleCell{work}, work);
++    } else {
++      auto const work = ws::promiseClean8(slot);
++      action(SingleCell{work}, work);
+     }
+-    
+-    moveTo(preserved, ResultLow);
+-    moveField(Cell{lhs, Low});
+-    moveTo(preserved, ResultHigh);
+-    moveField(Cell{lhs, High});
+-    
+-  } else {
+-
+-    moveTo(consumed, Low);
+-    loopOpen(); {
+-      dec();
+-      
+-      // Add rhs_low to result_high, keeping a copy in rhs_temp
+-      moveTo(preserved, Low);
+-      loopOpen(); {
+-	switchField(Temp);        inc();
+-	switchField(ResultLow);  inc();
+-	switchField(Low);         dec();	  
+-      } loopClose();
+-	
+-      // move temp back into rhs_low to reconstruct it
+-      switchField(Temp);
+-      loopOpen(); {
+-	switchField(Low);  inc();
+-	switchField(Temp); dec();
+-      } loopClose();
+-
+-      moveTo(consumed, Low);
+-    } loopClose();
+-
+-    moveTo(preserved, ResultLow);
+-    moveField(Cell{lhs, Low});
+-  }
+-  popPtr();
++  };
++
++  // The non-consumed operand supplies the five clean work cells. Keeping this
++  // choice preserves the old implementation's useful property that an
++  // ordinary x *= y does not require a temporary copy of y.
++  withValueWorkspace(lhs, [&](auto const &lhsValue, auto const &lhsWork) {
++    if (destroyRhs) {
++      withValueWorkspace(rhs, [&](auto const &rhsValue, auto const &) {
++        multiplyInto(lhsValue, rhsValue, lhsValue, lhsWork);
++      });
++    } else {
++      withValueWorkspace(rhs, [&](auto const &rhsValue, auto const &rhsWork) {
++        multiplyInto(lhsValue, lhsValue, rhsValue, rhsWork);
++      });
++    }
++  });
+ }
+-
+diff --git a/src/assembler/assembler_mul.tpp b/src/assembler/assembler_mul.tpp
+new file mode 100644
+index 0000000..cb63b2d
+--- /dev/null
++++ b/src/assembler/assembler_mul.tpp
+@@ -0,0 +1,103 @@
++template <ws::IsWorkspace Result, ws::IsWorkspace Consumed,
++          ws::IsWorkspace Preserved, ws::IsWorkspace Work>
++requires (
++  (Result::N == 1 || Result::N == 2) &&
++  (Consumed::N == 1 || Consumed::N == 2) &&
++  (Preserved::N == 1 || Preserved::N == 2) &&
++  Result::template Data<0, Result::N> &&
++  Consumed::template Data<0, Consumed::N> &&
++  Preserved::template Data<0, Preserved::N> &&
++  Work::template Scratch<2, 5>
++)
++void Assembler::multiplyInto(Result const &result, Consumed const &consumed,
++                             Preserved const &preserved, Work const &work) {
++  Cell const consumedLow = consumed[0];
++  Cell const preservedLow = preserved[0];
++
++  if constexpr (Result::N == 1) {
++    Cell const tmp = work[2];
++    Cell const product = work[3];
++
++    loop(consumedLow, [&] {
++      dec(consumedLow);
++
++      // Add preservedLow into product while reconstructing preservedLow.
++      loop(preservedLow, [&] {
++        dec(preservedLow);
++        inc(tmp);
++        inc(product);
++      });
++      loop(tmp, [&] {
++        dec(tmp);
++        inc(preservedLow);
++      });
++    });
++
++    moveField(product, result[0]);
++    return;
++  }
++
++  // 16-bit product modulo 2^16. Five clean work cells are enough:
++  // productLow | productHigh | incScratch | preserveTmp | incScratch
++  // preserveTmp is intentionally the Untouched cell of inc16's workspace, so
++  // it may hold a copy counter while inc16 propagates carry around it.
++  Cell const productLow = work[2];
++  Cell const productHigh = work[3];
++  Cell const preserveTmp = work[5];
++
++  auto const product = ws::promise(
++    productLow,
++    ws::Layout<
++      ws::DataCells<2>,
++      ws::Scratch,
++      ws::Untouched,
++      ws::Scratch
++    >{}
++  );
++
++  auto const restorePreserved = [&](Cell value) {
++    loop(preserveTmp, [&] {
++      dec(preserveTmp);
++      inc(value);
++    });
++  };
++
++  auto const addByteToHigh = [&](Cell value) {
++    loop(value, [&] {
++      dec(value);
++      inc(preserveTmp);
++      inc(productHigh);
++    });
++    restorePreserved(value);
++  };
++
++  auto const addLowToProduct = [&] {
++    loop(preservedLow, [&] {
++      dec(preservedLow);
++      inc(preserveTmp);
++      inc16(product);
++    });
++    restorePreserved(preservedLow);
++  };
++
++  // Low-byte contribution: consumedLow * preserved (full width where present).
++  loop(consumedLow, [&] {
++    dec(consumedLow);
++    if constexpr (Preserved::N == 2) {
++      addByteToHigh(preserved[1]);
++    }
++    addLowToProduct();
++  });
++
++  // High-byte contribution modulo 2^16: consumedHigh * preservedLow << 8.
++  if constexpr (Consumed::N == 2) {
++    Cell const consumedHigh = consumed[1];
++    loop(consumedHigh, [&] {
++      dec(consumedHigh);
++      addByteToHigh(preservedLow);
++    });
++  }
++
++  moveField(productLow, result[0]);
++  moveField(productHigh, result[1]);
++}
+diff --git a/src/assembler/assembler_pointers_memory.cc b/src/assembler/assembler_pointers_memory.cc
+index c83655d..a6f52c7 100644
+--- a/src/assembler/assembler_pointers_memory.cc
++++ b/src/assembler/assembler_pointers_memory.cc
+@@ -273,10 +273,14 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src, TransferMode mode) {
+   setToValue(ws::promise(Cell{dest, MacroCell::Scratch0}, ws::Layout<ws::ScratchCells<2>>{}),
+              128);
+ //  setToValue(128, Temps<1>::select(dest, MacroCell::Scratch1));
+-  moveTo(dest, MacroCell::Value1);
+-  lessKernel(Cell{dest, MacroCell::Scratch0},
+-             Temps<1>::select(dest, MacroCell::Scratch1));
+-  dec();
++  lessDestructive(
++    ws::promise(
++      Cell{dest, MacroCell::Value1},
++      ws::Layout<ws::Data<>, ws::Untouched, ws::Scratch>{}
++    ),
++    SingleCell{Cell{dest, MacroCell::Scratch0}}
++  );
++  dec(Cell{dest, MacroCell::Value1});
+ 
+   popPtr();
+ }
+diff --git a/src/assembler/assembler_print.cc b/src/assembler/assembler_print.cc
+index e06ef67..9174627 100644
+--- a/src/assembler/assembler_print.cc
++++ b/src/assembler/assembler_print.cc
+@@ -146,10 +146,25 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
+ 
+   // Now just print every character until the start of the string has been reached (seekMarker).
+   // Don't print the 1's digit in the loop.
+-  switchField(MacroCell::SeekMarker);
+-  notConstructive(Cell{_dp.current().offset, MacroCell::Flag},
+-		  Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
+-  switchField(MacroCell::Flag);
++  auto const writeNotSeekMarkerToFlag = [&] {
++    Cell const marker{_dp.current().offset, MacroCell::SeekMarker};
++    Cell const flag{_dp.current().offset, MacroCell::Flag};
++    Cell const scratch{_dp.current().offset, MacroCell::Scratch0};
++
++    copyField(marker, flag, scratch);
++    inc(scratch);
++    loop(flag, [&] {
++      dec(scratch);
++      zeroCell(flag);
++    });
++    loop(scratch, [&] {
++      dec(scratch);
++      inc(flag);
++    });
++    moveTo(flag);
++  };
++
++  writeNotSeekMarkerToFlag();
+   loopOpen(); {
+     zeroCell();
+ 
+@@ -158,10 +173,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
+     emit<primitive::Out>();
+ 	    
+     emit<primitive::MovePointerRelative>(-1 * MacroCell::FieldCount);
+-    switchField(MacroCell::SeekMarker);
+-    notConstructive(Cell{_dp.current().offset, MacroCell::Flag},
+-		    Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
+-    switchField(MacroCell::Flag);
++    writeNotSeekMarkerToFlag();
+   } loopClose();
+ 
+   // At seekmarker -> print 1's digit and clear seekMarker
+diff --git a/src/assembler/assembler_sub.tpp b/src/assembler/assembler_sub.tpp
+index 734e27d..28a0701 100644
+--- a/src/assembler/assembler_sub.tpp
++++ b/src/assembler/assembler_sub.tpp
+@@ -24,12 +24,13 @@ Assembler::Data16Result<W> Assembler::sub16Const(W const &lhs, int delta) {
+ 
+ template <ws::SingleCell W>
+ Assembler::Data8Result<W> Assembler::subDestructive(W const &lhs, SingleCell const &delta) {
+-  auto [cur, oth] = getFieldIndices(lhs[0], delta[0]);
++  Cell const x = lhs[0];
++  Cell const y = delta[0];
+ 
+-  pushPtr();
+-  moveTo(lhs[0]);
+-  emit<primitive::Subtract>(cur, oth);
+-  popPtr();
++  loop(y, [&] {
++    dec(y);
++    dec(x);
++  });
+ 
+   return lhs;
+ }
+diff --git a/src/ir/primitive.cc b/src/ir/primitive.cc
+index f3552fe..b322df3 100644
+--- a/src/ir/primitive.cc
++++ b/src/ir/primitive.cc
+@@ -199,393 +199,7 @@ std::string setToValue(int val, int current, int tmp) {
+ }
+ 
+ 
+-// Store !!current back intor current
+-std::string boolean(int current, int tmp) {
+-  assert(util::allDifferent(current, tmp));
+-
+-  std::ostringstream oss;
+-  oss << movePtr(tmp, current)
+-      << zero()
+-      << movePtr(current, tmp)
+-      << "["
+-      <<   movePtr(tmp, current)
+-      <<   "+"
+-      <<   movePtr(current, tmp)
+-      <<   zero()
+-      << "]"
+-      << movePtr(tmp, current)
+-      << moveValueAssumeZero(tmp, current)
+-      << movePtr(current, tmp);
+-  return oss.str();
+-}
+-
+-// Store !current back into current  
+-std::string notValue(int current, int tmp) {
+-  assert(util::allDifferent(current, tmp));
+-
+-  std::ostringstream oss;
+-  oss << movePtr(tmp, current)
+-      << setToValue(1)
+-      << movePtr(current, tmp)
+-      << "["
+-      <<   movePtr(tmp, current)
+-      <<   "-"
+-      <<   movePtr(current, tmp)
+-      <<   zero()
+-      << "]"
+-      << movePtr(tmp, current)
+-      << moveValueAssumeZero(tmp, current)
+-      << movePtr(current, tmp);
+-  return oss.str();
+-}
+-
+-// Destructive OR (result in current, destroys other) -> boolean output
+-// TODO: check if we assume boolean output when using this
+-std::string orValues(int current, int other) {
+-  assert(util::allDifferent(current, other));
+-    
+-  std::ostringstream oss;
+-  oss << "["
+-      <<   zero()
+-      <<   movePtr(other, current)
+-      <<   setToValue(1)
+-      <<   movePtr(current, other)
+-      << "]"
+-      << movePtr(other, current)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(current, other)
+-      <<   "+"
+-      <<   movePtr(other, current)
+-      << "]"
+-      <<  movePtr(current, other);
+-
+-  return oss.str();
+-}
+-
+-// Destructive AND (result in current, destroys other)
+-std::string andValues(int current, int other, int tmp) {
+-  assert(util::allDifferent(current, other, tmp));
+-    
+-  std::ostringstream oss;
+-  oss << movePtr(tmp, current)
+-      << setToValue(2)
+-      << movePtr(current, tmp)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(tmp, current)
+-      <<   "-"
+-      <<   movePtr(current,tmp)
+-      << "]+"
+-      << movePtr(other, current)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(tmp, other)
+-      <<   "-"
+-      <<   movePtr(other, tmp)
+-      << "]"
+-      << movePtr(tmp, other)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(current, tmp)
+-      <<   "-"
+-      <<   movePtr(tmp, current)
+-      << "]"
+-      <<  movePtr(current, tmp);
+-
+-  return oss.str();
+-}
+-
+-// Destructive XOR (result in current, destroys other)
+-std::string xorValues(int current, int other, int tmp) {
+-  assert(util::allDifferent(current, other, tmp));
+-
+-  std::ostringstream oss;
+-  oss << movePtr(tmp, current)
+-      << zero()
+-      << movePtr(current, tmp)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(tmp, current)
+-      <<   "-"
+-      <<   movePtr(current,tmp)
+-      << "]"
+-      << movePtr(other, current)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(tmp, other)
+-      <<   "+"
+-      <<   movePtr(other, tmp)
+-      << "]"
+-      << movePtr(tmp, other)
+-      << "["
+-      <<   "+"
+-      <<   zero()
+-      <<   movePtr(current, tmp)
+-      <<   "+"
+-      <<   movePtr(tmp, current)
+-      << "]"
+-      <<  movePtr(current, tmp);
+-
+-  return oss.str();
+-}
+-
+-// Destructive NAND (result in current, destroys other)
+-std::string nandValues(int current, int other, int tmp) {
+-  assert(util::allDifferent(current, other, tmp));
+-      
+-  std::ostringstream oss;
+-  oss << movePtr(tmp, current)
+-      << setToValue(2)
+-      << movePtr(current, tmp)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(tmp, current)
+-      <<   "-"
+-      <<   movePtr(current,tmp)
+-      << "]"
+-      << movePtr(other, current)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(tmp, other)
+-      <<   "-"
+-      <<   movePtr(other, tmp)
+-      << "]"
+-      << movePtr(tmp, other)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(current, tmp)
+-      <<   "+"
+-      <<   movePtr(tmp, current)
+-      << "]"
+-      <<  movePtr(current, tmp);
+-
+-  return oss.str();
+-}
+-
+-// Destructive NOR (result in current, destroys other)
+-std::string norValues(int current, int other) {
+-  assert(util::allDifferent(current, other));
+-    
+-  std::ostringstream oss;
+-  oss << "["
+-      <<   zero()
+-      <<   movePtr(other, current)
+-      <<   setToValue(1)
+-      <<   movePtr(current, other)
+-      << "]+"
+-      << movePtr(other, current)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(current, other)
+-      <<   "-"
+-      <<   movePtr(other, current)
+-      << "]"
+-      <<  movePtr(current, other);
+-
+-  return oss.str();
+-}
+-
+-
+-// Add other to current, destroys other
+-std::string add(int current, int other) {
+-  assert(util::allDifferent(current, other));
+-
+-  std::ostringstream oss;
+-  oss << movePtr(other, current)
+-      << "["
+-      <<   decrement()
+-      <<   movePtr(current, other)
+-      <<   increment()
+-      <<   movePtr(other, current)
+-      << "]"
+-      << movePtr(current, other);
+-      
+-  return oss.str();
+-}
+-
+-// Subtract other from current, destroys other
+-std::string subtract(int current, int other) {
+-  assert(util::allDifferent(current, other));
+-
+-  std::ostringstream oss;
+-  oss << movePtr(other, current)
+-      << "["
+-      <<   decrement()
+-      <<   movePtr(current, other)
+-      <<   decrement()
+-      <<   movePtr(other, current)
+-      << "]"
+-      << movePtr(current, other);
+-      
+-  return oss.str();
+-}
+-
+-// Compute current < other and stores the result in current. Other is destroyed
+-// Result: 0 if false, any nonzero if true
+-std::string less(int current, int other, int tmp) {
+-  assert(util::allDifferent(current, other, tmp));
+-
+-  std::ostringstream oss;
+-  oss << movePtr(tmp, current)
+-      << zero()
+-      << movePtr(current, tmp)
+-      << "["
+-      <<   "-"
+-      <<   movePtr(other, current)
+-      <<   "["
+-      <<     "-"
+-      <<     moveValueAssumeZero(other, tmp)
+-      <<   "]"
+-      <<   movePtr(tmp, other)
+-      <<   moveValueAssumeZero(tmp, other)
+-      <<   movePtr(current, tmp)
+-      << "]"
+-      << movePtr(other, current)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(current, other)
+-      <<   "+"
+-      <<   movePtr(other, current)
+-      << "]"
+-      << movePtr(current, other);
+-      
+-  return oss.str();
+-}
+-  
+-// Compute current <= other and stores the result in current. Other is destroyed
+-// Result: 0 if false, any nonzero if true
+-std::string lessOrEqual(int current, int other, int tmp) {
+-  assert(util::allDifferent(current, other, tmp));
+-
+-  std::ostringstream oss;
+-  oss << movePtr(tmp, current)
+-      << zero()
+-      << movePtr(other, tmp)
+-      << "["
+-      <<   "-"
+-      <<   movePtr(tmp, other)
+-      <<   moveValueAssumeZero(tmp, current)
+-      <<   movePtr(current, tmp)
+-      <<   "["
+-      <<     "-"
+-      <<     moveValueAssumeZero(current, tmp)
+-      <<   "]"
+-      <<   movePtr(other, current)
+-      << "]"
+-      << movePtr(tmp, other)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(current, tmp)
+-      <<   "-"
+-      <<   movePtr(tmp, current)
+-      << "]"
+-      << movePtr(current, tmp)
+-      << "+";
+-      
+-  return oss.str();
+-}
+-
+-// Compute current > other and stores the result in current. Other is destroyed
+-// Result: 0 if false, any nonzero if true  
+-std::string greater(int current, int other, int tmp) {
+-  assert(util::allDifferent(current, other, tmp));
+-
+-  std::ostringstream oss;
+-  oss << movePtr(tmp, current)
+-      << zero()
+-      << movePtr(other, tmp)
+-      << "["
+-      <<   "-"
+-      <<   movePtr(tmp, other)
+-      <<   moveValueAssumeZero(tmp, current)
+-      <<   movePtr(current, tmp)
+-      <<   "["
+-      <<     "-"
+-      <<     moveValueAssumeZero(current, tmp)
+-      <<   "]"
+-      <<   movePtr(other, current)
+-      << "]"
+-      << movePtr(tmp, other)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(current, tmp)
+-      <<   "+"
+-      <<   movePtr(tmp, current)
+-      << "]"
+-      << movePtr(current, tmp);
+-      
+-  return oss.str();
+-}
+-
+-// Compute current >= other and stores the result in current. Other is destroyed
+-// Result: 0 if false, any nonzero if true  
+-std::string greaterOrEqual(int current, int other, int tmp) {
+-  assert(util::allDifferent(current, other, tmp));
+-
+-  std::ostringstream oss;
+-  oss << movePtr(tmp, current)
+-      << zero()
+-      << movePtr(current, tmp)
+-      << "["
+-      <<   "-"
+-      <<   movePtr(other, current)
+-      <<   "["
+-      <<     "-"
+-      <<     moveValueAssumeZero(other, tmp)
+-      <<   "]"
+-      <<   movePtr(tmp, other)
+-      <<   moveValueAssumeZero(tmp, other)
+-      <<   movePtr(current, tmp)
+-      << "]"
+-      << "+"
+-      << movePtr(other, current)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(current, other)
+-      <<   "-"
+-      <<   movePtr(other, current)
+-      << "]"
+-      << movePtr(current, other);
+-      
+-  return oss.str();
+-}
+-
+-
+-// Equal
+-std::string equal(int current, int other) {
+-  assert(util::allDifferent(current, other));
+-    
+-  std::ostringstream oss;
+-  oss << "["
+-      <<   "-"
+-      <<   movePtr(other, current)
+-      <<   "-"
+-      <<   movePtr(current, other)
+-      << "]"
+-      << "+"
+-      << movePtr(other, current)
+-      << "["
+-      <<   zero()
+-      <<   movePtr(current,other)
+-      <<   "-"
+-      <<   movePtr(other, current)
+-      << "]"
+-      << movePtr(current, other);
+-    
+-  return oss.str();
+-}
+-
+-// Compare to constant value (destructive)
+-std::string cmpConst(int value, int current, int tmp) {
+-  assert(util::allDifferent(current, tmp));
+-    
+-  std::ostringstream oss;
+-  oss << decrement(value)
+-      << notValue(current, tmp);
+-  return oss.str();
+-}
+-}
++} // namespace acus::Algorithm
+ 
+ 
+ // Codegen
+@@ -647,36 +261,6 @@ GEN(CopyData) {
+   return Algorithm::copyValue(cur, tmp, dst);
+ }
+ 
+-GEN(Cmp) {
+-  auto [val, cur, tmp] = defer::resolve(ctx, value, current, scratch);
+-  return Algorithm::cmpConst(val, cur, tmp);
+-}
+-
+-GEN(Boolean) {
+-  auto [cur, tmp] = defer::resolve(ctx, current, scratch);
+-  return Algorithm::boolean(cur, tmp);
+-}
+-
+-GEN(Not) {
+-  auto [cur, tmp] = defer::resolve(ctx, current, scratch);
+-  return Algorithm::notValue(cur, tmp);
+-}
+-
+-GEN(Or) {
+-  auto [cur, oth] = defer::resolve(ctx, current, other);
+-  return Algorithm::orValues(cur, oth);
+-}
+-
+-GEN(And) {
+-  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+-  return Algorithm::andValues(cur, oth, tmp);
+-}
+-
+-GEN(Xor) {
+-  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+-  return Algorithm::xorValues(cur, oth, tmp);
+-}
+-
+ GEN(In) {
+   return ",";
+ }
+@@ -685,41 +269,6 @@ GEN(Out) {
+   return ".";
+ }
+ 
+-GEN(Add) {
+-  auto [cur, oth] = defer::resolve(ctx, current, other);
+-  return Algorithm::add(cur, oth);
+-}
+-
+-GEN(Subtract) {
+-  auto [cur, oth] = defer::resolve(ctx, current, other);
+-  return Algorithm::subtract(cur, oth);
+-}
+-
+-GEN(Less) {
+-  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+-  return Algorithm::less(cur, oth, tmp);
+-}
+-
+-GEN(LessOrEqual) {
+-  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+-  return Algorithm::lessOrEqual(cur, oth, tmp);
+-}
+-
+-GEN(Greater) {
+-  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+-  return Algorithm::greater(cur, oth, tmp);
+-}
+-
+-GEN(GreaterOrEqual) {
+-  auto [cur, oth, tmp] = defer::resolve(ctx, current, other, scratch);
+-  return Algorithm::greaterOrEqual(cur, oth, tmp);
+-}
+-
+-GEN(Equal) {
+-  auto [cur, oth] = defer::resolve(ctx, current, other);
+-  return Algorithm::equal(cur, oth);
+-}
+-
+ // Merge Rules
+ #define MERGE(Name) std::shared_ptr<primitive::Node> primitive::Name::merge(Node const *other) const
+ #define RULE(Other, Result, ...)                                        \
+@@ -727,14 +276,6 @@ GEN(Equal) {
+     return std::make_shared<Result>(__VA_ARGS__);                       \
+   }
+ 
+-MERGE(Equal) {
+-  RULE(ZeroCell, ZeroCell);
+-  RULE(ZeroCellPlus, ZeroCellPlus);
+-  RULE(ConstructConstant, ConstructConstant, *rhs);
+-  RULE(Boolean, Equal, *this);
+-  return nullptr;
+-}
+-
+ MERGE(MovePointerRelative) {
+   RULE(MovePointerRelative, MovePointerRelative, amount + rhs->amount);
+   return nullptr;
+@@ -763,9 +304,6 @@ MERGE(ConstructConstant) {
+   RULE(ConstructConstant, ConstructConstant, *rhs);
+   RULE(ZeroCell, ZeroCell);
+   RULE(ZeroCellPlus, ZeroCellPlus);
+-  RULE(Boolean, ConstructConstant, !!value, current, scratch);
+-  RULE(Not, ConstructConstant, !value, current, scratch);
+-  RULE(Cmp, ConstructConstant, (value == rhs->value), current, scratch);
+   return nullptr;
+ }
+ 
+@@ -789,86 +327,6 @@ MERGE(CopyData) {
+   return nullptr;
+ }
+ 
+-MERGE(Cmp) {
+-  RULE(ZeroCell, ZeroCell);
+-  RULE(ZeroCellPlus, ZeroCellPlus);
+-  RULE(Boolean, Cmp, *this);
+-  return nullptr;
+-}
+-
+-MERGE(Boolean) {
+-  RULE(Boolean, Boolean, *this);
+-  RULE(Not, Not, current, scratch);
+-  return nullptr;
+-}
+-
+-MERGE(Not) {
+-  RULE(Boolean, Not, *this);
+-  RULE(Not, Boolean, current, scratch);
+-  return nullptr;
+-}
+-
+-MERGE(Or) {
+-  RULE(Boolean, Or, *this);
+-  return nullptr;
+-}
+-
+-MERGE(And) {
+-  RULE(Boolean, And, *this);
+-  return nullptr;
+-}
+-
+-MERGE(Xor) {
+-  RULE(Boolean, Xor, *this);
+-  return nullptr;
+-}
+-
+-MERGE(Add) {
+-  RULE(ZeroCell, ZeroCell);
+-  RULE(ZeroCellPlus, ZeroCellPlus);
+-  RULE(ConstructConstant, ConstructConstant, *rhs);
+-  return nullptr;
+-}
+-
+-MERGE(Subtract) {
+-  RULE(ZeroCell, ZeroCell);
+-  RULE(ZeroCellPlus, ZeroCellPlus);
+-  RULE(ConstructConstant, ConstructConstant, *rhs);
+-  return nullptr;
+-}
+-
+-MERGE(Less) {
+-  RULE(ZeroCell, ZeroCell);
+-  RULE(ZeroCellPlus, ZeroCellPlus);
+-  RULE(ConstructConstant, ConstructConstant, *rhs);
+-  RULE(Boolean, Less, *this);
+-  return nullptr;
+-}
+-
+-MERGE(LessOrEqual) {
+-  RULE(ZeroCell, ZeroCell);
+-  RULE(ZeroCellPlus, ZeroCellPlus);
+-  RULE(ConstructConstant, ConstructConstant, *rhs);
+-  RULE(Boolean, LessOrEqual, *this);
+-  return nullptr;
+-}
+-
+-MERGE(Greater) {
+-  RULE(ZeroCell, ZeroCell);
+-  RULE(ZeroCellPlus, ZeroCellPlus);
+-  RULE(ConstructConstant, ConstructConstant, *rhs);
+-  RULE(Boolean, Greater, *this);
+-  return nullptr;
+-}
+-
+-MERGE(GreaterOrEqual) {
+-  RULE(ZeroCell, ZeroCell);
+-  RULE(ZeroCellPlus, ZeroCellPlus);
+-  RULE(ConstructConstant, ConstructConstant, *rhs);
+-  RULE(Boolean, GreaterOrEqual, *this);
+-  return nullptr;
+-}
+-
+ 
+ // Textual representation (TODO)
+ #define TXT(Name) std::string primitive::Name::text(Context const &ctx) const
+@@ -923,34 +381,6 @@ TXT(CopyData) {
+   return "COPY: " + std::to_string(dst - cur);
+ }
+ 
+-TXT(Cmp) {
+-  int const val = value.resolve(ctx);
+-  return "CMP: " + std::to_string(val);
+-} 
+-
+-TXT(Boolean) {
+-  return "BOOL";
+-}
+-
+-TXT(Not) {
+-  return "NOT";
+-} 
+-
+-TXT(Or) {
+-  auto [cur, oth] = defer::resolve(ctx, current, other);
+-  return "OR: " + std::to_string(oth - cur);
+-} 
+-
+-TXT(And) {
+-  auto [cur, oth] = defer::resolve(ctx, current, other);
+-  return "AND: " + std::to_string(oth - cur);
+-}
+-
+-TXT(Xor) {
+-  auto [cur, oth] = defer::resolve(ctx, current, other);
+-  return "XOR: " + std::to_string(oth - cur);
+-}
+-
+ TXT(In) {
+   return "IN";
+ }
+@@ -958,31 +388,3 @@ TXT(In) {
+ TXT(Out) {
+   return "OUT";
+ }
+-
+-TXT(Add) {
+-  return "ADD";
+-} 
+-
+-TXT(Subtract) {
+-  return "SUB";
+-} 
+-
+-TXT(Less) {
+-  return "LT";
+-} 
+-
+-TXT(LessOrEqual) {
+-  return "LE";
+-} 
+-
+-TXT(Greater) {
+-  return "GT";
+-} 
+-
+-TXT(GreaterOrEqual) {
+-  return "GE";
+-}
+-
+-TXT(Equal) {
+-  return "EQ";
+-} 

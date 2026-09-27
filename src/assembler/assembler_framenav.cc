@@ -110,26 +110,41 @@ void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Pay
     // For other markers that can have values > 1, we need the more general algorithm
     // That does a NOT operation on the marker-fields
 
+    auto const writeNotMarkerToFlag = [&] {
+      Cell const marker{_dp.current().offset, markerField};
+      Cell const flag{_dp.current().offset, MacroCell::Flag};
+      Cell const scratch{_dp.current().offset, MacroCell::Scratch0};
+
+      copyField(marker, flag, scratch);
+
+      // NOT(flag), using the clean scratch cell from the copy operation.
+      inc(scratch);
+      loop(flag, [&] {
+        dec(scratch);
+        zeroCell(flag);
+      });
+      loop(scratch, [&] {
+        dec(scratch);
+        inc(flag);
+      });
+
+      moveTo(flag);
+    };
+
     if (not checkCurrent) {
       switchField(MacroCell::Flag);
       zeroCell(); inc();
     }
     else {
-      switchField(markerField);
-      notConstructive(Cell{_dp.current().offset, MacroCell::Flag},
-		      Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
-      switchField(MacroCell::Flag);
+      writeNotMarkerToFlag();
     }
 
     loopOpen(); {
       zeroCell();
       step();
 
-      // Store NOT(marker) in Flag. A nonzero marker clears Flag and exits the loop.      
-      switchField(markerField);
-      notConstructive(Cell{_dp.current().offset, MacroCell::Flag},
-		      Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
-      switchField(MacroCell::Flag);
+      // Store NOT(marker) in Flag. A nonzero marker clears Flag and exits the loop.
+      writeNotMarkerToFlag();
     } loopClose();
   }
 

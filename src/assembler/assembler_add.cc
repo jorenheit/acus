@@ -34,48 +34,10 @@ Assembler::SingleCell Assembler::addConst(int delta) {
   return addConst(_dp.current(), delta);
 }
 
-Assembler::SingleCell Assembler::addConst(SingleCell const &target, int delta) {
-  pushPtr();
-  moveTo(target);
-  emit<primitive::ChangeBy>(delta);
-  popPtr();
-  return target;
+Assembler::SingleCell Assembler::addConst(Cell lhs, int delta) {
+  return addConst(SingleCell{lhs}, delta);
 }
 
-Assembler::Add16Operand Assembler::add16Const(Add16Operand const &lhs, int delta) {
-  if (delta == 0) return lhs;
-  if (delta < 0) {
-    return sub16Const(lhs, -delta);
-  }
 
-  Slot const tmpSlot = getTemp(ts::raw(1));
-  auto const tmp = ws::promiseClean16(tmpSlot);
-  setToValue16(tmp, delta);
-  add16Destructive(lhs, tmp);
-  freeTempSlot(tmpSlot);
-  return lhs;
-}
 
-Assembler::SingleCell Assembler::addDestructive(SingleCell const &op, SingleCell const &delta) {
-  auto [cur, oth] = getFieldIndices(op, delta);
-
-  pushPtr();
-  moveTo(op);
-  emit<primitive::Add>(cur, oth);
-  popPtr();
-  
-  return op;
-}
-
-Assembler::Add16Operand Assembler::add16Destructive(Add16Operand const &op, DoubleCell const &delta) {
-  // Add low byte
-  loop(delta[0], [&]{
-    dec();
-    inc16(op);
-  });
-
-  // Add high byte
-  addDestructive(op[1], delta[1]);
-  return op;
-}
 

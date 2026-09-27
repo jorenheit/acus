@@ -36,7 +36,7 @@ Slot Assembler::addressOfSlot(Slot pointeeSlot, API_CTX) {
   // Construct offset in second cell
   int const offset = pointeeSlot.offset();  
   moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value0);
-  setToValue16(offset);
+  setToValue16(ws::promise(_dp.current(), ws::Layout<ws::DataCells<2>>{}), offset);
   
   // setToValue_(offset & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
   // moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value1);
@@ -270,11 +270,17 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src, TransferMode mode) {
 
   // TODO: replace by getSignBit
   moveTo(dest, MacroCell::Scratch0);
-  setToValue(128, Temps<1>::select(dest, MacroCell::Scratch1));
-  moveTo(dest, MacroCell::Value1);
-  lessDestructive(Cell{dest, MacroCell::Scratch0},
-		  Temps<1>::select(dest, MacroCell::Scratch1));
-  dec();
+  setToValue(ws::promise(Cell{dest, MacroCell::Scratch0}, ws::Layout<ws::ScratchCells<2>>{}),
+             128);
+//  setToValue(128, Temps<1>::select(dest, MacroCell::Scratch1));
+  lessDestructive(
+    ws::promise(
+      Cell{dest, MacroCell::Value1},
+      ws::Layout<ws::Data<>, ws::Untouched, ws::Scratch>{}
+    ),
+    SingleCell{Cell{dest, MacroCell::Scratch0}}
+  );
+  dec(Cell{dest, MacroCell::Value1});
 
   popPtr();
 }

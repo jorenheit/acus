@@ -58,114 +58,31 @@ void Assembler::mulSlotBySlot(Slot lhs, Slot rhs) {
   popPtr();
 }
 
-// TODO: factor out mul and mul16 kernels
 void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {
-  // assert(types::isUnsignedInteger(lhs.type()));
-  // assert(types::isUnsignedInteger(rhs.type()));
-
   assert(lhs != rhs);
-  
-  // TODO: what if lhs and rhs are aliases?
-  Slot const &consumed = destroyRhs ? rhs : lhs;
-  Slot const &preserved = destroyRhs ? lhs : rhs;
-  constexpr auto Low  = static_cast<MacroCell::Field>(MacroCell::Value0);
-  constexpr auto High = static_cast<MacroCell::Field>(Low + 1);
-  constexpr auto Temp = static_cast<MacroCell::Field>(Low + 2);
-  //  constexpr auto Zero = static_cast<MacroCell::Field>(Low + 3);
-  constexpr auto ResultLow = static_cast<MacroCell::Field>(Low + 4);
-  constexpr auto ResultHigh = static_cast<MacroCell::Field>(Low + 5);
-  // Assume: rhs_low | rhs_high | temp | zero | result_low | result_high
-  
-  pushPtr();
-  if (lhs.type()->usesValue1()) {
-    
-    moveTo(consumed, Low);
-    loopOpen(); {
-      dec();
-      if (preserved.type()->usesValue1()) {
-	// TODO: make this idiom a primitive: move/copy to multiple targets
-	// Add rhs_high into result_high, ignore overflow
-	moveTo(preserved, High);
-	loopOpen(); {
-	  switchField(Temp); inc();
-	  switchField(ResultHigh); inc();
-	  switchField(High); dec();
-	} loopClose();
-	switchField(Temp);
-	loopOpen(); {
-	  switchField(High); inc();
-	  switchField(Temp); dec();
-	} loopClose();
-      }
-      // Add rhs_low into result_low, overflow into result_high,
-      // keep a copy in temp.
-      moveTo(preserved, Low);
-      emit<primitive::Inline>("[>>+>>>+<+[>-<<]<[>]<<<-]");
-      // move temp back into rhs_low to reconstruct it
-      switchField(Temp);
-      loopOpen(); {
-	switchField(Low); inc();
-	switchField(Temp); dec();
-      } loopClose();
-      moveTo(consumed, Low);
-    } loopClose();
 
-    if (consumed.type()->usesValue1()) {
-      moveTo(consumed, High);
-      loopOpen(); {
-	dec();
-      
-	// Add rhs_low to result_high, keeping a copy in rhs_temp
-	moveTo(preserved, Low);
-	loopOpen(); {
-	  switchField(Temp);        inc();
-	  switchField(ResultHigh);  inc();
-	  switchField(Low);         dec();	  
-	} loopClose();
-	
-	// move temp back into rhs_low to reconstruct it
-	switchField(Temp);
-	loopOpen(); {
-	  switchField(Low);  inc();
-	  switchField(Temp); dec();
-	} loopClose();
-
-	moveTo(consumed, High);
-      } loopClose();
+  auto const withValueWorkspace = [&](Slot slot, auto &&action) {
+    if (slot.type()->usesValue1()) {
+      auto const work = ws::promiseClean16(slot);
+      action(DoubleCell{work}, work);
+    } else {
+      auto const work = ws::promiseClean8(slot);
+      action(SingleCell{work}, work);
     }
-    
-    moveTo(preserved, ResultLow);
-    moveField(Cell{lhs, Low});
-    moveTo(preserved, ResultHigh);
-    moveField(Cell{lhs, High});
-    
-  } else {
+  };
 
-    moveTo(consumed, Low);
-    loopOpen(); {
-      dec();
-      
-      // Add rhs_low to result_high, keeping a copy in rhs_temp
-      moveTo(preserved, Low);
-      loopOpen(); {
-	switchField(Temp);        inc();
-	switchField(ResultLow);  inc();
-	switchField(Low);         dec();	  
-      } loopClose();
-	
-      // move temp back into rhs_low to reconstruct it
-      switchField(Temp);
-      loopOpen(); {
-	switchField(Low);  inc();
-	switchField(Temp); dec();
-      } loopClose();
-
-      moveTo(consumed, Low);
-    } loopClose();
-
-    moveTo(preserved, ResultLow);
-    moveField(Cell{lhs, Low});
-  }
-  popPtr();
+  // The non-consumed operand supplies the five clean work cells. Keeping this
+  // choice preserves the old implementation's useful property that an
+  // ordinary x *= y does not require a temporary copy of y.
+  withValueWorkspace(lhs, [&](auto const &lhsValue, auto const &lhsWork) {
+    if (destroyRhs) {
+      withValueWorkspace(rhs, [&](auto const &rhsValue, auto const &) {
+        multiplyInto(lhsValue, rhsValue, lhsValue, lhsWork);
+      });
+    } else {
+      withValueWorkspace(rhs, [&](auto const &rhsValue, auto const &rhsWork) {
+        multiplyInto(lhsValue, lhsValue, rhsValue, rhsWork);
+      });
+    }
+  });
 }
-

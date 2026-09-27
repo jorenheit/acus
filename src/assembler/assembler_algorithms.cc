@@ -5,10 +5,14 @@
 
 #include "assembler.ih"
 
+void Assembler::literalBf(std::string const &bf) {
+  emit<primitive::Inline>(bf);
+}
+
 void Assembler::literalBf(Cell start, std::string const &bf) {
   pushPtr();
   moveTo(start);
-  emit<primitive::Inline>(bf);
+  literalBf(bf);
   popPtr();
 }
 
@@ -68,110 +72,37 @@ void Assembler::zeroCellPlus() {
 void Assembler::setSlotToValue(Slot slot, int value) {
   assert(types::isInteger(slot.type()));
 
-  pushPtr();
-  moveTo(slot, MacroCell::Value0);
   if (slot.type()->usesValue1()) {
-    setToValue16(value);
+    setToValue16(ws::promiseClean16(slot), value);
   } else {
-    setToValue(value);
-    switchField(MacroCell::Value1);
-    zeroCell();
+    setToValue(ws::promiseClean8(slot), value);
+    zeroCell(Cell{slot, MacroCell::Value1});
   }
-  popPtr();
 }
 
-
-void Assembler::setToValue(int value) {
-  // Normalized version: must be at a Value-cell and use Scratch0 as temp.
-  assert(_dp.current().field == MacroCell::Value0 || _dp.current().field == MacroCell::Value1);
-  emit<primitive::ConstructConstant>(value & 0xff, MacroCell::Value0, MacroCell::Scratch0);
+Assembler::SingleCell Assembler::setToValue(int value) {
+  return setToValue(_dp.current(), value);
 }
 
-void Assembler::setToValue(int value, Temps<1> tmp) {
-  auto [cur, scratch] = getFieldIndices(_dp.current(), tmp.get<0>());
-  emit<primitive::ConstructConstant>(value, cur, scratch);
+Assembler::SingleCell Assembler::setToValue(Cell target, int value) {
+  return setToValue(SingleCell{target}, value);
 }
 
-
-
-void Assembler::setToValue16(int value) {
-  // Normalized version: must be at Value0 and use Scratch0 as temp.
-  assert(_dp.current().field == MacroCell::Value0);
-  pushPtr();
-  setToValue(value);
-  switchField(MacroCell::Value1);
-  setToValue(value >> 8);
-  popPtr();
+Assembler::SingleCell Assembler::inc(size_t n) {
+  return inc(_dp.current(), n);
 }
 
-void Assembler::setToValue16(int value, Cell high, Temps<1> tmp) { 
-  pushPtr();
-  setToValue(value & 0xff, tmp);
-  moveTo(high);
-  setToValue((value >> 8) & 0xff, tmp);
-  popPtr();
+Assembler::SingleCell Assembler::inc(Cell target, size_t n) {
+  return inc(SingleCell{target}, n);
 }
 
-
-Assembler::SingleCell Assembler::inc() {
-  return inc(_dp.current());
+Assembler::SingleCell Assembler::dec(size_t n) {
+  return dec(_dp.current(), n);
 }
 
-Assembler::SingleCell Assembler::inc(SingleCell const &target) {
-  pushPtr();
-  moveTo(target[0]);
-  emit<primitive::ChangeBy>(1);
-  popPtr();
-  return target;
+Assembler::SingleCell Assembler::dec(Cell target, size_t n) {
+  return dec(SingleCell{target}, n);
 }
-
-Assembler::SingleCell Assembler::dec() {
-  return dec(_dp.current());
-}
-
-Assembler::SingleCell Assembler::dec(SingleCell const &target) {
-  pushPtr();
-  moveTo(target[0]);
-  emit<primitive::ChangeBy>(-1);
-  popPtr();
-  return target;
-}
-
-
-Assembler::Inc16Operand Assembler::inc16(Inc16Operand const &op) {
-  // This overload assumes that the high cell is right next to the current (low) cell,
-  // followed by (at least) 3 empty scratch cells. If that is not guaranteed, call the
-  // overload below.
-  // emit<primitive::Inline>(">>>>+<<<+<+[>->]>>[<<]>>-<<<<");
-  
-  auto const [L, H, S1, S2, S3] = op.cells();
-  pushPtr();
-  moveTo(S3); inc();
-  moveTo(H);  inc();
-  moveTo(L);  inc();
-  emit<primitive::Inline>("[>->]>>[<<]<<");
-  moveTo(S3); dec();
-  popPtr();
-
-  return op;
-}
-
-Assembler::Inc16Operand Assembler::dec16(Inc16Operand const &op) {
-  auto const [L, H, S1, S2, S3] = op.cells();
-  pushPtr();
-
-  inc(S3);
-  dec(H);
-  moveTo(L);
-  emit<primitive::Inline>("[>+>]>>[<<]<<");
-  dec(S3);
-  dec(L);
-
-  popPtr();
-
-  return op;
-}
-
 
 void Assembler::moveField(Cell from, Cell to) {
   auto [src, dst] = getFieldIndices(from, to);

@@ -294,7 +294,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     moveTo(0, MacroCell::Value0);
     primitive::DInt const diff = currentFrameSize + paramStart + offset;
     emit<primitive::MovePointerRelative>(diff);
-    setToValue16(value);
+    setToValue16(ws::promise(_dp.current(), ws::Layout<ws::DataCells<2>>{}), value);
     emit<primitive::MovePointerRelative>(-diff);
     offset += MacroCell::FieldCount;
   };
@@ -446,13 +446,13 @@ void Assembler::fetchReturnData() {
   emit<primitive::MovePointerRelative>(stackFrameSize);
 
   // On Value1 field of the call-frame -> if 0, set our own Value1 field to 0 as well
-  notDestructive(Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
-  loopOpen(); {
-    emit<primitive::MovePointerRelative>(-stackFrameSize);
-    zeroCell();
-    emit<primitive::MovePointerRelative>(stackFrameSize);
+  notDestructive(ws::promise(_dp.current(), ws::Layout<ws::Data<>, ws::Scratch>{}));
+  loop([&]{
     dec();
-  } loopClose();
+    emit<primitive::MovePointerRelative>(-stackFrameSize);
+    dec();
+    emit<primitive::MovePointerRelative>(stackFrameSize);
+  });
   emit<primitive::MovePointerRelative>(-stackFrameSize);
   
   
@@ -495,41 +495,30 @@ void Assembler::fetchReturnData(Slot returnSlot) {
 
 void Assembler::branchIfSlot(Slot slot, std::string const &trueLabel, std::string const &falseLabel) {
 
-  pushPtr();
+  Slot const tmp = getTemp(slot.type());
+  assignSlot(tmp, slot);
 
-  Slot tmp = getTemp(ts::u8());
-    
-  moveTo(slot);
   if (slot.type()->usesValue1()) {
-    orConstructive(Cell{tmp, MacroCell::Value0},
-		   Cell{slot, MacroCell::Value1},
-		   Temps<2>::select(tmp, MacroCell::Scratch0,
-				    tmp, MacroCell::Scratch1));
-  }
-  else {
-    copyField(Cell{tmp, MacroCell::Value0},
-	      Temps<1>::select(tmp, MacroCell::Scratch0));
+    orDestructive(SingleCell{Cell{tmp, MacroCell::Value0}},
+                  SingleCell{Cell{tmp, MacroCell::Value1}});
+  } else {
+    zeroCell(Cell{tmp, MacroCell::Value1});
   }
 
-  moveTo(tmp);
-  switchField(MacroCell::Flag);
-  zeroCell(); inc();
-  switchField(MacroCell::Value0);
-  loopOpen(); {
-    zeroCell();
+  Cell const trueFlag  = {tmp, MacroCell::Value0};
+  Cell const falseFlag = {tmp, MacroCell::Value1};
+
+  setToValue(falseFlag, 1);
+  loop(trueFlag, [&]{
+    zeroCell(trueFlag);
+    zeroCell(falseFlag);
     setNextBlock(_currentFunction->name, trueLabel);
-    switchField(MacroCell::Flag);
-    zeroCell();
-    switchField(MacroCell::Value0);	
-  }; loopClose();
-
-  switchField(MacroCell::Flag);
-  loopOpen(); {
-    zeroCell();
+  });
+  
+  loop(falseFlag ,[&] {
+    zeroCell(falseFlag);
     setNextBlock(_currentFunction->name, falseLabel);
-  } loopClose();
-
-  popPtr();
+  });
 
   freeTempSlot(tmp);
 }

@@ -457,6 +457,7 @@ private:
   Slot addressOfSlot(Slot slot, API_CTX);
   
   // Algorithms: all applied to the current DP (assembler_algorithms.cc)
+  void literalBf(std::string const &bf);
   void literalBf(Cell start, std::string const &bf);
   void moveTo(Cell cell);
   void moveTo(int offset, MacroCell::Field field = MacroCell::Value0);
@@ -481,253 +482,150 @@ private:
   void copyOrMoveField(TransferMode mode, Cell dest, Temps<1>);
   void copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp);
     
-  void setToValue(int value);
+  using SingleCell = ws::Workspace<ws::Data<>>;
+  using DoubleCell = ws::Workspace<ws::Data<>, ws::Data<>>;
 
-  void setToValue16(int value);
-
-  // These should go I think
-  void setToValue(int value, Temps<1>);
-  void setToValue16(int value, Cell high, Temps<1>);
-
-
-
-  using SingleCell = ws::Workspace<
-    ws::Data
+  template <ws::IsWorkspace W>
+  using Bool16Result = typename W::template Transform<
+    ws::Replace<0, ws::Data<>>,
+    ws::Replace<1, ws::Data<0>>
   >;
 
-  using DoubleCell = ws::Workspace<
-    ws::Data,
-    ws::Data
-  >;
-
-  using Clean8 = ws::Workspace<
-    ws::Data,
-    ws::Clobber,
-    ws::ZeroCells<5>
-  >;
-
-  using Clean16 = ws::Workspace<
-    ws::DataCells<2>,
-    ws::ZeroCells<5>
+  template <ws::IsWorkspace W>
+  using Data8Result = typename W::template Transform<
+    ws::Replace<0, ws::Data<>>
   >;
   
-  using Inc16Operand = ws::Workspace<
-    ws::DataCells<2>,
-    ws::Zero,
-    ws::DoNotTouch,
-    ws::Zero
+  template <ws::IsWorkspace W>
+  using Data16Result = typename W::template Transform<
+    ws::Replace<0, ws::Data<>>,
+    ws::Replace<1, ws::Data<>>
   >;
   
-  using Add16Operand = ws::Workspace<
-    ws::DataCells<2>,
-    ws::ZeroCells<3>
+  template <ws::IsWorkspace W>
+  using DivModResult = typename W::template Transform<
+    ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
+    ws::Replace<1, ws::Prepared<ws::Role::RemainderLow>>
   >;
 
-  template <size_t ScratchOffset>
-  using SingleAndScratch = ws::Workspace<
-    ws::Data,
-    ws::DoNotTouchCells<ScratchOffset - 1>,
-    ws::Zero
+  template <ws::IsWorkspace W>
+  using DivMod16DigitResult = typename W::template Transform<
+    ws::Replace<0, ws::Prepared<ws::Role::RemainderLow>>,
+    ws::Replace<1, ws::Prepared<ws::Role::RemainderHigh>>,
+    ws::Replace<5, ws::Prepared<ws::Role::QuotientLow>>
   >;
 
-  template <size_t ScratchOffset>
-  using DoubleAndScratch = ws::Workspace<
-    ws::Data,
-    ws::Data,
-    ws::DoNotTouchCells<ScratchOffset - 2>,
-    ws::Zero
+  template <ws::IsWorkspace W>
+  using DivMod16Result = typename W::template Transform<
+    ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
+    ws::Replace<1, ws::Prepared<ws::Role::QuotientHigh>>,
+    ws::Replace<2, ws::Prepared<ws::Role::RemainderLow>>,
+    ws::Replace<3, ws::Prepared<ws::Role::RemainderHigh>>
   >;
-    
-  using DivModNum = ws::Workspace<
-    ws::Data,
-    ws::Clobber,
-    ws::ZeroCells<5>
+
+  template <ws::IsWorkspace W>
+  using SignBitResult = typename W::template Transform<
+    ws::Replace<0, ws::Prepared<ws::Role::SignBit>>
   >;
+
+  // inc/dec (assembler_algorithms.cc)
+  SingleCell inc(size_t n = 1);
+  SingleCell inc(Cell target, size_t n = 1);
+  SingleCell dec(size_t n = 1);
+  SingleCell dec(Cell target, size_t n = 1);
+
+  template <ws::SingleCell W>   Data8Result<W>  inc(W const &, size_t n = 1);
+  template <ws::Inc16Operand W> Data16Result<W> inc16(W const &);
+  template <ws::SingleCell W>   Data8Result<W>  dec(W const &, size_t n = 1);
+  template <ws::Dec16Operand W> Data16Result<W> dec16(W const &);
+
+  // setToValue (assembler_algorithms.{cc,tpp} // TODO: other file
+  SingleCell setToValue(int value);
+  SingleCell setToValue(Cell target, int value);
   
-  using DivMod16Num = ws::Workspace<
-    ws::DataCells<2>,
-    ws::ZeroCells<5>
-  >;
-  
-  using DivMod16Denom = ws::Workspace<
-    ws::DataCells<2>,
-    ws::ZeroCells<3>
-  >;
+  template <ws::SingleCell W>       Data8Result<W>  setToValue(W const &target, int value);
+  template <ws::DoubleCell W>       Data16Result<W> setToValue16(W const &target, int value);
+  template <ws::SingleAndScratch W> Data8Result<W>  setToValue(W const &target, int value);
+  template <ws::DoubleAndScratch W> Data16Result<W> setToValue16(W const &target, int value);
 
-  using DivMod16DigitResult = ws::Workspace<
-    ws::Prepared<ws::Role::RemainderLow>,
-    ws::Prepared<ws::Role::RemainderHigh>,
-    ws::ZeroCells<3>,
-    ws::Prepared<ws::Role::QuotientLow>,
-    ws::ZeroCells<1>
-  >;
-
-  using DivModPrepared = ws::Workspace<
-    ws::Prepared<ws::Role::NumeratorLow>,
-    ws::Prepared<ws::Role::DenominatorLow>,
-    ws::ZeroCells<4>
-  >;
-
-  using DivModResult = ws::Workspace<
-    ws::Prepared<ws::Role::QuotientLow>,
-    ws::Prepared<ws::Role::RemainderLow>,
-    ws::ZeroCells<4>
-  >;
-
-  using DivMod16Result = ws::Workspace<
-    ws::Prepared<ws::Role::QuotientLow>,
-    ws::Prepared<ws::Role::QuotientHigh>,
-    ws::Prepared<ws::Role::RemainderLow>,
-    ws::Prepared<ws::Role::RemainderHigh>,
-    ws::ZeroCells<3>
-  >;
-
-  using SignBitOperand = ws::Workspace<
-    ws::Data,
-    ws::ZeroCells<3>
-  >;
-    
-  SingleCell inc();
-  SingleCell inc(SingleCell const &);
-  SingleCell dec();
-  SingleCell dec(SingleCell const &);
-  Inc16Operand inc16(Inc16Operand const &);
-  Inc16Operand dec16(Inc16Operand const &);
+  // Add (assember_add.{cc,tpp}
   SingleCell addConst(int delta);
-  SingleCell addConst(SingleCell const &, int delta);    
+  SingleCell addConst(Cell lhs, int delta);
+
+  template <ws::SingleCell W>       Data8Result<W>  addConst(W const &lhs, int delta);
+  template <ws::SingleAndScratch W> Data8Result<W>  addConst(W const &lhs, int delta);
+  template <ws::SingleCell W>       Data8Result<W>  addDestructive(W const &lhs, SingleCell const &delta);
+  template <ws::Add16Operand W>     Data16Result<W> add16Const(W const &lhs, int delta);
+  template <ws::Add16Operand W>     Data16Result<W> add16Destructive(W const &lhs, DoubleCell const &delta);
+
+  // Sub (assembler_sub.{cc,tpp})
   SingleCell subConst(int delta);
-  SingleCell subConst(SingleCell const &, int delta);
+  SingleCell subConst(Cell lhs, int delta);
 
-  template <size_t ScratchOffset> requires (ScratchOffset > 0)
-  SingleAndScratch<ScratchOffset> addConst(SingleAndScratch<ScratchOffset> const &lhs, int delta);
+  template <ws::SingleCell W>       Data8Result<W>  subConst(W const &lhs, int delta);
+  template <ws::SingleCell W>       Data8Result<W>  subDestructive(W const &lhs, SingleCell const &delta);
+  template <ws::SingleAndScratch W> Data8Result<W>  subConst(W const &lhs, int delta);
+  template <ws::Sub16Operand W>     Data16Result<W> sub16Const(W const &lhs, int delta);
+  template <ws::Sub16Operand W>     Data16Result<W> sub16Destructive(W const &lhs, DoubleCell const &delta);
 
-  template <size_t ScratchOffset> requires (ScratchOffset > 0)
-  SingleAndScratch<ScratchOffset> subConst(SingleAndScratch<ScratchOffset> const &lhs, int delta);
+  // Multiplication workspace helper (assembler_mul.{cc,tpp}). The value views
+  // are deliberately normalized to one or two cells so their N encodes the
+  // arithmetic width; Work is the preserved slot that supplies clean scratch.
+  template <ws::IsWorkspace Result, ws::IsWorkspace Consumed,
+            ws::IsWorkspace Preserved, ws::IsWorkspace Work>
+  requires (
+    (Result::N == 1 || Result::N == 2) &&
+    (Consumed::N == 1 || Consumed::N == 2) &&
+    (Preserved::N == 1 || Preserved::N == 2) &&
+    Result::template Data<0, Result::N> &&
+    Consumed::template Data<0, Consumed::N> &&
+    Preserved::template Data<0, Preserved::N> &&
+    Work::template Scratch<2, 5>
+  )
+  void multiplyInto(Result const &result, Consumed const &consumed,
+                    Preserved const &preserved, Work const &work);
 
-  template <size_t ScratchOffset> requires (ScratchOffset > 0)
-  SingleAndScratch<ScratchOffset> setToValue(SingleAndScratch<ScratchOffset> const &target, int value);
+  // DivMod (assembler_divmod.{cc,tpp})
+  template <ws::DivModNum N>      DivModResult<N> divModDestructive(N const &num, SingleCell const &denom, TransferMode rhsMode);
+  template <ws::DivModPrepared W> DivModResult<W> divModPreparedDestructive(W const &prep);
+  template <ws::DivMod16Num N, ws::DivMod16Den D> DivMod16DigitResult<N> divMod16Digit(N const &num, D const &den);
+  template <ws::DivMod16Num N, ws::DivMod16Den D> DivMod16Result<N>      divMod16Destructive(N const &num, D const &den);
 
-  template <size_t ScratchOffset> requires (ScratchOffset > 0)
-  DoubleAndScratch<ScratchOffset> setToValue16(DoubleAndScratch<ScratchOffset> const &target, int value);
+  // SignBit (assembler_unary.{cc,tpp})
+  template <ws::SignBitOperand W>   SignBitResult<W> signBitDestructive(W const &op);
+  template <ws::SingleAndScratch W> Data8Result<W>   boolDestructive(W const &op);
+  template <ws::DoubleCell W>       Bool16Result<W>  bool16Destructive(W const &val);
 
-  template <typename W, size_t ScratchOffset = ws::firstZeroCell<W, 1>()>
-  requires (ScratchOffset != ws::impl::npos)
-  auto addConst(W const &lhs, int delta) {
-    return addConst<ws::firstZeroCell<W, 1>()>(lhs, delta);
-  }
+  // Logical functions (assembler_logical.{cc,tpp}
+  template <ws::SingleAndScratch W> Data8Result<W>  notDestructive(W const &op);
+  template <ws::DoubleCell W>       Bool16Result<W> not16Destructive(W const &op);
 
-  template <typename W, size_t ScratchOffset = ws::firstZeroCell<W, 1>()>
-  requires (ScratchOffset != ws::impl::npos)
-  auto subConst(W const &lhs, int delta) {
-    return subConst<ws::firstZeroCell<W, 1>()>(lhs, delta);
-  }
-  template <typename W, size_t ScratchOffset = ws::firstZeroCell<W, 1>()>
-  requires (ScratchOffset != ws::impl::npos)
-  auto setToValue(W const &target, int value) {
-    return setToValue<ScratchOffset>(target, value);
-  }
-
-  template <typename W, size_t ScratchOffset = ws::firstZeroCell<W, 1>()>
-  requires (ScratchOffset != ws::impl::npos)
-  auto setToValue16(W const &target, int value) {
-    return setToValue16<ScratchOffset>(target, value);
-  }
-    
-  SignBitOperand signBitDestructive(SignBitOperand const &op);
-    
-  Add16Operand add16Const(Add16Operand const &lhs, int delta);
-  Add16Operand sub16Const(Add16Operand const &lhs, int delta);
-    
-  SingleCell addDestructive(SingleCell const &op, SingleCell const &delta);
-  SingleCell subDestructive(SingleCell const &op, SingleCell const &delta);
-  Add16Operand add16Destructive(Add16Operand const &op, DoubleCell const &delta);
-  Add16Operand sub16Destructive(Add16Operand const &op, DoubleCell const &delta);
-
-    
-  void divMod16Const(int denom, Cell high, Cell modResultLow, Cell modResultHigh, Temps<8>);
-  DivModResult divModDestructive(DivModNum const &num, SingleCell const &denom, TransferMode rhsMode);
-  DivModResult divModDestructiveKernel(DivModPrepared const &prep);
-  DivMod16Result divMod16Destructive(DivMod16Num const &num, DivMod16Denom const &denom);
-
-  DivMod16DigitResult divMod16Digit(DivMod16Num const &num, DivMod16Denom const &denom);
-    
-  void divMod16DestructiveGuaranteed8BitResult(Cell denom);
-
-
-  template <size_t ScratchOffset> requires (ScratchOffset > 0)
-  SingleAndScratch<ScratchOffset> boolDestructive(SingleAndScratch<ScratchOffset> const &op);
-
-  template <typename W, size_t ScratchOffset = ws::firstZeroCell<W, 1>()>
-  requires (ScratchOffset != ws::impl::npos)
-  auto boolDestructive(W const &target) {
-    return boolDestructive<ScratchOffset>(target);
-  }
-    
-
-    
-  // void boolConstructive(Cell result, Temps<1>);
-  void bool16Destructive(Cell high);
-  // void bool16Constructive(Cell high, Cell result, Temps<2>);
+  template <ws::SingleCell W>       Data8Result<W>  orDestructive(W const &lhs, SingleCell const &rhs);
+  template <ws::SingleAndScratch W> Data8Result<W>  andDestructive(W const &lhs, SingleCell const &rhs);
+  template <ws::SingleAndScratch W> Data8Result<W>  xorDestructive(W const &lhs, SingleCell const &rhs);
+  template <ws::SingleAndScratch W> Data8Result<W>  nandDestructive(W const &lhs, SingleCell const &rhs);
+  template <ws::SingleCell W>       Data8Result<W>  norDestructive(W const &lhs, SingleCell const &rhs);
+  template <ws::SingleAndScratch W> Data8Result<W>  xnorDestructive(W const &lhs, SingleCell const &rhs);
   
-  void notDestructive(Temps<1>);
-  void notConstructive(Cell result, Temps<1>);
-  void not16Destructive(Cell high, Temps<1>);
-  void not16Constructive(Cell high, Cell result, Temps<2>);
+  template <ws::DoubleCell W> Bool16Result<W> or16Destructive(W const &lhs, DoubleCell const &rhs);
+  template <ws::DoubleCell W> Bool16Result<W> and16Destructive(W const &lhs, DoubleCell const &rhs);
+  template <ws::DoubleCell W> Bool16Result<W> xor16Destructive(W const &lhs, DoubleCell const &rhs);
+  template <ws::DoubleCell W> Bool16Result<W> nand16Destructive(W const &lhs, DoubleCell const &rhs);
+  template <ws::DoubleCell W> Bool16Result<W> nor16Destructive(W const &lhs, DoubleCell const &rhs);
+  template <ws::DoubleCell W> Bool16Result<W> xnor16Destructive(W const &lhs, DoubleCell const &rhs);
 
-  void orDestructive(Cell other);
-  void orConstructive(Cell result, Cell other, Temps<2>);
-  void or16Destructive(Cell high, Cell otherLow, Cell otherHigh);
-  void or16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
+  // Comparisons (assembler_comparisons.{cc,tpp}
+  template <ws::SingleCell W>       Data8Result<W> eqDestructive(W const &lhs, SingleCell const &rhs);
+  template <ws::SingleAndScratch W> Data8Result<W> lessDestructive(W const &lhs, SingleCell const &rhs);
+  template <ws::SingleAndScratch W> Data8Result<W> lessOrEqualDestructive(W const &lhs, SingleCell const &rhs);
+  template <ws::SingleAndScratch W> Data8Result<W> greaterDestructive(W const &lhs, SingleCell const &rhs);
+  template <ws::SingleAndScratch W> Data8Result<W> greaterOrEqualDestructive(W const &lhs, SingleCell const &rhs);
 
-  void norDestructive(Cell other, Temps<1>);
-  void norConstructive(Cell result, Cell other, Temps<2>);
-  void nor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
-  void nor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
-  
-  void andDestructive(Cell other, Temps<1>);
-  void andConstructive(Cell result, Cell other, Temps<2>);
-  void and16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
-  void and16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
-
-  void nandDestructive(Cell other, Temps<1>);
-  void nandConstructive(Cell result, Cell other, Temps<2>);
-  void nand16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
-  void nand16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
-
-  void xorDestructive(Cell other, Temps<1>);
-  void xorConstructive(Cell result, Cell other, Temps<2>);
-  void xor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
-  void xor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
-
-  void xnorDestructive(Cell other, Temps<1>);
-  void xnorConstructive(Cell result, Cell other, Temps<2>);
-  void xnor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
-  void xnor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
-
-  void eqDestructive(Cell other, Temps<1>);
-  void eqConstructive(Cell result, Cell other, Temps<1>);
-  void eq16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
-  void eq16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
-  
-  void lessDestructive(Cell other, Temps<1>);
-  void lessConstructive(Cell result, Cell other, Temps<2>);
-  void less16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
-  void less16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8>);
-
-  void lessOrEqualDestructive(Cell other, Temps<1>);
-  void lessOrEqualConstructive(Cell result, Cell other, Temps<2>);
-  void lessOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
-  void lessOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<6>);
-
-  void greaterDestructive(Cell other, Temps<1>);
-  void greaterConstructive(Cell result, Cell other, Temps<2>);
-  void greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
-  void greater16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<6>);
-
-  void greaterOrEqualDestructive(Cell other, Temps<1>);
-  void greaterOrEqualConstructive(Cell result, Cell other, Temps<2>);
-  void greaterOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
-  void greaterOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8>);
+  template <ws::DoubleAndScratch L>                     Bool16Result<L> eq16Destructive(L const &lhs, DoubleCell const &rhs);
+  template <ws::Compare16Lhs L, ws::DoubleAndScratch R> Bool16Result<L> less16Destructive(L const &lhs, R const &rhs);
+  template <ws::Compare16Lhs L, ws::DoubleAndScratch R> Bool16Result<L> lessOrEqual16Destructive(L const &lhs, R const &rhs);
+  template <ws::Compare16Lhs L, ws::DoubleAndScratch R> Bool16Result<L> greater16Destructive(L const &lhs, R const &rhs);
+  template <ws::Compare16Lhs L, ws::DoubleAndScratch R> Bool16Result<L> greaterOrEqual16Destructive(L const &lhs, R const &rhs);
 
   // Frame Navigation (assembler_framenav.cc)
   void resetOrigin();
@@ -913,6 +811,7 @@ private:
     
   // General helpers (inline definitions, assembler_private.tpp)
   void loop(Cell flag, auto&& body);
+  void loop(auto&& body);
 
     
   template <typename Primitive, typename ... Args>
@@ -926,7 +825,16 @@ private:
 
   static std::string defaultOpenTag();
   static std::string defaultCloseTag();  
-};
+}; // Assembler
+
+#include "../../../src/assembler/assembler_add.tpp"
+#include "../../../src/assembler/assembler_sub.tpp"
+#include "../../../src/assembler/assembler_mul.tpp"
+#include "../../../src/assembler/assembler_divmod.tpp"
+#include "../../../src/assembler/assembler_algorithms.tpp"
+#include "../../../src/assembler/assembler_unary.tpp"
+#include "../../../src/assembler/assembler_logical.tpp"
+#include "../../../src/assembler/assembler_comparisons.tpp"
 
 
 // Builder objects for programs, functions, blocks, and calls
