@@ -483,7 +483,8 @@ private:
   void copyField(Cell from, Cell to, Cell tmp);
   void copyOrMoveField(TransferMode mode, Cell dest, Temps<1>);
   void copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp);
-    
+
+  // Workspaces for the implementations
   using SingleCell = ws::Workspace<ws::Data<>>;
   using DoubleCell = ws::Workspace<ws::Data<>, ws::Data<>>;
 
@@ -570,9 +571,7 @@ private:
   template <ws::Sub16Operand W>     Data16Result<W> sub16Const(W const &lhs, int delta);
   template <ws::Sub16Operand W>     Data16Result<W> sub16Destructive(W const &lhs, DoubleCell const &delta);
 
-  // Multiplication workspace helper (assembler_mul.{cc,tpp}). The value views
-  // are deliberately normalized to one or two cells so their N encodes the
-  // arithmetic width; Work is the preserved slot that supplies clean scratch.
+  // Mul (assembler_mul.{cc,tpp}).
   template <ws::MulValue Result, ws::MulValue Consumed, ws::MulValue Preserved, ws::MulWork Work>
   Result multiplyInto(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
 
