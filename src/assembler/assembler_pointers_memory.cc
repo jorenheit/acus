@@ -576,7 +576,7 @@ void Assembler::rebasePointers(Slot slot, Cell depthDiff, auto &&rebase) {
     copyField(depthDiffCopy,
               Temps<1>::select(slot + RuntimePointer::FrameDepth, MacroCell::Scratch1));
     moveTo(currentDepth);
-    rebase(depthDiffCopy);
+    rebase(currentDepth, depthDiffCopy);
     break;
   }
 
@@ -607,16 +607,16 @@ void Assembler::rebasePointers(Slot slot, Cell depthDiff, auto &&rebase) {
 void Assembler::rebasePointersToCurrentFrame(Slot slot, Cell depthToAdd) {
   // Moving a pointer value into a newer frame increases its distance
   // to the pointee by the number of crossed frames.
-  rebasePointers(slot, depthToAdd, [&](Cell diff) {
-    addDestructive(diff);
+  rebasePointers(slot, depthToAdd, [&](Cell current, Cell diff) {
+    addDestructive(SingleCell{current}, diff);
   });
 }
 
 void Assembler::rebasePointersToOlderFrame(Slot slot, Cell depthToSub) {
   // Moving a pointer value into an older frame decreases its distance
   // to the pointee by the number of crossed frames.
-  rebasePointers(slot, depthToSub, [&](Cell diff) {
-    subDestructive(diff);
+  rebasePointers(slot, depthToSub, [&](Cell current, Cell diff) {
+    subDestructive(SingleCell{current}, diff);
   });
 }
 
