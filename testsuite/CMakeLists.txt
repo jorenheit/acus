@@ -1,4 +1,4 @@
-add_executable(acus-runtime-tests testsuite.cc)
+	add_executable(acus-runtime-tests testsuite.cc)
 target_compile_features(acus-runtime-tests PRIVATE cxx_std_23)
 set_target_properties(acus-runtime-tests PROPERTIES CXX_EXTENSIONS OFF)
 acus_enable_warnings(acus-runtime-tests)

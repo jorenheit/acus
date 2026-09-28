@@ -17,14 +17,15 @@ namespace acus::primitive {
   struct Context {
     
     int fieldCount;
-    std::unordered_map<std::string, int> blockIDtoIndex;
+
+    std::unordered_map<std::string, int> blockIDToDispatchIndex;
     std::unordered_map<std::string, int> stackFrameSize;
     std::unordered_map<std::string, int> localBaseOffset;
 
-    int getBlockIndex(std::string const &f, std::string const &b = "") const {      
+    int getDispatchIndex(std::string const &f, std::string const &b = "") const {      
       std::string const id = f + (b.empty() ? "" : (std::string(".") + b));
-      assert(blockIDtoIndex.contains(id));
-      return blockIDtoIndex.at(id);
+      assert(blockIDToDispatchIndex.contains(id));
+      return blockIDToDispatchIndex.at(id);
     }
 
     int getStackFrameSize(std::string const &f) const {
@@ -99,6 +100,12 @@ namespace acus::primitive {
     MERGABLE;
   };
 
+  struct Inline : Node {
+    std::string code;
+    inline explicit Inline(std::string code) : code(std::move(code)) {}
+    COMMON_INTERFACE;
+  };
+
   struct MovePointerRelative: Node {
     DInt amount = 0;
 
@@ -145,6 +152,7 @@ namespace acus::primitive {
 
   struct ConstructConstant: Node {
 
+    bool naive;
     DInt value, current, scratch;
     
     /*
@@ -156,7 +164,15 @@ namespace acus::primitive {
      */
 
 
+    explicit ConstructConstant(DInt val):
+      naive(true),
+      value(std::move(val)),
+      current(0),
+      scratch(0)
+    {}
+    
     explicit ConstructConstant(DInt val, DInt current, DInt scratch):
+      naive(false),
       value(std::move(val)),
       current(std::move(current)),
       scratch(std::move(scratch))
@@ -168,7 +184,10 @@ namespace acus::primitive {
 
   
   struct ChangeBy: Node {
-    DInt delta;
+
+    bool naive;
+    DInt delta, current, scratch;
+
     /*
       Changes the value in the current cell by an amount 'delta'.
       
@@ -177,7 +196,20 @@ namespace acus::primitive {
       Invariants: -
     */
     
-    inline explicit ChangeBy(DInt d): delta(std::move(d)) {}
+    explicit ChangeBy(DInt delta):
+      naive(true),
+      delta(std::move(delta)),
+      current(0),
+      scratch(0)
+    {}
+    
+    explicit ChangeBy(DInt delta, DInt current, DInt scratch):
+      naive(false),
+      delta(std::move(delta)),
+      current(std::move(current)),
+      scratch(std::move(scratch))
+    {}
+
     COMMON_INTERFACE;
     MERGABLE;
   };
@@ -238,314 +270,6 @@ namespace acus::primitive {
   };
 
 
-  struct Boolean: Node {
-    DInt current, scratch;
-    /*
-      Converts 'current' to bool (destructive).
-
-      Assumed initial pointer position: current
-      Assumed empty: scratch
-      Invariants: ptr, scratch
-     */
-
-    inline explicit Boolean(DInt current, DInt scratch):
-      current(std::move(current)),
-      scratch(std::move(scratch))
-    {}
-    
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-  
-  struct Not: Node {
-    DInt current, scratch;
-
-    /*
-      Not operator applied to the value stored at 'current'. Overwrites
-      'current' with 0 if nonzero, 1 if zero (destructive).
-
-      Assumed initial pointer position: current
-      Assumed empty: scratch
-      Invariants: ptr, scratch
-     */
-    
-    inline explicit Not(DInt current, DInt scratch):
-      current(std::move(current)),
-      scratch(std::move(scratch))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-  
-
-  struct Or: Node {
-    DInt current, other, scratch;
-
-    /*
-      OR operator applied to the values stored at current and other. Overwrites
-      the value at 'current' with the result of 'current || other'.
-      Consumes other as well (other == 0 afterwards).
-      
-      Assumed initial pointer position: current
-      Assumed empty: scratch
-      Invariants: ptr, scratch
-      Clears: other
-     */
-    
-    inline explicit Or(DInt current, DInt other, DInt scratch):
-      current(std::move(current)),
-      other(std::move(other)),
-      scratch(std::move(scratch))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-
-  struct Xor: Node {
-    DInt current, other, scratch1, scratch2;
-
-    /*
-      XOR operator applied to the values stored at current and other. Overwrites
-      the value at 'current' with the result of 'current ^ other'.
-      Consumes other as well (other == 0 afterwards).
-      
-      Assumed initial pointer position: current
-      Assumed empty: scratch1, scratch2
-      Invariants: ptr, scratch1, scratch2
-      Clears: other
-     */
-    
-    inline explicit Xor(DInt current, DInt other, DInt scratch1, DInt scratch2):
-      current(std::move(current)),
-      other(std::move(other)),
-      scratch1(std::move(scratch1)),
-      scratch2(std::move(scratch2))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-  
-  struct And: Node {
-    DInt current, other, scratch;
-
-    /*
-      AND operator applied to the values stored at current and other. Overwrites
-      the value at 'current' with the result of 'current && other'. Consumes
-      other as well (other == 0 afterwards).
-      
-      Assumed initial pointer position: current
-      Assumed empty: scratch
-      Invariants: ptr, scratch
-      Clears: other
-      
-     */
-    
-    inline explicit And(DInt current, DInt other, DInt scratch):
-      current(std::move(current)),
-      other(std::move(other)),
-      scratch(std::move(scratch))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-
-  struct Less: Node {
-    DInt current, other, scratch1, scratch2;
-
-    /*
-      NAND operator applied to the values stored at current and other. Overwrites
-      the value at 'current' with the result of 'current < other)'. Consumes
-      other as well (other == 0 afterwards).
-      
-      Assumed initial pointer position: current
-      Assumed empty: scratch1, scratch2
-      Invariants: ptr, scratch1, scratch2
-      Clears: other
-      
-     */
-    
-    inline explicit Less(DInt current, DInt other, DInt scratch1, DInt scratch2):
-      current(std::move(current)),
-      other(std::move(other)),
-      scratch1(std::move(scratch1)),
-      scratch2(std::move(scratch2))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-
-  struct LessOrEqual: Node {
-    DInt current, other, scratch1, scratch2;
-
-    /*
-      NAND operator applied to the values stored at current and other. Overwrites
-      the value at 'current' with the result of 'current <= other)'. Consumes
-      other as well (other == 0 afterwards).
-      
-      Assumed initial pointer position: current
-      Assumed empty: scratch1, scratch2
-      Invariants: ptr, scratch1, scratch2
-      Clears: other
-      
-     */
-    
-    inline explicit LessOrEqual(DInt current, DInt other, DInt scratch1, DInt scratch2):
-      current(std::move(current)),
-      other(std::move(other)),
-      scratch1(std::move(scratch1)),
-      scratch2(std::move(scratch2))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-
-  struct Greater: Node {
-    DInt current, other, scratch1, scratch2;
-
-    /*
-      NAND operator applied to the values stored at current and other. Overwrites
-      the value at 'current' with the result of 'current > other)'. Consumes
-      other as well (other == 0 afterwards).
-      
-      Assumed initial pointer position: current
-      Assumed empty: scratch1, scratch2
-      Invariants: ptr, scratch1, scratch2
-      Clears: other
-      
-     */
-    
-    inline explicit Greater(DInt current, DInt other, DInt scratch1, DInt scratch2):
-      current(std::move(current)),
-      other(std::move(other)),
-      scratch1(std::move(scratch1)),
-      scratch2(std::move(scratch2))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-
-  struct GreaterOrEqual: Node {
-    DInt current, other, scratch1, scratch2;
-
-    /*
-      NAND operator applied to the values stored at current and other. Overwrites
-      the value at 'current' with the result of 'current >= other)'. Consumes
-      other as well (other == 0 afterwards).
-      
-      Assumed initial pointer position: current
-      Assumed empty: scratch1, scratch2
-      Invariants: ptr, scratch1, scratch2
-      Clears: other
-      
-     */
-    
-    inline explicit GreaterOrEqual(DInt current, DInt other, DInt scratch1, DInt scratch2):
-      current(std::move(current)),
-      other(std::move(other)),
-      scratch1(std::move(scratch1)),
-      scratch2(std::move(scratch2))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-
-
-  struct Equal: Node {
-    DInt current, other;
-
-    /*
-      NAND operator applied to the values stored at current and other. Overwrites
-      the value at 'current' with the result of 'current == other)'. Consumes
-      other as well (other == 0 afterwards).
-      
-      Assumed initial pointer position: current
-      Invariants: ptr
-      Clears: other
-      
-     */
-    
-    inline explicit Equal(DInt current, DInt other):
-      current(std::move(current)),
-      other(std::move(other))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-    
-  
-  struct Cmp: Node {
-    DInt value, current, scratch; 
-    
-    /*
-      Compares the value stored at 'current' to 'value'. Stores 1 in 'result'
-      if equal, 0 otherwise.
-      
-      Assumed initial pointer position: current
-      Assumed empty: scratch
-      Invariants: ptr, scratch
-     */
-    
-    inline explicit Cmp(DInt value, DInt current, DInt scratch):
-      value(std::move(value)),
-      current(std::move(current)),
-      scratch(std::move(scratch))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-
-
-  struct Add: Node {
-    DInt current, other;
-
-    /*
-      ADD operator: add the value stored at other to current. Overwrites
-      the value at 'current' with the result of 'current + other' while
-      consuming other (left 0).
-      
-      Assumed initial pointer position: current
-      Clears: other
-     */
-    
-    inline explicit Add(DInt current, DInt other):
-      current(std::move(current)),
-      other(std::move(other))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
-
-  struct Subtract: Node {
-    DInt current, other;
-
-    /*
-      SUB operator: subtract the value stored at other from current. Overwrites
-      the value at 'current' with the result of 'current - other' while consuming
-      other (left 0).
-      
-      Assumed initial pointer position: current
-      Clears: other
-     */
-    
-    inline explicit Subtract(DInt current, DInt other):
-      current(std::move(current)),
-      other(std::move(other))
-    {}
-
-    COMMON_INTERFACE;
-    MERGABLE;
-  };
   
 } // namespace acus::ir
 

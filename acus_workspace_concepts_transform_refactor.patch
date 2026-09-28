@@ -1,0 +1,2459 @@
+diff --git a/include/acus/assembler/assembler.h b/include/acus/assembler/assembler.h
+index 6be6309..c9b9c76 100644
+--- a/include/acus/assembler/assembler.h
++++ b/include/acus/assembler/assembler.h
+@@ -484,31 +484,37 @@ private:
+   using SingleCell = ws::Workspace<ws::Data<>>;
+   using DoubleCell = ws::Workspace<ws::Data<>, ws::Data<>>;
+ 
+- template <impl::IsWorkspace W>
++  template <ws::IsWorkspace W>
++  using Bool16Result = typename W::template Transform<
++    ws::Replace<0, ws::Data<>>,
++    ws::Replace<1, ws::Scratch>
++  >;
++
++  template <ws::IsWorkspace W>
+   using Data8Result = typename W::template Transform<
+-    ws::Replace<0, ws::Prepared<ws::Role::ResultLow>>,
++    ws::Replace<0, ws::Data<>>
+   >;
+   
+-  template <impl::IsWorkspace W>
++  template <ws::IsWorkspace W>
+   using Data16Result = typename W::template Transform<
+-    ws::Replace<0, ws::Prepared<ws::Role::ResultLow>>,
+-    ws::Replace<1, ws::Prepared<ws::Role::ResultHigh>>
++    ws::Replace<0, ws::Data<>>,
++    ws::Replace<1, ws::Data<>>
+   >;
+   
+-  template <impl::IsWorkspace W>
++  template <ws::IsWorkspace W>
+   using DivModResult = typename W::template Transform<
+     ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
+-    ws::Replace<0, ws::Prepared<ws::Role::RemainderLow>>
++    ws::Replace<1, ws::Prepared<ws::Role::RemainderLow>>
+   >;
+ 
+-  template <impl::IsWorkspace W>
++  template <ws::IsWorkspace W>
+   using DivMod16DigitResult = typename W::template Transform<
+     ws::Replace<0, ws::Prepared<ws::Role::RemainderLow>>,
+     ws::Replace<1, ws::Prepared<ws::Role::RemainderHigh>>,
+     ws::Replace<5, ws::Prepared<ws::Role::QuotientLow>>
+   >;
+ 
+-  template <impl::IsWorkspace W>
++  template <ws::IsWorkspace W>
+   using DivMod16Result = typename W::template Transform<
+     ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
+     ws::Replace<1, ws::Prepared<ws::Role::QuotientHigh>>,
+@@ -516,7 +522,7 @@ private:
+     ws::Replace<3, ws::Prepared<ws::Role::RemainderHigh>>
+   >;
+ 
+-  template <impl::IsWorkspace W>
++  template <ws::IsWorkspace W>
+   using SignBitResult = typename W::template Transform<
+     ws::Replace<0, ws::Prepared<ws::Role::SignBit>>
+   >;
+@@ -558,8 +564,8 @@ private:
+   template <ws::SingleCell W>       Data8Result<W>  subConst(W const &lhs, int delta);
+   template <ws::SingleCell W>       Data8Result<W>  subDestructive(W const &lhs, SingleCell const &delta);
+   template <ws::SingleAndScratch W> Data8Result<W>  subConst(W const &lhs, int delta);
+-  template <ws::Sub16Operand W>     Data16Result<W> sub16Const(Sub16Operand const &lhs, int delta);
+-  template <ws::Sub16Operand W>     Data16Result<W> sub16Destructive(Sub16Operand const &lhs, DoubleCell const &delta);
++  template <ws::Sub16Operand W>     Data16Result<W> sub16Const(W const &lhs, int delta);
++  template <ws::Sub16Operand W>     Data16Result<W> sub16Destructive(W const &lhs, DoubleCell const &delta);
+ 
+   // DivMod (assembler_divmod.{cc,tpp})
+   template <ws::DivModNum N>      DivModResult<N> divModDestructive(N const &num, SingleCell const &denom, TransferMode rhsMode);
+@@ -569,70 +575,59 @@ private:
+ 
+   // SignBit (assembler_unary.{cc,tpp})
+   template <ws::SignBitOperand W>   SignBitResult<W> signBitDestructive(W const &op);
+-  template <ws::SingleAndScratch W> Data8Result<W>   boolDestructive(W const &op);
+-  template <ws::DoubleCell W>       Data8Result<W>   bool16Destructive(W const &val);
+-  template <ws::SingleAndScratch W> Data8Result<W>   andDestructive(W const &lhs, SingleCell const &rhs);
+-
+-    
+-  
+-  void notDestructive(Temps<1>);
++  template <ws::SingleAndScratch W> Data8Result<W> boolDestructive(W const &op);
++  template <ws::DoubleCell W>       Bool16Result<W> bool16Destructive(W const &val);
++
++  template <ws::SingleAndScratch W> Data8Result<W> notDestructive(W const &op);
++  template <ws::DoubleCell W>       Bool16Result<W> not16Destructive(W const &op);
++
++  template <ws::SingleCell W>       Data8Result<W> orDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::DoubleCell W>       Bool16Result<W> or16Destructive(W const &lhs, DoubleCell const &rhs);
++  template <ws::SingleAndScratch W> Data8Result<W> andDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::DoubleCell W>       Bool16Result<W> and16Destructive(W const &lhs, DoubleCell const &rhs);
++  template <ws::SingleAndScratch W> Data8Result<W> xorDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::DoubleCell W>       Bool16Result<W> xor16Destructive(W const &lhs, DoubleCell const &rhs);
++  template <ws::SingleAndScratch W> Data8Result<W> nandDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::DoubleCell W>       Bool16Result<W> nand16Destructive(W const &lhs, DoubleCell const &rhs);
++  template <ws::SingleAndScratch W> Data8Result<W> norDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::DoubleCell W>       Bool16Result<W> nor16Destructive(W const &lhs, DoubleCell const &rhs);
++  template <ws::SingleAndScratch W> Data8Result<W> xnorDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::DoubleCell W>       Bool16Result<W> xnor16Destructive(W const &lhs, DoubleCell const &rhs);
++
++  // Legacy low-level kernels still used by comparison/constructive code.
++  // These are deliberately kept separate from the workspace-facing API.
++  void notKernel(Temps<1>);
+   void notConstructive(Cell result, Temps<1>);
+-  void not16Destructive(Cell high, Temps<1>);
++  void not16Kernel(Cell high, Temps<1>);
+   void not16Constructive(Cell high, Cell result, Temps<2>);
+-  
+-  SingleCell orDestructive(SingleCell const &lhs, SingleCell const &rhs);
+-  Bool16Result or16Destructive(DoubleCell const &lhs, DoubleCell const &rhs);
+-
+-
+-
+-  void norDestructive(Cell other, Temps<1>);
+-//  void norConstructive(Cell result, Cell other, Temps<2>);
+-  void nor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
+-//  void nor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
+-  
+-  // void andDestructive(Cell other, Temps<1>);
+-//  void andConstructive(Cell result, Cell other, Temps<2>);
+-  void and16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
+-//  void and16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
+-
+-  void nandDestructive(Cell other, Temps<1>);
+-//  void nandConstructive(Cell result, Cell other, Temps<2>);
+-  void nand16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
+-//  void nand16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
+-
+-  void xorDestructive(Cell other, Temps<1>);
+-//  void xorConstructive(Cell result, Cell other, Temps<2>);
+-  void xor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
+-//  void xor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
+-
+-  void xnorDestructive(Cell other, Temps<1>);
+-//  void xnorConstructive(Cell result, Cell other, Temps<2>);
+-  void xnor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
+-//  void xnor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
+-
+-  void eqDestructive(Cell other, Temps<1>);
+-//  void eqConstructive(Cell result, Cell other, Temps<1>);
+-  void eq16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
+-//  void eq16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4>);
+-  
+-  void lessDestructive(Cell other, Temps<1>);
+-//  void lessConstructive(Cell result, Cell other, Temps<2>);
+-  void less16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
+-//  void less16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8>);
+-
+-  void lessOrEqualDestructive(Cell other, Temps<1>);
+-//  void lessOrEqualConstructive(Cell result, Cell other, Temps<2>);
+-  void lessOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+-//  void lessOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<6>);
+-
+-  void greaterDestructive(Cell other, Temps<1>);
+-//  void greaterConstructive(Cell result, Cell other, Temps<2>);
+-  void greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
+-//  void greater16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<6>);
+-
+-  void greaterOrEqualDestructive(Cell other, Temps<1>);
++  void andKernel(Cell other, Temps<1>);
++  void xorKernel(Cell other, Temps<1>);
++
++  using Compare16Rhs = ws::Workspace<ws::DataCells<2>, ws::ScratchCells<2>>;
++
++  template <ws::SingleCell W>       Data8Result<W> eqDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::Compare16Operand W> Bool16Result<W> eq16Destructive(W const &lhs, Compare16Rhs const &rhs);
++  template <ws::SingleAndScratch W> Data8Result<W> lessDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::Compare16Operand W> Bool16Result<W> less16Destructive(W const &lhs, Compare16Rhs const &rhs);
++  template <ws::SingleAndScratch W> Data8Result<W> lessOrEqualDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::Compare16Operand W> Bool16Result<W> lessOrEqual16Destructive(W const &lhs, Compare16Rhs const &rhs);
++  template <ws::SingleAndScratch W> Data8Result<W> greaterDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::Compare16Operand W> Bool16Result<W> greater16Destructive(W const &lhs, Compare16Rhs const &rhs);
++  template <ws::SingleAndScratch W> Data8Result<W> greaterOrEqualDestructive(W const &lhs, SingleCell const &rhs);
++  template <ws::Compare16Operand W> Bool16Result<W> greaterOrEqual16Destructive(W const &lhs, Compare16Rhs const &rhs);
++
++  // Non-contiguous kernels used by the workspace wrappers above.
++  void eqKernel(Cell other);
++  void eq16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<1>);
++  void lessKernel(Cell other, Temps<1>);
++  void less16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
++  void lessOrEqualKernel(Cell other, Temps<1>);
++  void lessOrEqual16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
++  void greaterKernel(Cell other, Temps<1>);
++  void greater16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<3>);
++  void greaterOrEqualKernel(Cell other, Temps<1>);
++  void greaterOrEqual16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
+   void greaterOrEqualConstructive(Cell result, Cell other, Temps<2>);
+-  void greaterOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4>);
+   void greaterOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8>);
+ 
+   // Frame Navigation (assembler_framenav.cc)
+@@ -839,6 +834,8 @@ private:
+ #include "../../../src/assembler/assembler_divmod.tpp"
+ #include "../../../src/assembler/assembler_algorithms.tpp"
+ #include "../../../src/assembler/assembler_unary.tpp"
++#include "../../../src/assembler/assembler_logical.tpp"
++#include "../../../src/assembler/assembler_comparisons.tpp"
+ 
+ 
+ // Builder objects for programs, functions, blocks, and calls
+diff --git a/include/acus/assembler/assembler_private.tpp b/include/acus/assembler/assembler_private.tpp
+index a34d519..527d3cb 100644
+--- a/include/acus/assembler/assembler_private.tpp
++++ b/include/acus/assembler/assembler_private.tpp
+@@ -55,5 +55,15 @@ void Assembler::branchOnSignBit(Slot slot, TrueBranch&& trueBranch, FalseBranch&
+ 
+ 
+ 
+-  
++
++void Assembler::loop(Cell flag, auto&& body) {
++  pushPtr();
++  moveTo(flag);
++  loopOpen(); {
++    body();
++    moveTo(flag);
++  } loopClose();
++  popPtr();
++}
++
+ } // namespace acus
+diff --git a/include/acus/core/data.h b/include/acus/core/data.h
+index 0728fbf..8f24ad2 100644
+--- a/include/acus/core/data.h
++++ b/include/acus/core/data.h
+@@ -150,19 +150,19 @@ namespace acus {
+ 
+     } // impl
+ 
+-    template <size_t Value = -1>
++    template <int Value = -1>
+     struct Data: impl::Region<1, Data<Value>> {
+-      static constexpr value = Value;
++      static constexpr int value = Value;
+       static constexpr bool known = Value != -1;
+       static_assert(Value == -1 || (Value >= 0 && Value <= 255));
+     };
+     
+-    struct Zero:      impl::Region<1, Zero> {};
++    struct Scratch:      impl::Region<1, Scratch> {};
+     struct Clobber:   impl::Region<1, Clobber> {};
+     struct Untouched: impl::Region<1, Untouched> {};
+     
+     template <size_t N> struct DataCells:      impl::Region<N, Data<>> {};
+-    template <size_t N> struct ZeroCells:      impl::Region<N, Zero> {};
++    template <size_t N> struct ScratchCells:      impl::Region<N, Scratch> {};
+     template <size_t N> struct ClobberCells:   impl::Region<N, Clobber> {};
+     template <size_t N> struct UntouchedCells: impl::Region<N, Untouched> {};
+ 
+@@ -197,8 +197,9 @@ namespace acus {
+       template <IsRegion T>
+       struct Satisfies<T, T>: std::true_type {};
+ 
+-      // Expect any Data, get Zero -> OK
+-      struct Satisfies<Zero, Data<>>: std::true_type {};
++      // Expect any Data, get Scratch -> OK
++      template <>
++      struct Satisfies<Scratch, Data<>>: std::true_type {};
+ 
+       // Expect any Data, get specific data -> OK
+       template <int V> requires (V != -1)
+@@ -208,8 +209,13 @@ namespace acus {
+       template <Role R>
+       struct Satisfies<Prepared<R>, Data<>> : std::true_type {};
+ 
++      // Clobber contains an arbitrary byte, so it is also valid wherever
++      // arbitrary Data<> is sufficient. It is not valid for known Data<V>.
++      template <>
++      struct Satisfies<Clobber, Data<>> : std::true_type {};
++
+       // Expect Clobber, anything works
+-      template <IsRegion R>
++      template <IsRegion R> requires (not std::is_same_v<R, Clobber>)
+       struct Satisfies<R, Clobber>: std::true_type {};
+ 
+       // Expect Untouched, anything works
+@@ -222,7 +228,7 @@ namespace acus {
+       class WorkspaceBase {};
+ 
+       template <typename T>
+-      concept IsWorkspace = std::is_base_of_v<impl::WorkspaceBase, T>;
++      concept IsWorkspace = std::is_base_of_v<impl::WorkspaceBase, std::remove_cvref_t<T>>;
+ 
+       
+       template <typename ... Args>
+@@ -337,6 +343,9 @@ namespace acus {
+ 
+     } // impl
+ 
++    template <typename W>
++    concept IsWorkspace = impl::IsWorkspace<W>;
++
+     template <impl::IsWorkspace Workspace, impl::IsRegion Required, size_t Start = 0>
+     consteval size_t firstSatisfyingCell() {
+       using W = std::remove_cvref_t<Workspace>;
+@@ -344,8 +353,8 @@ namespace acus {
+     }
+ 
+     template <impl::IsWorkspace Workspace, size_t Start = 0>
+-    consteval size_t firstZeroCell() {
+-      return firstSatisfyingCell<Workspace, Zero, Start>();
++    consteval size_t firstScratchCell() {
++      return firstSatisfyingCell<Workspace, Scratch, Start>();
+     }
+ 
+     template <typename Workspace, typename Required, size_t Start = 0>
+@@ -353,7 +362,7 @@ namespace acus {
+     (firstSatisfyingCell<Workspace, Required, Start>() != impl::npos);
+ 
+     template <typename Workspace, size_t Start = 0>
+-    concept HasZeroCell = (firstZeroCell<Workspace, Start>() != impl::npos);
++    concept HasScratchCell = (firstScratchCell<Workspace, Start>() != impl::npos);
+     
+     template <size_t Index>
+     struct At {
+@@ -505,6 +514,18 @@ namespace acus {
+     template <typename ... Args>
+     requires (std::is_base_of_v<impl::RegionBase, Args> && ...)
+     struct Layout {};
++
++    // Compile-time description of one cell-type replacement used by
++    // Workspace::Transform. Transformations operate on the expanded
++    // physical-cell layout, so a replacement always describes exactly
++    // one cell.
++    template <size_t Index, impl::IsRegion Region>
++    struct Replace {
++      static_assert(Region::N == 1,
++                    "Workspace replacements must describe exactly one cell");
++      static constexpr size_t index = Index;
++      using Type = Region;
++    };
+     
+     template <typename ... Args>
+     class Workspace: impl::WorkspaceBase {
+@@ -518,10 +539,10 @@ namespace acus {
+       requires (std::is_base_of_v<impl::RegionBase, Ts> && ...)
+       friend Workspace<Ts...>  promise(Cell const &);
+ 
+-      friend Workspace<Data<>, Clobber, ZeroCells<5>> promiseClean8(Cell const &);
+-      friend Workspace<Data<>, Clobber, ZeroCells<5>> promiseClean8(int);
+-      friend Workspace<Data<>, Data<>,  ZeroCells<5>> promiseClean16(Cell const &);
+-      friend Workspace<Data<>, Data<>,  ZeroCells<5>> promiseClean16(int);
++      friend Workspace<ws::Data<>, ws::Clobber, ws::ScratchCells<5>> promiseClean8(Cell const &);
++      friend Workspace<ws::Data<>, ws::Clobber, ws::ScratchCells<5>> promiseClean8(int);
++      friend Workspace<ws::Data<>, ws::Data<>, ws::ScratchCells<5>> promiseClean16(Cell const &);
++      friend Workspace<ws::Data<>, ws::Data<>, ws::ScratchCells<5>> promiseClean16(int);
+ 
+       template <typename ... Ts>
+       requires (std::is_base_of_v<impl::RegionBase, Ts> && ...)
+@@ -549,7 +570,7 @@ namespace acus {
+       static constexpr Reserved  makeReservedArray() {
+         return [&]<size_t ... I>(std::index_sequence<I...>) -> Reserved {
+           return {
+-            std::is_same_v<impl::At<I, Layout>, Untouched> ...
++            std::is_same_v<impl::At<I, Layout>, ws::Untouched> ...
+           };
+         }(std::make_index_sequence<N>{});
+       }
+@@ -562,8 +583,50 @@ namespace acus {
+         _cells(makeArray(start))
+       {}
+ 
+-      template <typename T, size_t Index, size_t N>
+-      static constexpr bool Has = impl::rangeSatisfies<Layout, T, Index, Index + N - 1>();
++      template <typename T, size_t Index, size_t Count>
++      static consteval bool has() {
++        if constexpr (Count == 0) {
++          return true;
++        } else if constexpr (Index >= N || Count > N - Index) {
++          return false;
++        } else {
++          return impl::rangeSatisfies<Layout, T, Index, Index + Count - 1>();
++        }
++      }
++
++      template <typename T, size_t Index, size_t Count>
++      static constexpr bool Has = has<T, Index, Count>();
++
++      template <size_t Index, typename Original, typename... Replacements>
++      struct ReplacementAt {
++        using Type = Original;
++      };
++
++      template <size_t Index, typename Original, typename First, typename... Rest>
++      struct ReplacementAt<Index, Original, First, Rest...> {
++        using Type = std::conditional_t<
++          First::index == Index,
++          typename First::Type,
++          typename ReplacementAt<Index, Original, Rest...>::Type
++        >;
++      };
++
++      template <typename... Replacements>
++      static consteval bool uniqueReplacementIndices() {
++        constexpr std::array<size_t, sizeof...(Replacements)> indices{Replacements::index...};
++        for (size_t i = 0; i < indices.size(); ++i) {
++          for (size_t j = i + 1; j < indices.size(); ++j) {
++            if (indices[i] == indices[j]) return false;
++          }
++        }
++        return true;
++      }
++
++      template <typename... Replacements, size_t... I>
++      static auto transformedType(std::index_sequence<I...>)
++        -> std::type_identity<Workspace<
++          typename ReplacementAt<I, impl::At<I, Layout>, Replacements...>::Type...
++        >>;
+       
+     public:
+ 
+@@ -574,26 +637,55 @@ namespace acus {
+       template <size_t Index, size_t N = 1>
+       static constexpr bool Data = Has<ws::Data<>, Index, N>;
+ 
+-      template <size_t Index, size_t Value>
++      template <size_t Index, int Value>
+       static constexpr bool KnownData = Has<ws::Data<Value>, Index, 1>;
+       
+       template <size_t Index, size_t N = 1>
+-      static constexpr bool Zero = Has<ws::Zero, Index, N>;
++      static constexpr bool Scratch = Has<ws::Scratch, Index, N>;
+ 
+       template <size_t Index, size_t N = 1>
+       static constexpr bool Clobber = Has<ws::Clobber, Index, N>;
+ 
+       template <size_t Start = 0>
+-      static constexpr size_t ScratchOffset = impl::firstZeroCell<Layout, Start>();
++      static constexpr size_t ScratchOffset =
++        impl::firstSatisfyingCell<Layout, ws::Scratch, Start>();
++
++      template <typename... Replacements>
++      struct TransformedType {
++        static_assert(((Replacements::index < N) && ...),
++                      "Workspace replacement index out of range");
++        static_assert(uniqueReplacementIndices<Replacements...>(),
++                      "Workspace Transform contains duplicate replacement indices");
++
++        using Type = std::conditional_t<
++          sizeof...(Replacements) == 0,
++          Workspace<Args...>,
++          typename decltype(
++            transformedType<Replacements...>(std::make_index_sequence<N>{})
++          )::type
++        >;
++      };
++
++      template <typename... Replacements>
++      using Transform = typename TransformedType<Replacements...>::Type;
++
++      // Reify a transformed static contract over the same physical cells.
++      // This is intentionally explicit: unlike the normal converting
++      // constructor, a transformation may strengthen the contract (for
++      // example Data<> -> Prepared<Role>) after an algorithm has established
++      // that postcondition.
++      template <typename... Replacements>
++      Transform<Replacements...> transformed() const {
++        return Transform<Replacements...>{_start};
++      }
+ 
+-      
+-      
+       Workspace(Cell const &single) requires (N == 1) :
+         _start(single),
+         _cells({single})
+       {}
+       
+-      template <typename Other> requires Other::template Satisfies<Args ...>
++      template <impl::IsWorkspace Other>
++      requires Other::template Satisfies<Args ...>
+       Workspace(Other const &other):
+         _start(other.start()),
+         _cells(makeArray(_start))
+@@ -637,34 +729,46 @@ namespace acus {
+     }; // Workspace
+ 
+ 
+-    // Concepts
+-    // TODO: move to another file
++    // Workspace capability concepts.  Each concept describes what an
++    // algorithm may assume about the concrete workspace passed by the caller;
++    // no weakening conversion is performed.  Refinement is written explicitly
++    // so constrained overload resolution can prefer the stronger algorithm.
+     template <typename W>
+-    concept SingleCell = impl::IsWorkspace<W> && W::template Data<0, 1>;
++    concept SingleCell =
++      impl::IsWorkspace<W> && W::template Data<0>;
+ 
+     template <typename W>
+-    concept DoubleCell = impl::IsWorkspace<W> && W::template Data<0, 2>;
++    concept DoubleCell =
++      SingleCell<W> && W::template Data<0, 2>;
+     
+     template <typename W>
+-    concept SingleAndScratch = impl::IsWorkspace<W> && W::template Data<0, 1> && W::template ScratchOffset<1> != impl::npos;
++    concept SingleAndScratch =
++      SingleCell<W> && W::template ScratchOffset<1> != impl::npos;
+ 
+     template <typename W>
+-    concept DoubleAndScratch = impl::IsWorkspace<W> && W::template Data<0, 2> && W::template ScratchOffset<1> != impl::npos;
++    concept DoubleAndScratch =
++      DoubleCell<W> && SingleAndScratch<W> &&
++      W::template ScratchOffset<2> != impl::npos;
+ 
++    template <typename W>
++    concept Inc16Operand =
++      DoubleCell<W> && W::template Satisfies<
++        DataCells<2>,
++        Scratch,
++        Untouched,
++        Scratch
++      >;
+ 
+     template <typename W>
+-    concept Inc16Operand = impl::IsWorkspace<W> && W::template Satisfies<
+-      DataCells<2>,
+-      Zero,
+-      Untouched,
+-      Zero      
+-    >;
++    concept Add16Operand =
++      DoubleAndScratch<W> && W::template Satisfies<
++        DataCells<2>,
++        ScratchCells<3>
++      >;
+ 
+     template <typename W>
+-    concept Add16Operand = impl::IsWorkspace<W> && W::template Satisfies<
+-      DataCells<2>,
+-      ZeroCells<3>
+-    >;
++    concept Compare16Operand =
++      DoubleCell<W> && W::template Scratch<2, 2>;
+ 
+     template <typename W>
+     concept Dec16Operand = Inc16Operand<W>;
+@@ -673,37 +777,42 @@ namespace acus {
+     concept Sub16Operand = Add16Operand<W>;
+ 
+     template <typename W>
+-    concept DivModNum = impl::IsWorkspace<W> && W::template Satisfies<
+-      Data<>,
+-      Clobber,
+-      ZeroCells<5>
+-    >
++    concept DivModNum =
++      SingleCell<W> && W::template Satisfies<
++        Data<>,
++        Clobber,
++        ScratchCells<5>
++      >;
+ 
+     template <typename W>
+-    concept DivMod16Num = impl::IsWorkspace<W> && W::template Satisfies<
+-      DataCells<2>,
+-      ZeroCells<5>
+-    >;
++    concept DivMod16Num =
++      DoubleCell<W> && W::template Satisfies<
++        DataCells<2>,
++        ScratchCells<5>
++      >;
+ 
+     template <typename W>
+-    concept DivMod16Den = impl::IsWorkspace<W> && W::template Satisfies<
+-      DataCells<2>,
+-      ZeroCells<3>
+-    >;
++    concept DivMod16Den =
++      DoubleCell<W> && W::template Satisfies<
++        DataCells<2>,
++        ScratchCells<3>
++      >;
+     
+     template <typename W>
+-    concept DivModPrepared = impl::IsWorkspace<W> && W::template Satisfies<
+-      Prepared<Role::NumeratorLow>,
+-      Prepared<Role::DenominatorLow>,
+-      ZeroCells<4>
+-    >;
++    concept DivModPrepared =
++      impl::IsWorkspace<W> && W::template Satisfies<
++        Prepared<Role::NumeratorLow>,
++        Prepared<Role::DenominatorLow>,
++        ScratchCells<4>
++      >;
+ 
+     template <typename W>
+-    concept SignBitOperand = impl::IsWorkspace<W> && W::template Satisfies<
+-      Data<>,
+-      ZeroCells<3>
+-    >;
+-    
++    concept SignBitOperand =
++      SingleCell<W> && W::template Satisfies<
++        Data<>,
++        ScratchCells<3>
++      >;
++
+     template <typename ... Args>
+     requires (std::is_base_of_v<impl::RegionBase, Args> && ...)
+     Workspace<Args...>  promise(Cell const &start) {
+@@ -716,21 +825,21 @@ namespace acus {
+       return promise(Cell{offset, field});
+     }
+     
+-    inline Workspace<Data, Clobber, ZeroCells<5>> promiseClean8(Cell const &value0) {
++    inline Workspace<Data<>, Clobber, ScratchCells<5>> promiseClean8(Cell const &value0) {
+       assert(value0.field == MacroCell::Value0);
+       return {value0};
+     }
+ 
+-    inline Workspace<Data, Clobber, ZeroCells<5>> promiseClean8(int offset) {
++    inline Workspace<Data<>, Clobber, ScratchCells<5>> promiseClean8(int offset) {
+       return promiseClean8(Cell{offset, MacroCell::Value0});
+     }
+ 
+-    inline Workspace<Data, Data, ZeroCells<5>> promiseClean16(Cell const &value0) {
++    inline Workspace<Data<>, Data<>, ScratchCells<5>> promiseClean16(Cell const &value0) {
+       assert(value0.field == MacroCell::Value0);
+       return {value0};
+     }
+ 
+-    inline Workspace<Data, Data, ZeroCells<5>> promiseClean16(int offset) {
++    inline Workspace<Data<>, Data<>, ScratchCells<5>> promiseClean16(int offset) {
+       return promiseClean16(Cell{offset, MacroCell::Value0});
+     }
+     
+diff --git a/src/assembler/assembler_add.cc b/src/assembler/assembler_add.cc
+index 752a5b7..c5cf933 100644
+--- a/src/assembler/assembler_add.cc
++++ b/src/assembler/assembler_add.cc
+@@ -34,7 +34,7 @@ Assembler::SingleCell Assembler::addConst(int delta) {
+   return addConst(_dp.current(), delta);
+ }
+ 
+-Assembler::SingleCell addConst(Cell lhs, int delta) {
++Assembler::SingleCell Assembler::addConst(Cell lhs, int delta) {
+   return addConst(SingleCell{lhs}, delta);
+ }
+ 
+diff --git a/src/assembler/assembler_add.tpp b/src/assembler/assembler_add.tpp
+index 4b8c275..59755ab 100644
+--- a/src/assembler/assembler_add.tpp
++++ b/src/assembler/assembler_add.tpp
+@@ -1,72 +1,57 @@
+ 
+-// Simple version, no scratch provided
++// Simple version, no scratch required.
+ template <ws::SingleCell W>
+ Assembler::Data8Result<W> Assembler::addConst(W const &lhs, int delta) {
+   pushPtr();
+-  moveTo(lhs);
+-  emit<primitive::ChangeBy>(lhs);
++  moveTo(lhs[0]);
++  emit<primitive::ChangeBy>(delta);
+   popPtr();
+   return lhs;
+ }
+ 
+-// Scratch provided -> use it to (possibly) use the more compact algorithm
++// Scratch provided -> use it to select the compact constant-change algorithm.
+ template <ws::SingleAndScratch W>
+-Assembler::Data8Result<W>  Assembler::addConst(W const &lhs, int delta) {
++Assembler::Data8Result<W> Assembler::addConst(W const &lhs, int delta) {
++  constexpr size_t scratch = W::template ScratchOffset<1>;
+   pushPtr();
+   moveTo(lhs[0]);
+-  emit<primitive::ChangeBy>(delta, 0, W::ScratchOffset);
++  emit<primitive::ChangeBy>(delta, 0, scratch);
+   popPtr();
+   return lhs;
+ }
+ 
+-// 16 bit constant addition
+-template <ws::IsWorkspace W>
+-Assembler::Data16Result<W> Assembler::add16Const(Add16Operand const &lhs, int delta) {
++template <ws::Add16Operand W>
++Assembler::Data16Result<W> Assembler::add16Const(W const &lhs, int delta) {
+   if (delta == 0) return lhs;
+-  if (delta < 0) {
+-    return sub16Const(lhs, -delta);
+-  }
++  if (delta < 0) return sub16Const(lhs, -delta);
+ 
+   Slot const tmpSlot = getTemp(ts::raw(1));
+   auto const tmp = ws::promiseClean16(tmpSlot);
+   setToValue16(tmp, delta);
+-  add16Destructive(lhs, tmp);
++  add16Destructive(lhs, DoubleCell{tmp});
+   freeTempSlot(tmpSlot);
+   return lhs;
+ }
+ 
+-// 8 bit addition
+-Assembler::SingleCell Assembler::addDestructive(SingleCell const &lhs, SingleCell const &delta) {
+-
+-  // TODO: use this
+-  // loop(delta, [&]{
+-  //   dec(delta);
+-  //   inc(lhs);
+-  // });
+-
+-  auto [cur, oth] = getFieldIndices(lhs, delta);
++template <ws::SingleCell W>
++Assembler::Data8Result<W> Assembler::addDestructive(W const &lhs, SingleCell const &delta) {
++  auto [cur, oth] = getFieldIndices(lhs[0], delta[0]);
+ 
+   pushPtr();
+-  moveTo(lhs);
++  moveTo(lhs[0]);
+   emit<primitive::Add>(cur, oth);
+   popPtr();
+-  
++
+   return lhs;
+ }
+ 
+-
+-// 16 bit addition
+-template <ws::IsWorkspace W>
+-Assembler::Data16Result<W> Assembler::add16Destructive(Add16Operand const &lhs, DoubleCell const &delta) {
+-  // Add low byte
+-  loop(delta[0], [&]{
+-    dec();
++template <ws::Add16Operand W>
++Assembler::Data16Result<W> Assembler::add16Destructive(W const &lhs, DoubleCell const &delta) {
++  loop(delta[0], [&] {
++    dec(delta[0]);
+     inc16(lhs);
+   });
+ 
+-  // Add high byte
+-  addDestructive(lhs[1], delta[1]);
+-  return op;
++  addDestructive(SingleCell{lhs[1]}, SingleCell{delta[1]});
++  return lhs;
+ }
+-
+-
+diff --git a/src/assembler/assembler_algorithms.cc b/src/assembler/assembler_algorithms.cc
+index f4e4a0e..0bee6c6 100644
+--- a/src/assembler/assembler_algorithms.cc
++++ b/src/assembler/assembler_algorithms.cc
+@@ -96,6 +96,10 @@ Assembler::SingleCell Assembler::dec() {
+   return dec(_dp.current());
+ }
+ 
++Assembler::SingleCell Assembler::dec(Cell target) {
++  return dec(SingleCell{target});
++}
++
+ void Assembler::moveField(Cell from, Cell to) {
+   auto [src, dst] = getFieldIndices(from, to);
+   if (src == dst) return;
+diff --git a/src/assembler/assembler_algorithms.tpp b/src/assembler/assembler_algorithms.tpp
+index fd2f1f5..a6ffb27 100644
+--- a/src/assembler/assembler_algorithms.tpp
++++ b/src/assembler/assembler_algorithms.tpp
+@@ -1,16 +1,18 @@
+ 
+ template <ws::SingleCell W>
+-Assembler::Data8Result<W> Assembler::inc(W const &op)
++Assembler::Data8Result<W> Assembler::inc(W const &op) {
+   pushPtr();
+   moveTo(op[0]);
+   emit<primitive::ChangeBy>(1);
+   popPtr();
+-  return target;
++  return op;
+ }
+ 
+-template <impl::IsWorkspace W>
+-Assembler::Data16Result<W> Assembler::inc16(W const &op) {  
+-  auto const [L, H, S1, S2, S3] = op.cells();
++template <ws::Inc16Operand W>
++Assembler::Data16Result<W> Assembler::inc16(W const &op) {
++  auto const [L, H, S1, S2, S3] = op.template cells<5>();
++  (void)S1;
++  (void)S2;
+ 
+   inc(S3);
+   inc(H);
+@@ -22,17 +24,19 @@ Assembler::Data16Result<W> Assembler::inc16(W const &op) {
+ }
+ 
+ template <ws::SingleCell W>
+-Assembler::Data8Result<W> dec(W const &op) {
++Assembler::Data8Result<W> Assembler::dec(W const &op) {
+   pushPtr();
+   moveTo(op[0]);
+   emit<primitive::ChangeBy>(-1);
+   popPtr();
+-  return target;
++  return op;
+ }
+ 
+-template <impl::IsWorkspace W>
++template <ws::Dec16Operand W>
+ Assembler::Data16Result<W> Assembler::dec16(W const &op) {
+-  auto const [L, H, S1, S2, S3] = op.cells();
++  auto const [L, H, S1, S2, S3] = op.template cells<5>();
++  (void)S1;
++  (void)S2;
+ 
+   inc(S3);
+   dec(H);
+@@ -46,32 +50,40 @@ Assembler::Data16Result<W> Assembler::dec16(W const &op) {
+ template <ws::SingleCell W>
+ Assembler::Data8Result<W> Assembler::setToValue(W const &target, int value) {
+   pushPtr();
+-  moveTo(target);
++  moveTo(target[0]);
+   zeroCell();
+-  addConst(value & 0xff);
++  emit<primitive::ChangeBy>(value & 0xff);
+   popPtr();
+   return target;
+ }
+ 
+ template <ws::DoubleCell W>
+ Assembler::Data16Result<W> Assembler::setToValue16(W const &target, int value) {
+-  setToValue(target[0], value & 0xff);
+-  setToValue(target[1], (value >> 8) & 0xff);
++  setToValue(SingleCell{target[0]}, value & 0xff);
++  setToValue(SingleCell{target[1]}, (value >> 8) & 0xff);
+   return target;
+ }
+ 
+ template <ws::SingleAndScratch W>
+ Assembler::Data8Result<W> Assembler::setToValue(W const &target, int value) {
++  constexpr size_t scratch = W::template ScratchOffset<1>;
+   pushPtr();
+   moveTo(target[0]);
+-  emit<primitive::ConstructConstant>(value & 0xff, 0, W::ScratchOffset);
++  emit<primitive::ConstructConstant>(value & 0xff, 0, scratch);
+   popPtr();
+   return target;
+ }
+ 
+ template <ws::DoubleAndScratch W>
+ Assembler::Data16Result<W> Assembler::setToValue16(W const &target, int value) {
+-  setToValue(ws::promise(target[0], ws::Layout<ws::Data, ws::Data, ws::Zero>{}), value & 0xff);
+-  setToValue(ws::promise(target[1], ws::Layout<ws::Data, ws::Zero>{}),           value >> 8);
++  constexpr size_t scratch = W::template ScratchOffset<2>;
++
++  pushPtr();
++  moveTo(target[0]);
++  emit<primitive::ConstructConstant>(value & 0xff, 0, scratch);
++  moveTo(target[1]);
++  emit<primitive::ConstructConstant>((value >> 8) & 0xff, 0, scratch - 1);
++  popPtr();
++
+   return target;
+-}  
++}
+diff --git a/src/assembler/assembler_calls_control.cc b/src/assembler/assembler_calls_control.cc
+index 541b9f1..b65e756 100644
+--- a/src/assembler/assembler_calls_control.cc
++++ b/src/assembler/assembler_calls_control.cc
+@@ -294,7 +294,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
+     moveTo(0, MacroCell::Value0);
+     primitive::DInt const diff = currentFrameSize + paramStart + offset;
+     emit<primitive::MovePointerRelative>(diff);
+-    setToValue16(value);
++    setToValue16(ws::promise(_dp.current(), ws::Layout<ws::DataCells<2>>{}), value);
+     emit<primitive::MovePointerRelative>(-diff);
+     offset += MacroCell::FieldCount;
+   };
+@@ -446,7 +446,7 @@ void Assembler::fetchReturnData() {
+   emit<primitive::MovePointerRelative>(stackFrameSize);
+ 
+   // On Value1 field of the call-frame -> if 0, set our own Value1 field to 0 as well
+-  notDestructive(Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
++  notKernel(Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
+   loopOpen(); {
+     emit<primitive::MovePointerRelative>(-stackFrameSize);
+     zeroCell();
+@@ -499,8 +499,8 @@ void Assembler::branchIfSlot(Slot slot, std::string const &trueLabel, std::strin
+   assignSlot(tmp, slot);
+ 
+   if (slot.type()->usesValue1()) {
+-    orDestructive(Cell{tmp, MacroCell::Value0},
+-                  Cell{tmp, MacroCell::Value1});
++    orDestructive(SingleCell{Cell{tmp, MacroCell::Value0}},
++                  SingleCell{Cell{tmp, MacroCell::Value1}});
+   } else {
+     zeroCell(Cell{tmp, MacroCell::Value1});
+   }
+diff --git a/src/assembler/assembler_comparisons.cc b/src/assembler/assembler_comparisons.cc
+index 40a0f39..e8ff9e8 100644
+--- a/src/assembler/assembler_comparisons.cc
++++ b/src/assembler/assembler_comparisons.cc
+@@ -17,10 +17,9 @@ void Assembler::slotEqualConst(Slot lhs, int val) {
+   subConstFromSlot(lhs, val);
+   
+   if (lhs.type()->usesValue1()) {
+-    not16Destructive(Cell{lhs, MacroCell::Value1},
+-		     Temps<1>::select(lhs, MacroCell::Scratch0));
++    not16Destructive(ws::promiseClean16(lhs));
+   } else {
+-    notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
++    notDestructive(ws::promiseClean8(lhs));
+   }
+ 
+   popPtr();
+@@ -33,13 +32,9 @@ void Assembler::slotEqualSlot(Slot lhs, Slot rhs) {
+   moveTo(lhs);
+ 
+   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+-    eq16Destructive(Cell{lhs, MacroCell::Value1},
+-		    Cell{rhsCopy, MacroCell::Value0},
+-		    Cell{rhsCopy, MacroCell::Value1},
+-		    Temps<1>::select(lhs, MacroCell::Scratch0));
++    eq16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+   } else {
+-    eqDestructive(Cell{rhsCopy, MacroCell::Value0},
+-		  Temps<1>::select(lhs, MacroCell::Scratch0));
++    eqDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+   }
+ 
+   popPtr();
+@@ -49,16 +44,14 @@ void Assembler::slotEqualSlot(Slot lhs, Slot rhs) {
+ void Assembler::slotNotEqualConst(Slot lhs, int val) {
+   pushPtr();
+   slotEqualConst(lhs, val);
+-  moveTo(lhs);
+-  notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
++  notDestructive(ws::promiseClean8(lhs));
+   popPtr();
+ }
+ 
+ void Assembler::slotNotEqualSlot(Slot lhs, Slot rhs) {
+   pushPtr();
+   slotEqualSlot(lhs, rhs);
+-  moveTo(lhs);
+-  notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
++  notDestructive(ws::promiseClean8(lhs));
+   popPtr();
+ }
+ 
+@@ -146,16 +139,9 @@ void Assembler::slotLessSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs)
+ 
+   moveTo(lhs);  
+   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+-    less16Destructive(Cell{lhs, MacroCell::Value1},
+-		      Cell{rhsCopy, MacroCell::Value0},
+-		      Cell{rhsCopy, MacroCell::Value1},
+-		      Temps<4>::select(lhs, MacroCell::Scratch0,
+-				       lhs, MacroCell::Scratch1,
+-				       rhsCopy, MacroCell::Scratch0,
+-				       rhsCopy, MacroCell::Scratch1));
++    less16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+   } else {
+-    lessDestructive(Cell{rhsCopy, MacroCell::Value0},
+-		    Temps<1>::select(lhs, MacroCell::Scratch0));
++    lessDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+   }
+ 
+   popPtr();
+@@ -285,15 +271,9 @@ void Assembler::slotLessEqualSlotUnsigned(Slot lhs, Slot rhs, bool const destroy
+ 
+   moveTo(lhs);  
+   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+-    lessOrEqual16Destructive(Cell{lhs, MacroCell::Value1},
+-			     Cell{rhsCopy, MacroCell::Value0},
+-			     Cell{rhsCopy, MacroCell::Value1},
+-			     Temps<3>::select(lhs, MacroCell::Scratch0,
+-					      lhs, MacroCell::Scratch1,
+-					      rhsCopy, MacroCell::Scratch0));
++    lessOrEqual16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+   } else {
+-    lessOrEqualDestructive(Cell{rhsCopy, MacroCell::Value0},
+-			   Temps<1>::select(lhs, MacroCell::Scratch0));
++    lessOrEqualDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+   }
+ 
+   popPtr();
+@@ -401,15 +381,9 @@ void Assembler::slotGreaterSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRh
+     
+   moveTo(lhs);  
+   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+-    greater16Destructive(Cell{lhs, MacroCell::Value1},
+-			 Cell{rhsCopy, MacroCell::Value0},
+-			 Cell{rhsCopy, MacroCell::Value1},
+-			 Temps<3>::select(lhs, MacroCell::Scratch0,
+-					  lhs, MacroCell::Scratch1,
+-					  rhsCopy, MacroCell::Scratch0));
++    greater16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+   } else {
+-    greaterDestructive(Cell{rhsCopy, MacroCell::Value0},
+-		       Temps<1>::select(lhs, MacroCell::Scratch0));
++    greaterDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+   }
+ 
+   popPtr();
+@@ -518,16 +492,9 @@ void Assembler::slotGreaterEqualSlotUnsigned(Slot lhs, Slot rhs, bool const dest
+ 
+   moveTo(lhs);  
+   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+-    greaterOrEqual16Destructive(Cell{lhs, MacroCell::Value1},
+-				Cell{rhsCopy, MacroCell::Value0},
+-				Cell{rhsCopy, MacroCell::Value1},
+-				Temps<4>::select(lhs, MacroCell::Scratch0,
+-						 lhs, MacroCell::Scratch1,
+-						 rhsCopy, MacroCell::Scratch0,
+-						 rhsCopy, MacroCell::Scratch1));
++    greaterOrEqual16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+   } else {
+-    greaterOrEqualDestructive(Cell{rhsCopy, MacroCell::Value0},
+-			      Temps<1>::select(lhs, MacroCell::Scratch0));
++    greaterOrEqualDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+   }
+ 
+   popPtr();
+@@ -572,7 +539,7 @@ void Assembler::slotGreaterEqualSlotSigned(Slot lhs, Slot rhs) {
+ 		  });   
+ }
+ 
+-void Assembler::eqDestructive(Cell other, Temps<1> tmp) {
++void Assembler::eqKernel(Cell other) {
+   auto [cur, oth] = getFieldIndices(_dp.current(), other);
+   emit<primitive::Equal>(cur, oth);
+ }
+@@ -581,21 +548,21 @@ void Assembler::eqDestructive(Cell other, Temps<1> tmp) {
+ //   pushPtr();
+ //   copyField(result, tmp);
+ //   moveTo(result);
+-//   eqDestructive(other, tmp);
++//   eqKernel(other, tmp);
+ //   popPtr();
+ // }
+ 
+-void Assembler::eq16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
++void Assembler::eq16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
+   Cell const currentLow = _dp.current();
+   Cell const currentHigh = high;
+ 
+   pushPtr();
+   moveTo(currentLow);
+-  eqDestructive(otherLow, tmp.select<0>());
++  eqKernel(otherLow);
+   moveTo(currentHigh);
+-  eqDestructive(otherHigh, tmp.select<0>());
++  eqKernel(otherHigh);
+   moveTo(currentLow);
+-  andDestructive(currentHigh, tmp.select<0>());
++  andKernel(currentHigh, tmp.select<0>());
+   popPtr();
+ }
+ 
+@@ -615,12 +582,12 @@ void Assembler::eq16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<
+ //   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
+ 
+ //   moveTo(result);
+-//   eq16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3>());
++//   eq16Kernel(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3>());
+ //   popPtr();
+ // }
+ 
+ 
+-void Assembler::lessDestructive(Cell other, Temps<1> tmp) { 
++void Assembler::lessKernel(Cell other, Temps<1> tmp) {
+   auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+   emit<primitive::Less>(cur, oth, scratch);
+ }
+@@ -632,11 +599,11 @@ void Assembler::lessDestructive(Cell other, Temps<1> tmp) {
+ //   moveTo(other);
+ //   copyField(otherCopy, tmp.select<1>());
+ //   moveTo(result);
+-//   lessDestructive(otherCopy, tmp.select<1>());
++//   lessKernel(otherCopy, tmp.select<1>());
+ //   popPtr();
+ // }
+ 
+-void Assembler::less16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
++void Assembler::less16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
+   // xH < yH || (xH == yH && xL < yL)
+ 
+   pushPtr();
+@@ -650,29 +617,29 @@ void Assembler::less16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temp
+   moveTo(currentHigh); copyField(currentCopyHigh, tmp.select<2>());
+   
+   moveTo(currentHigh);
+-  lessDestructive(otherHigh, tmp.select<2>());
++  lessKernel(otherHigh, tmp.select<2>());
+   Cell const highByteLess = currentHigh;
+   // otherHigh cleared
+   // currentHigh: xH < yH
+ 
+   moveTo(currentCopyHigh);
+-  eqDestructive(otherCopyHigh, tmp.select<2>());
++  eqKernel(otherCopyHigh);
+   Cell const highByteEqual = currentCopyHigh;
+   // otherCopyHigh cleared
+   // currentCopyHigh: xH == yH
+   
+   moveTo(currentLow);
+-  lessDestructive(otherLow, tmp.select<2>()); 
++  lessKernel(otherLow, tmp.select<2>());
+   Cell const lowByteLess = currentLow;
+   // otherLow cleared
+   // currentLow: xL < yL
+ 
+   moveTo(highByteEqual); 
+-  andDestructive(lowByteLess, tmp.select<2>()); 
++  andKernel(lowByteLess, tmp.select<2>());
+   // currentLow cleared
+   // currentCopyHigh: xH == yH && xL < yL
+   
+-  orDestructive(highByteEqual, highByteLess);
++  orDestructive(SingleCell{highByteEqual}, SingleCell{highByteLess});
+   // currentHigh cleared
+   // currentCopyHigh: xH < yH || (xH == yH && xL < yL)
+   
+@@ -700,12 +667,12 @@ void Assembler::less16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temp
+ //   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
+ 
+ //   moveTo(result);
+-//   less16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<4, 5, 6, 7>());
++//   less16Kernel(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<4, 5, 6, 7>());
+ //   popPtr();  
+ // }
+ 
+ 
+-void Assembler::lessOrEqualDestructive(Cell other, Temps<1> tmp) {
++void Assembler::lessOrEqualKernel(Cell other, Temps<1> tmp) {
+   auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+   emit<primitive::LessOrEqual>(cur, oth, scratch);
+ }
+@@ -717,13 +684,13 @@ void Assembler::lessOrEqualDestructive(Cell other, Temps<1> tmp) {
+ //   moveTo(other);
+ //   copyField(otherCopy, tmp.select<1>());
+ //   moveTo(result);
+-//   lessOrEqualDestructive(otherCopy, tmp.select<1>());
++//   lessOrEqualKernel(otherCopy, tmp.select<1>());
+ //   popPtr();
+ // }
+ 
+-void Assembler::lessOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
+-  greater16Destructive(high, otherLow, otherHigh, tmp);
+-  notDestructive(tmp.select<0>());
++void Assembler::lessOrEqual16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
++  greater16Kernel(high, otherLow, otherHigh, tmp);
++  notKernel(tmp.select<0>());
+ }
+ 
+ // void Assembler::lessOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<6> tmp) {
+@@ -742,12 +709,12 @@ void Assembler::lessOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHig
+ //   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
+ 
+ //   moveTo(result);
+-//   lessOrEqual16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3, 4, 5>());
++//   lessOrEqual16Kernel(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3, 4, 5>());
+ //   popPtr();  
+ 
+ // }
+ 
+-void Assembler::greaterDestructive(Cell other, Temps<1> tmp) {
++void Assembler::greaterKernel(Cell other, Temps<1> tmp) {
+   auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+   emit<primitive::Greater>(cur, oth, scratch);
+ }
+@@ -759,12 +726,12 @@ void Assembler::greaterDestructive(Cell other, Temps<1> tmp) {
+ //   moveTo(other);
+ //   copyField(otherCopy, tmp.select<1>());
+ //   moveTo(result);
+-//   greaterDestructive(otherCopy, tmp.select<1>());
++//   greaterKernel(otherCopy, tmp.select<1>());
+ //   popPtr();
+ // }
+ 
+ 
+-void Assembler::greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
++void Assembler::greater16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<3> tmp) {
+   // xH > yH || (xH == yH && xL > yL)
+ 
+   pushPtr();
+@@ -778,29 +745,29 @@ void Assembler::greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, T
+   moveTo(currentHigh); copyField(currentCopyHigh, tmp.select<2>());
+   
+   moveTo(currentHigh);
+-  greaterDestructive(otherHigh, tmp.select<2>());
++  greaterKernel(otherHigh, tmp.select<2>());
+   Cell const highByteGreater = currentHigh;
+   // otherHigh cleared
+   // currentHigh: xH > yH
+   
+   moveTo(currentCopyHigh);
+-  eqDestructive(otherCopyHigh, tmp.select<2>());
++  eqKernel(otherCopyHigh);
+   Cell const highByteEqual = currentCopyHigh;
+   // otherCopyHigh cleared
+   // currentCopyHigh: xH == yH
+   
+   moveTo(currentLow);
+-  greaterDestructive(otherLow, tmp.select<2>()); 
++  greaterKernel(otherLow, tmp.select<2>());
+   Cell const lowByteGreater = currentLow;
+   // otherLow cleared
+   // currentLow: xL > yL
+ 
+   moveTo(highByteEqual); 
+-  andDestructive(lowByteGreater, tmp.select<2>()); 
++  andKernel(lowByteGreater, tmp.select<2>());
+   // currentLow cleared
+   // currentCopyHigh: xH == yH && xL > yL
+   
+-  orDestructive(highByteEqual, highByteGreater);
++  orDestructive(SingleCell{highByteEqual}, SingleCell{highByteGreater});
+   // currentHigh cleared
+   // currentCopyHigh: xH > yH || (xH == yH && xL > yL)
+   
+@@ -828,13 +795,13 @@ void Assembler::greater16Destructive(Cell high, Cell otherLow, Cell otherHigh, T
+ //   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
+ 
+ //   moveTo(result);
+-//   greater16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3, 4, 5>());
++//   greater16Kernel(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3, 4, 5>());
+ //   popPtr();  
+ // }
+ 
+ 
+ 
+-void Assembler::greaterOrEqualDestructive(Cell other, Temps<1> tmp) {
++void Assembler::greaterOrEqualKernel(Cell other, Temps<1> tmp) {
+   auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+   emit<primitive::GreaterOrEqual>(cur, oth, scratch);
+ }
+@@ -846,13 +813,13 @@ void Assembler::greaterOrEqualDestructive(Cell other, Temps<1> tmp) {
+ //   moveTo(other);
+ //   copyField(otherCopy, tmp.select<1>());
+ //   moveTo(result);
+-//   greaterOrEqualDestructive(otherCopy, tmp.select<1>());
++//   greaterOrEqualKernel(otherCopy, tmp.select<1>());
+ //   popPtr();
+ // }
+ 
+-void Assembler::greaterOrEqual16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
+-  less16Destructive(high, otherLow, otherHigh, tmp);
+-  notDestructive(tmp.select<0>());
++void Assembler::greaterOrEqual16Kernel(Cell high, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
++  less16Kernel(high, otherLow, otherHigh, tmp);
++  notKernel(tmp.select<0>());
+ }
+ 
+ // void Assembler::greaterOrEqual16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<8> tmp) {
+@@ -871,7 +838,7 @@ void Assembler::greaterOrEqual16Destructive(Cell high, Cell otherLow, Cell other
+ //   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
+ 
+ //   moveTo(result);
+-//   greaterOrEqual16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<4, 5, 6, 7>());
++//   greaterOrEqual16Kernel(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<4, 5, 6, 7>());
+ //   popPtr();  
+ 
+ // }
+diff --git a/src/assembler/assembler_comparisons.tpp b/src/assembler/assembler_comparisons.tpp
+new file mode 100644
+index 0000000..396dc2d
+--- /dev/null
++++ b/src/assembler/assembler_comparisons.tpp
+@@ -0,0 +1,108 @@
++template <ws::SingleCell W>
++Assembler::Data8Result<W> Assembler::eqDestructive(W const &lhs, SingleCell const &rhs) {
++  pushPtr();
++  moveTo(lhs[0]);
++  eqKernel(rhs[0]);
++  popPtr();
++  return lhs;
++}
++
++template <ws::Compare16Operand W>
++Assembler::Bool16Result<W> Assembler::eq16Destructive(W const &lhs, Compare16Rhs const &rhs) {
++  pushPtr();
++  moveTo(lhs[0]);
++  eq16Kernel(lhs[1], rhs[0], rhs[1], Temps<1>{lhs[2]});
++  popPtr();
++  return lhs.template transformed<
++    ws::Replace<0, ws::Data<>>,
++    ws::Replace<1, ws::Scratch>
++  >();
++}
++
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::lessDestructive(W const &lhs, SingleCell const &rhs) {
++  constexpr size_t scratch = W::template ScratchOffset<1>;
++  pushPtr();
++  moveTo(lhs[0]);
++  lessKernel(rhs[0], Temps<1>{lhs[scratch]});
++  popPtr();
++  return lhs;
++}
++
++template <ws::Compare16Operand W>
++Assembler::Bool16Result<W> Assembler::less16Destructive(W const &lhs, Compare16Rhs const &rhs) {
++  pushPtr();
++  moveTo(lhs[0]);
++  less16Kernel(lhs[1], rhs[0], rhs[1], Temps<4>{lhs[2], lhs[3], rhs[2], rhs[3]});
++  popPtr();
++  return lhs.template transformed<
++    ws::Replace<0, ws::Data<>>,
++    ws::Replace<1, ws::Scratch>
++  >();
++}
++
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::lessOrEqualDestructive(W const &lhs, SingleCell const &rhs) {
++  constexpr size_t scratch = W::template ScratchOffset<1>;
++  pushPtr();
++  moveTo(lhs[0]);
++  lessOrEqualKernel(rhs[0], Temps<1>{lhs[scratch]});
++  popPtr();
++  return lhs;
++}
++
++template <ws::Compare16Operand W>
++Assembler::Bool16Result<W> Assembler::lessOrEqual16Destructive(W const &lhs, Compare16Rhs const &rhs) {
++  pushPtr();
++  moveTo(lhs[0]);
++  lessOrEqual16Kernel(lhs[1], rhs[0], rhs[1], Temps<3>{lhs[2], lhs[3], rhs[2]});
++  popPtr();
++  return lhs.template transformed<
++    ws::Replace<0, ws::Data<>>,
++    ws::Replace<1, ws::Scratch>
++  >();
++}
++
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::greaterDestructive(W const &lhs, SingleCell const &rhs) {
++  constexpr size_t scratch = W::template ScratchOffset<1>;
++  pushPtr();
++  moveTo(lhs[0]);
++  greaterKernel(rhs[0], Temps<1>{lhs[scratch]});
++  popPtr();
++  return lhs;
++}
++
++template <ws::Compare16Operand W>
++Assembler::Bool16Result<W> Assembler::greater16Destructive(W const &lhs, Compare16Rhs const &rhs) {
++  pushPtr();
++  moveTo(lhs[0]);
++  greater16Kernel(lhs[1], rhs[0], rhs[1], Temps<3>{lhs[2], lhs[3], rhs[2]});
++  popPtr();
++  return lhs.template transformed<
++    ws::Replace<0, ws::Data<>>,
++    ws::Replace<1, ws::Scratch>
++  >();
++}
++
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::greaterOrEqualDestructive(W const &lhs, SingleCell const &rhs) {
++  constexpr size_t scratch = W::template ScratchOffset<1>;
++  pushPtr();
++  moveTo(lhs[0]);
++  greaterOrEqualKernel(rhs[0], Temps<1>{lhs[scratch]});
++  popPtr();
++  return lhs;
++}
++
++template <ws::Compare16Operand W>
++Assembler::Bool16Result<W> Assembler::greaterOrEqual16Destructive(W const &lhs, Compare16Rhs const &rhs) {
++  pushPtr();
++  moveTo(lhs[0]);
++  greaterOrEqual16Kernel(lhs[1], rhs[0], rhs[1], Temps<4>{lhs[2], lhs[3], rhs[2], rhs[3]});
++  popPtr();
++  return lhs.template transformed<
++    ws::Replace<0, ws::Data<>>,
++    ws::Replace<1, ws::Scratch>
++  >();
++}
+diff --git a/src/assembler/assembler_divmod.cc b/src/assembler/assembler_divmod.cc
+index 1af74a3..e22bc14 100644
+--- a/src/assembler/assembler_divmod.cc
++++ b/src/assembler/assembler_divmod.cc
+@@ -85,7 +85,7 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
+ 	    Cell{lhs, MacroCell::Scratch1});
+   
+   signBitDestructive(ws::promise(Cell{lhs, MacroCell::Scratch0},
+-				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
++				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
+ 
+   Slot tmp = getTemp(ts::raw(2));
+   Slot const resultNegative = tmp.sub(ts::u8(), 0);
+@@ -112,7 +112,7 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
+ 	    Cell{rhsCopy, MacroCell::Scratch1});
+   
+   signBitDestructive(ws::promise(Cell{rhsCopy, MacroCell::Scratch0},
+-				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
++				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
+ 
+   // Take absolute value of rhsCopy and set/adjust resultNegative flag if necessary
+   {
+@@ -122,7 +122,7 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
+       negateSlot(rhsCopy);
+ 
+       moveTo(resultNegativeFlag);
+-      notDestructive(Cell{resultNegative, MacroCell::Scratch0});
++      notKernel(Temps<1>{Cell{resultNegative, MacroCell::Scratch0}});
+     });
+   }
+ 
+@@ -172,7 +172,7 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
+     lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0
+   };
+   copyField(lhsSignByte, S, SCopy1);
+-  signBitDestructive(ws::promise(S, ws::Layout<ws::Data, ws::ZeroCells<5>>{}));
++  signBitDestructive(ws::promise(S, ws::Layout<ws::Data<>, ws::ScratchCells<5>>{}));
+ 
+   // Copy sign bit to adjacent cells so we have enough independent copies.
+   literalBf(S, modSlot
+@@ -190,7 +190,7 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
+   // Fix division sign.
+   if (denom < 0) {
+     moveTo(SCopy1);
+-    notDestructive(Temps<1>(S)); // Reuse S, already zero.
++    notKernel(Temps<1>(S)); // Reuse S, already zero.
+   }
+   
+   loop(SCopy1, [&] {
+@@ -272,7 +272,7 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
+ 	    Cell{lhs, MacroCell::Scratch1});
+   
+   signBitDestructive(ws::promise(Cell{lhs, MacroCell::Scratch0},
+-				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
++				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
+ 
+   Slot tmp = getTemp(ts::raw(2));
+   Slot const resultNegative = tmp.sub(rhs.type(), 0);
+@@ -366,7 +366,7 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
+   };
+ 
+   copyField(lhsSignByte, S, SCopy1);
+-  signBitDestructive(ws::promise(S, ws::Layout<ws::Data, ws::ZeroCells<5>>{}));
++  signBitDestructive(ws::promise(S, ws::Layout<ws::Data<>, ws::ScratchCells<5>>{}));
+ 
+   // Copy sign bit to adjacent cells so we have enough independent copies.
+   literalBf(S, divSlot
+@@ -391,7 +391,7 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
+   if (divSlot) {
+     if (denom < 0) {
+       moveTo(SCopy2);
+-      notDestructive(Temps<1>{SCopy1}); // Reuse S2, already zero.
++      notKernel(Temps<1>{SCopy1}); // Reuse S2, already zero.
+     }
+     loop(SCopy1, [&] {
+       zeroCell(SCopy1);
+diff --git a/src/assembler/assembler_divmod.tpp b/src/assembler/assembler_divmod.tpp
+index ecd5d24..32d398d 100644
+--- a/src/assembler/assembler_divmod.tpp
++++ b/src/assembler/assembler_divmod.tpp
+@@ -10,7 +10,7 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
+ 
+   // Reuse the CopyTemp field for DTest and pick a new CopyTemp field
+   v.rename("CopyTemp", "DTest");
+-  v.rename<3>("CopyTemp");
++  v.template rename<3>("CopyTemp");
+   copyField(v["D"], v["DTest"], v["CopyTemp"]);
+ 
+   // Assume denominator == 0.
+@@ -23,9 +23,10 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
+     auto prepared = ws::promise(v["N"], ws::Layout<
+ 				ws::Prepared<ws::Role::NumeratorLow>,
+ 				ws::Prepared<ws::Role::DenominatorLow>,
+-				ws::ZeroCells<5>>{});
++				ws::ScratchCells<5>>{});
+ 
+-    v = divModDestructiveKernel(prepared).view("Q", "R"); 
++    v = divModDestructiveKernel(prepared)
++      .view("Q", "R", ws::At<6>{"ZeroFlag"});
+   });
+ 
+   loop(v["ZeroFlag"], [&] {
+@@ -39,18 +40,16 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
+ 
+   popPtr();
+ 
+-  return ws::promise(num.start(), ws::Layout<
+-      ws::Prepared<ws::Role::QuotientLow>,
+-      ws::Prepared<ws::Role::RemainderLow>,
+-      ws::ZeroCells<5>
+-    >{}
+-  );
++  return num.template transformed<
++    ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
++    ws::Replace<1, ws::Prepared<ws::Role::RemainderLow>>
++  >();
+ }
+ 
+ template <ws::DivModPrepared W>
+ Assembler::DivModResult<W> Assembler::divModDestructiveKernel(W const &prep) {
+ 
+-  auto const [N, D, Q, CopyTemp, DCopy, RestoreFlag] = prep.cells<6>();
++  auto const [N, D, Q, CopyTemp, DCopy, RestoreFlag] = prep.template cells<6>();
+ 
+   pushPtr();
+ 
+@@ -101,7 +100,7 @@ Assembler::DivModResult<W> Assembler::divModDestructiveKernel(W const &prep) {
+   // 0 | c | n/d |    0     |   d   |     0
+   //
+   // remainder = d - c
+-  subDestructive(DCopy, D);
++  subDestructive(SingleCell{DCopy}, SingleCell{D});
+ 
+   // D and N are now both zero, so place the final results there.
+   moveField(DCopy, D); // TODO: known zero move optimization
+@@ -112,22 +111,20 @@ Assembler::DivModResult<W> Assembler::divModDestructiveKernel(W const &prep) {
+   // Q | R | 0 | 0 | 0 | 0
+   popPtr();
+ 
+-  return ws::promise(prep.start(), ws::Layout<
+-      ws::Prepared<ws::Role::QuotientLow>,
+-      ws::Prepared<ws::Role::RemainderLow>,
+-      ws::ZeroCells<4>
+-    >{}
+-  );
++  return prep.template transformed<
++    ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
++    ws::Replace<1, ws::Prepared<ws::Role::RemainderLow>>
++  >();
+ }
+ 
+-template <impl::DivMod16Num N>
+-Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, DivMod16Denom const &den) {
++template <ws::DivMod16Num N, ws::DivMod16Den D>
++Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const &den) {
+ 
+   using Dec17Operand = ws::Workspace<
+     ws::DataCells<3>,
+-    ws::Zero,
++    ws::Scratch,
+     ws::Untouched,
+-    ws::ZeroCells<2>
++    ws::ScratchCells<2>
+   >;
+   
+   auto const dec17 = [&](Dec17Operand const &op) -> Dec17Operand {
+@@ -160,8 +157,8 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, DivMod1
+ 
+   pushPtr();
+ 
+-  [[maybe_unused]] auto const [Rlo, Rhi, G, scratch, Qinitial, Qfinal] = num.cells<6>();
+-  auto const [Dlo, Dhi, DloCopy, DhiCopy, CopyTemp] = den.cells<5>();
++  [[maybe_unused]] auto const [Rlo, Rhi, G, scratch, Qinitial, Qfinal] = num.template cells<6>();
++  auto const [Dlo, Dhi, DloCopy, DhiCopy, CopyTemp] = den.template cells<5>();
+ 
+   // Preserve the denominator. The subtraction loop consumes Dlo/Dhi
+   // on every iteration, so these copies are restored afterwards.
+@@ -177,15 +174,15 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, DivMod1
+     // 17-bit subtraction: Rlo:Rhi:G -= Dlo:Dhi
+     loop(Dlo, [&] {
+       dec(Dlo);
+-      dec17(ws::promise(Rlo, ws::Layout<ws::DataCells<3>, ws::Zero,  ws::Untouched, // Qinitial
+-                        ws::ZeroCells<2>>{}));
++      dec17(ws::promise(Rlo, ws::Layout<ws::DataCells<3>, ws::Scratch,  ws::Untouched, // Qinitial
++                        ws::ScratchCells<2>>{}));
+     });
+ 
+     loop(Dhi, [&] {
+       dec(Dhi);
+       dec16(ws::promise(Rhi,
+-                        ws::Layout< ws::DataCells<2>, ws::Zero, ws::Untouched, // Qinitial
+-                        ws::ZeroCells<2>>{}));
++                        ws::Layout< ws::DataCells<2>, ws::Scratch, ws::Untouched, // Qinitial
++                        ws::ScratchCells<2>>{}));
+     });
+ 
+     // Restore denominator for the next subtraction.
+@@ -207,7 +204,7 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, DivMod1
+     ws::promise(Rlo, ws::Layout<
+ 		ws::Prepared<ws::Role::RemainderLow>,
+ 		ws::Prepared<ws::Role::RemainderHigh>,
+-		ws::ZeroCells<3>,
++		ws::ScratchCells<3>,
+ 		ws::Untouched // Q
+ 		>{});
+ 
+@@ -217,13 +214,11 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, DivMod1
+   popPtr();
+ 
+ 
+-  return ws::promise(num.start(), ws::Layout<
+-		     ws::Prepared<ws::Role::RemainderLow>,
+-		     ws::Prepared<ws::Role::RemainderHigh>,
+-		     ws::ZeroCells<3>,
+-		     ws::Prepared<ws::Role::QuotientLow>,
+-		     ws::ZeroCells<1>
+-		     >{});
++  return num.template transformed<
++    ws::Replace<0, ws::Prepared<ws::Role::RemainderLow>>,
++    ws::Replace<1, ws::Prepared<ws::Role::RemainderHigh>>,
++    ws::Replace<5, ws::Prepared<ws::Role::QuotientLow>>
++  >();
+ }
+ 
+ 
+@@ -282,7 +277,7 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
+       tv.renameAll("Nlo", "Carry");
+       moveField(nv["Nlo"], tv["Nlo"]);
+       tv = divMod16Digit(ws::promiseClean16(tv["Nlo"]), ws::promiseClean16(dv["Dlo"]))
+-	.view("Rlo", "Rhi", ws::At<5>("Qlo"));
++	.view("Rlo", "Rhi", ws::At<5>{"Qlo"});
+ 
+       nv.renameAll("Qlo", "Qhi", "Rlo", "Rhi");
+       moveField(tv["Rlo"], nv["Rlo"]);
+@@ -306,10 +301,10 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
+   popPtr();
+   freeSlot(tmpSlot);
+ 
+-  return ws::promise(num.start(), ws::Layout<
+-		     ws::Prepared<ws::Role::QuotientLow>,
+-		     ws::Prepared<ws::Role::QuotientHigh>,
+-		     ws::Prepared<ws::Role::RemainderLow>,
+-		     ws::Prepared<ws::Role::RemainderHigh>,
+-		     ws::ZeroCells<3>> {});
++  return num.template transformed<
++    ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
++    ws::Replace<1, ws::Prepared<ws::Role::QuotientHigh>>,
++    ws::Replace<2, ws::Prepared<ws::Role::RemainderLow>>,
++    ws::Replace<3, ws::Prepared<ws::Role::RemainderHigh>>
++  >();
+ }
+diff --git a/src/assembler/assembler_logical.cc b/src/assembler/assembler_logical.cc
+index 29a29b9..085c558 100644
+--- a/src/assembler/assembler_logical.cc
++++ b/src/assembler/assembler_logical.cc
+@@ -28,14 +28,10 @@ void Assembler::andSlotWithSlot(Slot lhs, Slot rhs) {
+   moveTo(lhs);
+ 
+   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+-    and16Destructive(Cell{lhs, MacroCell::Value1},
+-                     Cell{rhsCopy, MacroCell::Value0},
+-                     Cell{rhsCopy, MacroCell::Value1},
+-                     Temps<1>::select(lhs, MacroCell::Scratch0));
++    and16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+ 		     
+   } else {
+-    andDestructive(Cell{rhsCopy, MacroCell::Value0},
+-                   Temps<1>::select(lhs, MacroCell::Scratch0));
++    andDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+   }
+ 
+   popPtr();
+@@ -55,10 +51,9 @@ void Assembler::nandSlotWithConst(Slot lhs, int val) {
+   }
+ 
+   if (lhs.type()->usesValue1()) {
+-    not16Destructive(Cell{lhs, MacroCell::Value1},
+-		     Temps<1>::select(lhs, MacroCell::Scratch0));
++    not16Destructive(ws::promiseClean16(lhs));
+   } else {
+-    notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
++    notDestructive(ws::promiseClean8(lhs));
+   }
+   
+   popPtr();
+@@ -72,14 +67,10 @@ void Assembler::nandSlotWithSlot(Slot lhs, Slot rhs) {
+   moveTo(lhs);
+ 
+   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+-    nand16Destructive(Cell{lhs, MacroCell::Value1},
+-		      Cell{rhsCopy, MacroCell::Value0},
+-		      Cell{rhsCopy, MacroCell::Value1},
+-		      Temps<1>::select(lhs, MacroCell::Scratch0));
++    nand16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+ 		     
+   } else {
+-    nandDestructive(Cell{rhsCopy, MacroCell::Value0},
+-		    Temps<1>::select(lhs, MacroCell::Scratch0));
++    nandDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+   }
+ 
+   popPtr();
+@@ -98,7 +89,7 @@ void Assembler::orSlotWithConst(Slot lhs, int val) {
+     bool16Destructive(ws::promiseClean16(lhs));
+   } else {
+     zeroCell(Cell{lhs, MacroCell::Value1});
+-    boolDestructive(ws::promise(lhs, ws::Layout<ws::Data, ws::Zero>{}));
++    boolDestructive(ws::promise(lhs, ws::Layout<ws::Data<>, ws::Scratch>{}));
+   }
+ }
+ 
+@@ -128,10 +119,9 @@ void Assembler::norSlotWithConst(Slot lhs, int val) {
+   moveTo(lhs, MacroCell::Value0);
+ 
+   if (lhs.type()->usesValue1()) {
+-    not16Destructive(Cell{lhs, MacroCell::Value1},
+-		      Temps<1>::select(lhs, MacroCell::Scratch0));
++    not16Destructive(ws::promiseClean16(lhs));
+   } else {
+-    notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
++    notDestructive(ws::promiseClean8(lhs));
+   }
+   
+   popPtr();
+@@ -145,14 +135,10 @@ void Assembler::norSlotWithSlot(Slot lhs, Slot rhs) {
+   moveTo(lhs);
+ 
+   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+-    nor16Destructive(Cell{lhs, MacroCell::Value1},
+-		     Cell{rhsCopy, MacroCell::Value0},
+-		     Cell{rhsCopy, MacroCell::Value1},
+-		     Temps<1>::select(lhs, MacroCell::Scratch0));
++    nor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+ 		     
+   } else {
+-    norDestructive(Cell{rhsCopy, MacroCell::Value0},
+-		   Temps<1>::select(lhs, MacroCell::Scratch0));
++    norDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+   }
+ 
+   popPtr();
+@@ -165,10 +151,9 @@ void Assembler::xorSlotWithConst(Slot lhs, int val) {
+ 
+   if (val != 0) {
+     if (lhs.type()->usesValue1()) {
+-      not16Destructive(Cell{lhs, MacroCell::Value1},
+-		       Temps<1>::select(lhs, MacroCell::Scratch0));
++      not16Destructive(ws::promiseClean16(lhs));
+     } else {
+-      notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
++      notDestructive(ws::promiseClean8(lhs));
+     }
+   }
+   else {
+@@ -190,14 +175,10 @@ void Assembler::xorSlotWithSlot(Slot lhs, Slot rhs) {
+   moveTo(lhs);
+ 
+   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+-    xor16Destructive(Cell{lhs, MacroCell::Value1},
+-		     Cell{rhsCopy, MacroCell::Value0},
+-		     Cell{rhsCopy, MacroCell::Value1},
+-		     Temps<1>::select(lhs, MacroCell::Scratch0));
++    xor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+ 		     
+   } else {
+-    xorDestructive(Cell{rhsCopy, MacroCell::Value0},
+-		   Temps<1>::select(lhs, MacroCell::Scratch0));
++    xorDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+   }
+ 
+   popPtr();
+@@ -211,10 +192,9 @@ void Assembler::xnorSlotWithConst(Slot lhs, int val) {
+ 
+   if (val == 0) {
+     if (lhs.type()->usesValue1()) {
+-      not16Destructive(Cell{lhs, MacroCell::Value1},
+-		       Temps<1>::select(lhs, MacroCell::Scratch0));
++      not16Destructive(ws::promiseClean16(lhs));
+     } else {
+-      notDestructive(Temps<1>::select(lhs, MacroCell::Scratch0));
++      notDestructive(ws::promiseClean8(lhs));
+     }
+   }
+   else {
+@@ -236,34 +216,30 @@ void Assembler::xnorSlotWithSlot(Slot lhs, Slot rhs) {
+   moveTo(lhs);
+ 
+   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+-    xnor16Destructive(Cell{lhs, MacroCell::Value1},
+-		      Cell{rhsCopy, MacroCell::Value0},
+-		      Cell{rhsCopy, MacroCell::Value1},
+-		      Temps<1>::select(lhs, MacroCell::Scratch0));
++    xnor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+   } else {
+-    xnorDestructive(Cell{rhsCopy, MacroCell::Value0},
+-		    Temps<1>::select(lhs, MacroCell::Scratch0));
++    xnorDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+   }
+ 
+   popPtr();
+   freeTempSlot(rhsCopy);
+ }
+ 
+-void Assembler::notDestructive(Temps<1> tmp) {
++void Assembler::notKernel(Temps<1> tmp) {
+   auto [cur, tmp0] = getFieldIndices(_dp.current(), tmp.get<0>());
+   emit<primitive::Not>(cur, tmp0);
+ }
+ 
+-void Assembler::not16Destructive(Cell high, Temps<1> tmp) {
+-  orDestructive(_dp.current(), high);
+-  notDestructive(tmp.select<0>());
++void Assembler::not16Kernel(Cell high, Temps<1> tmp) {
++  orDestructive(SingleCell{_dp.current()}, SingleCell{high});
++  notKernel(tmp.select<0>());
+ }
+ 
+ void Assembler::notConstructive(Cell result, Temps<1> tmp) {
+   pushPtr();
+   copyField(result, tmp);
+   moveTo(result);
+-  notDestructive(tmp);
++  notKernel(tmp);
+   popPtr();
+ }
+ 
+@@ -275,200 +251,20 @@ void Assembler::not16Constructive(Cell high, Cell result, Temps<2> tmp) {
+   moveTo(high);
+   copyField(resultHigh, tmp.select<1>());
+   moveTo(result);
+-  not16Destructive(resultHigh, tmp.select<1>());
++  not16Kernel(resultHigh, tmp.select<1>());
+   popPtr();  
+ }
+ 
+ 
+-Assembler::SingleCell Assembler::orDestructive(SingleCell const &lhs, SingleCell const &rhs) {
+-  // TODO: workspaces of binary functions should not overlap.
+-
+-  
+-  loop(lhs, [&] {
+-    zeroCell(lhs);
+-    setToValue(rhs, 1);
+-  });
+-
+-  loop(rhs, [&] {
+-    zeroCell(rhs);
+-    inc(lhs);
+-  });
+-
+-  return lhs;
++// Low-level kernels retained for comparison and constructive algorithms that
++// still work with non-contiguous temporary cells. Workspace-facing logical
++// operations live in assembler_logical.tpp.
++void Assembler::andKernel(Cell other, Temps<1> tmp) {
++  auto [cur, oth, tmp0] = getFieldIndices(_dp.current(), other, tmp.get<0>());
++  emit<primitive::And>(cur, oth, tmp0);
+ }
+ 
+-Assembler::Bool16Result Assembler::or16Destructive(DoubleCell const &lhs, DoubleCell const &rhs) {
+-  auto const result = orDestructive(bool16Destructive(lhs),  bool16Destructive(rhs));
+-  return ws::promise(result.start(), ws::Layout<ws::Data, ws::Zero>{});
+-}
+-
+-
+-// void Assembler::andDestructive(Cell other, Temps<1> tmp) {
+-//   auto [cur, oth, tmp0] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+-//   emit<primitive::And>(cur, oth, tmp0);
+-// }
+-
+-// void Assembler::andConstructive(Cell result, Cell other, Temps<2> tmp) { 
+-//   Cell const &otherCopy = tmp.get<0>();
+-//   pushPtr();
+-//   copyField(result, tmp.select<1>());  
+-//   moveTo(other);
+-//   copyField(otherCopy, tmp.select<1>());
+-//   moveTo(result);
+-//   andDestructive(otherCopy, tmp.select<1>());
+-//   popPtr();
+-// }
+-
+-void Assembler::and16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
+-
+-  pushPtr();
+-  Cell const currentLow = _dp.current();
+-  Cell const currentHigh = high;
+-
+-  // Collapse both to bool
+-  moveTo(currentLow);
+-  bool16Destructive(currentLow, currentHigh);
+-  moveTo(otherLow);
+-  bool16Destructive(otherLow,otherHigh);
+-
+-  // And results
+-  moveTo(currentLow);
+-  andDestructive(otherLow, tmp);
+-  popPtr();
+-}
+-
+-
+-// void Assembler::and16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) { 
+-
+-//   Cell const currentLow = _dp.current();
+-//   Cell const currentHigh = high;
+-//   Cell const otherCopyLow = tmp.get<0>();
+-//   Cell const otherCopyHigh = tmp.get<1>();
+-//   Cell const resultHigh = tmp.get<2>();
+-  
+-//   pushPtr();
+-
+-//   moveTo(currentLow);  copyField(result, tmp.select<3>());
+-//   moveTo(currentHigh); copyField(resultHigh, tmp.select<3>());
+-//   moveTo(otherLow);    copyField(otherCopyLow, tmp.select<3>());
+-//   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
+-
+-//   moveTo(result);
+-//   and16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3>());
+-//   popPtr();
+-// }
+-
+-void Assembler::xorDestructive(Cell other, Temps<1> tmp) {
++void Assembler::xorKernel(Cell other, Temps<1> tmp) {
+   auto [cur, oth, scratch] = getFieldIndices(_dp.current(), other, tmp.get<0>());
+   emit<primitive::Xor>(cur, oth, scratch);
+ }
+-
+-// void Assembler::xorConstructive(Cell result, Cell other, Temps<2> tmp) { 
+-//   Cell const &otherCopy = tmp.get<0>();
+-//   pushPtr();
+-//   copyField(result, tmp.select<1>());  
+-//   moveTo(other);
+-//   copyField(otherCopy, tmp.select<1>());
+-//   moveTo(result);
+-//   xorDestructive(otherCopy, tmp.select<1>());
+-//   popPtr();
+-// }
+-
+-void Assembler::xor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
+-  pushPtr();
+-  Cell const currentLow = _dp.current();
+-  Cell const currentHigh = high;
+-
+-  // Collapse both to bool
+-  moveTo(currentLow);
+-  bool16Destructive(currentHigh);
+-  moveTo(otherLow);
+-  bool16Destructive(otherHigh);
+-
+-  // And results
+-  moveTo(currentLow);
+-  xorDestructive(otherLow, tmp);
+-  popPtr();
+-}
+-
+-
+-// void Assembler::xor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) { 
+-
+-//   Cell const currentLow = _dp.current();
+-//   Cell const currentHigh = high;
+-//   Cell const otherCopyLow = tmp.get<0>();
+-//   Cell const otherCopyHigh = tmp.get<1>();
+-//   Cell const resultHigh = tmp.get<2>();
+-  
+-//   pushPtr();
+-
+-//   moveTo(currentLow);  copyField(result, tmp.select<3>());
+-//   moveTo(currentHigh); copyField(resultHigh, tmp.select<3>());
+-//   moveTo(otherLow);    copyField(otherCopyLow, tmp.select<3>());
+-//   moveTo(otherHigh);   copyField(otherCopyHigh, tmp.select<3>());
+-
+-//   moveTo(result);
+-//   xor16Destructive(resultHigh, otherCopyLow, otherCopyHigh, tmp.select<3>());
+-//   popPtr();
+-// }
+-
+-void Assembler::nandDestructive(Cell other, Temps<1> tmp) {
+-  andDestructive(other, tmp);
+-  notDestructive(tmp);
+-}
+-
+-// void Assembler::nandConstructive(Cell result, Cell other, Temps<2> tmp) {
+-//   andConstructive(result, other, tmp);
+-//   notDestructive(tmp.select<0>());
+-// }
+-
+-void Assembler::nand16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
+-  and16Destructive(high, otherLow, otherHigh, tmp);
+-  notDestructive(tmp);
+-}
+-
+-
+-// void Assembler::nand16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
+-//   and16Constructive(high, result, otherLow, otherHigh, tmp);
+-//   notDestructive(tmp.select<0>());
+-// }
+-
+-void Assembler::norDestructive(Cell other, Temps<1> tmp) {
+-  orDestructive(_dp.current(), other);
+-  notDestructive(tmp);
+-}
+-
+-// void Assembler::norConstructive(Cell result, Cell other, Temps<2> tmp) {
+-//   orConstructive(result, other, tmp);
+-//   notDestructive(tmp.select<0>());
+-// }
+-
+-void Assembler::nor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
+-  or16Destructive(high, otherLow, otherHigh);
+-  notDestructive(tmp);
+-}
+-
+-// void Assembler::nor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
+-//   or16Constructive(high, result, otherLow, otherHigh, tmp);
+-//   notDestructive(tmp.select<0>());
+-// }
+-
+-void Assembler::xnorDestructive(Cell other, Temps<1> tmp) {
+-  xorDestructive(other, tmp);
+-  notDestructive(tmp.select<0>());
+-}
+-
+-// void Assembler::xnorConstructive(Cell result, Cell other, Temps<2> tmp) {
+-//   xorConstructive(result, other, tmp);
+-//   notDestructive(tmp.select<0>());
+-// }
+-
+-void Assembler::xnor16Destructive(Cell high, Cell otherLow, Cell otherHigh, Temps<1> tmp) {
+-  xor16Destructive(high, otherLow, otherHigh, tmp);
+-  notDestructive(tmp.select<0>());
+-}
+-
+-// void Assembler::xnor16Constructive(Cell high, Cell result, Cell otherLow, Cell otherHigh, Temps<4> tmp) {
+-//   xor16Constructive(high, result, otherLow, otherHigh, tmp);
+-//   notDestructive(tmp.select<0>());
+-// }
+diff --git a/src/assembler/assembler_logical.tpp b/src/assembler/assembler_logical.tpp
+index 2eb979b..b5561b6 100644
+--- a/src/assembler/assembler_logical.tpp
++++ b/src/assembler/assembler_logical.tpp
+@@ -1,44 +1,140 @@
+-
+ template <ws::SingleAndScratch W>
+ Assembler::Data8Result<W> Assembler::boolDestructive(W const &op) {
++  constexpr size_t scratch = W::template ScratchOffset<1>;
+   loop(op[0], [&]{
+     zeroCell(op[0]);
+-    inc(op[ScratchOffset]);
++    inc(op[scratch]);
+   });
+-  
+-  addDestructive(op[0], op[ScratchOffset]);
+-  return {op.start()};
++
++  addDestructive(SingleCell{op[0]}, SingleCell{op[scratch]});
++  return op;
++}
++
++template <ws::DoubleCell W>
++Assembler::Bool16Result<W> Assembler::bool16Destructive(W const &op) {
++  orDestructive(SingleCell{op[0]}, SingleCell{op[1]});
++  return op.template transformed<
++    ws::Replace<0, ws::Data<>>,
++    ws::Replace<1, ws::Scratch>
++  >();
++}
++
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::notDestructive(W const &op) {
++  constexpr size_t scratch = W::template ScratchOffset<1>;
++  auto const [cur, tmp] = getFieldIndices(op[0], op[scratch]);
++
++  pushPtr();
++  moveTo(op[0]);
++  emit<primitive::Not>(cur, tmp);
++  popPtr();
++  return op;
++}
++
++template <ws::DoubleCell W>
++Assembler::Bool16Result<W> Assembler::not16Destructive(W const &op) {
++  auto result = bool16Destructive(op);
++  notDestructive(result);
++  return result;
++}
++
++template <ws::SingleCell W>
++Assembler::Data8Result<W> Assembler::orDestructive(W const &lhs, SingleCell const &rhs) {
++  auto const [cur, oth] = getFieldIndices(lhs[0], rhs[0]);
++
++  pushPtr();
++  moveTo(lhs[0]);
++  emit<primitive::Or>(cur, oth);
++  popPtr();
++  return lhs;
++}
++
++template <ws::DoubleCell W>
++Assembler::Bool16Result<W> Assembler::or16Destructive(W const &lhs, DoubleCell const &rhs) {
++  auto result = bool16Destructive(lhs);
++  auto rhsBool = bool16Destructive(rhs);
++  orDestructive(result, SingleCell{rhsBool});
++  return result;
+ }
+ 
+ template <ws::SingleAndScratch W>
+ Assembler::Data8Result<W> Assembler::andDestructive(W const &lhs, SingleCell const &rhs) {
++  constexpr size_t scratch = W::template ScratchOffset<1>;
++  auto const [cur, oth, tmp] = getFieldIndices(lhs[0], rhs[0], lhs[scratch]);
+ 
+-  Cell const x   = lhs[0];
+-  Cell const y   = rhs[0];
+-  Cell const tmp = lhs[ScratchOffset];
+-  
+-  setToValue(tmp, 2);
+-  loop(x, [&]{
+-    zeroCell(x);
+-    dec(tmp);
+-  });
+-  inc(x);
++  pushPtr();
++  moveTo(lhs[0]);
++  emit<primitive::And>(cur, oth, tmp);
++  popPtr();
++  return lhs;
++}
+ 
+-  loop(y, [&]{
+-    zeroCell(y);
+-    dec(tmp);
+-  });
+-  
+-  loop(tmp, [&]{
+-    zeroCell(tmp);
+-    dec(x);
+-  });
+-  
+-  return {lhs.start()};
++template <ws::DoubleCell W>
++Assembler::Bool16Result<W> Assembler::and16Destructive(W const &lhs, DoubleCell const &rhs) {
++  auto result = bool16Destructive(lhs);
++  auto rhsBool = bool16Destructive(rhs);
++  andDestructive(result, SingleCell{rhsBool});
++  return result;
++}
++
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::xorDestructive(W const &lhs, SingleCell const &rhs) {
++  constexpr size_t scratch = W::template ScratchOffset<1>;
++  auto const [cur, oth, tmp] = getFieldIndices(lhs[0], rhs[0], lhs[scratch]);
++
++  pushPtr();
++  moveTo(lhs[0]);
++  emit<primitive::Xor>(cur, oth, tmp);
++  popPtr();
++  return lhs;
++}
++
++template <ws::DoubleCell W>
++Assembler::Bool16Result<W> Assembler::xor16Destructive(W const &lhs, DoubleCell const &rhs) {
++  auto result = bool16Destructive(lhs);
++  auto rhsBool = bool16Destructive(rhs);
++  xorDestructive(result, SingleCell{rhsBool});
++  return result;
++}
++
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::nandDestructive(W const &lhs, SingleCell const &rhs) {
++  auto result = andDestructive(lhs, rhs);
++  notDestructive(result);
++  return result;
++}
++
++template <ws::DoubleCell W>
++Assembler::Bool16Result<W> Assembler::nand16Destructive(W const &lhs, DoubleCell const &rhs) {
++  auto result = and16Destructive(lhs, rhs);
++  notDestructive(result);
++  return result;
++}
++
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::norDestructive(W const &lhs, SingleCell const &rhs) {
++  auto result = orDestructive(lhs, rhs);
++  notDestructive(result);
++  return result;
++}
++
++template <ws::DoubleCell W>
++Assembler::Bool16Result<W> Assembler::nor16Destructive(W const &lhs, DoubleCell const &rhs) {
++  auto result = or16Destructive(lhs, rhs);
++  notDestructive(result);
++  return result;
++}
++
++template <ws::SingleAndScratch W>
++Assembler::Data8Result<W> Assembler::xnorDestructive(W const &lhs, SingleCell const &rhs) {
++  auto result = xorDestructive(lhs, rhs);
++  notDestructive(result);
++  return result;
+ }
+ 
+ template <ws::DoubleCell W>
+-Assembler::Data8Result<W> Assembler::bool16Destructive(W const &val) {
+-  auto const result = orDestructive(val[0], val[1]);
+-  return ws::promise(result.start(), ws::Layout<ws::Data<>, ws::Zero>{});
++Assembler::Bool16Result<W> Assembler::xnor16Destructive(W const &lhs, DoubleCell const &rhs) {
++  auto result = xor16Destructive(lhs, rhs);
++  notDestructive(result);
++  return result;
+ }
+diff --git a/src/assembler/assembler_pointers_memory.cc b/src/assembler/assembler_pointers_memory.cc
+index 7c90526..c83655d 100644
+--- a/src/assembler/assembler_pointers_memory.cc
++++ b/src/assembler/assembler_pointers_memory.cc
+@@ -36,7 +36,7 @@ Slot Assembler::addressOfSlot(Slot pointeeSlot, API_CTX) {
+   // Construct offset in second cell
+   int const offset = pointeeSlot.offset();  
+   moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value0);
+-  setToValue16(offset);
++  setToValue16(ws::promise(_dp.current(), ws::Layout<ws::DataCells<2>>{}), offset);
+   
+   // setToValue_(offset & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
+   // moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value1);
+@@ -270,12 +270,12 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src, TransferMode mode) {
+ 
+   // TODO: replace by getSignBit
+   moveTo(dest, MacroCell::Scratch0);
+-  setToValue(ws::promise(Cell{dest, MacroCell::Scratch0}, ws::Layout<ws::ZeroCells<2>>{}),
++  setToValue(ws::promise(Cell{dest, MacroCell::Scratch0}, ws::Layout<ws::ScratchCells<2>>{}),
+              128);
+ //  setToValue(128, Temps<1>::select(dest, MacroCell::Scratch1));
+   moveTo(dest, MacroCell::Value1);
+-  lessDestructive(Cell{dest, MacroCell::Scratch0},
+-		  Temps<1>::select(dest, MacroCell::Scratch1));
++  lessKernel(Cell{dest, MacroCell::Scratch0},
++             Temps<1>::select(dest, MacroCell::Scratch1));
+   dec();
+ 
+   popPtr();
+diff --git a/src/assembler/assembler_print.cc b/src/assembler/assembler_print.cc
+index 6fa5a7d..e06ef67 100644
+--- a/src/assembler/assembler_print.cc
++++ b/src/assembler/assembler_print.cc
+@@ -191,7 +191,7 @@ void Assembler::printDecimalSlotSigned(Slot slot) {
+ 	    Cell{valSlot, MacroCell::Scratch1});
+ 
+   signBitDestructive(ws::promise(Cell{valSlot, MacroCell::Scratch0},
+-				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
++				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
+   
+ 
+   
+@@ -211,7 +211,7 @@ void Assembler::printDecimalSlotSigned(Slot slot) {
+     negateSlot(valSlot);
+     //    setToValue('-', Temps<1>::select(valSlot, MacroCell::Scratch0));
+     // Use  -cell to hold the minus sign
+-    setToValue(ws::promise(minusSignFlag, ws::Layout<ws::Zero, ws::Zero>{}), '-');
++    setToValue(ws::promise(minusSignFlag, ws::Layout<ws::Scratch, ws::Scratch>{}), '-');
+     emit<primitive::Out>();
+     zeroCell(minusSignFlag);
+   });
+diff --git a/src/assembler/assembler_sub.cc b/src/assembler/assembler_sub.cc
+index 64d00f9..8a74983 100644
+--- a/src/assembler/assembler_sub.cc
++++ b/src/assembler/assembler_sub.cc
+@@ -39,3 +39,7 @@ Assembler::SingleCell Assembler::subConst(int delta) {
+ 
+ 
+ 
++
++Assembler::SingleCell Assembler::subConst(Cell lhs, int delta) {
++  return subConst(SingleCell{lhs}, delta);
++}
+diff --git a/src/assembler/assembler_sub.tpp b/src/assembler/assembler_sub.tpp
+index 5e81535..734e27d 100644
+--- a/src/assembler/assembler_sub.tpp
++++ b/src/assembler/assembler_sub.tpp
+@@ -1,59 +1,46 @@
+ 
+-
+ template <ws::SingleCell W>
+ Assembler::Data8Result<W> Assembler::subConst(W const &lhs, int delta) {
+   return addConst(lhs, -delta);
+ }
+ 
+ template <ws::SingleAndScratch W>
+-Assembler::Data8Result<W> subConst(W const &lhs, int delta) {
++Assembler::Data8Result<W> Assembler::subConst(W const &lhs, int delta) {
+   return addConst(lhs, -delta);
+ }
+ 
+-template <ws::IsWorkspace W>
++template <ws::Sub16Operand W>
+ Assembler::Data16Result<W> Assembler::sub16Const(W const &lhs, int delta) {
+   if (delta == 0) return lhs;
+-  if (delta < 0) {
+-    return add16Const(lhs, -delta);
+-  }  
++  if (delta < 0) return add16Const(lhs, -delta);
+ 
+   Slot const tmpSlot = getTemp(ts::raw(1));
+   auto const tmp = ws::promiseClean16(tmpSlot);
+-  
+   setToValue16(tmp, delta);
+-  sub16Destructive(lhs, tmp);
++  sub16Destructive(lhs, DoubleCell{tmp});
+   freeTempSlot(tmpSlot);
+   return lhs;
+ }
+-template <ws::SingleCell W>
+-Data8Result<W> Assembler::subDestructive(W const &lhs, SingleCell const &delta) {
+ 
+-  // TODO: use this
+-  // loop(delta, [&]{
+-  //   dec(delta);
+-  //   dec(lhs);
+-  // });
+-  
+-  auto [cur, oth] = getFieldIndices(lhs, delta);
++template <ws::SingleCell W>
++Assembler::Data8Result<W> Assembler::subDestructive(W const &lhs, SingleCell const &delta) {
++  auto [cur, oth] = getFieldIndices(lhs[0], delta[0]);
+ 
+   pushPtr();
+-  moveTo(lhs);
++  moveTo(lhs[0]);
+   emit<primitive::Subtract>(cur, oth);
+   popPtr();
+-  
+-  return op;
++
++  return lhs;
+ }
+ 
+-template <ws::IsWorkspace W>
++template <ws::Sub16Operand W>
+ Assembler::Data16Result<W> Assembler::sub16Destructive(W const &lhs, DoubleCell const &delta) {
+-  // Subtract low byte
+-  loop(delta[0], [&]{
++  loop(delta[0], [&] {
+     dec(delta[0]);
+-    dec16(op);
++    dec16(lhs);
+   });
+-  
+-  // Subtract high byte
+-  subDestructive(op[1], delta[1]);
+-  return op;
+-}
+ 
++  subDestructive(SingleCell{lhs[1]}, SingleCell{delta[1]});
++  return lhs;
++}
+diff --git a/src/assembler/assembler_unary.cc b/src/assembler/assembler_unary.cc
+index 40a521f..590b566 100644
+--- a/src/assembler/assembler_unary.cc
++++ b/src/assembler/assembler_unary.cc
+@@ -115,7 +115,7 @@ Expression Assembler::castImpl(Expression obj, types::TypeHandle toType, API_CTX
+ 	      Cell{slot, MacroCell::Scratch1});
+ 
+     signBitDestructive(ws::promise(Cell{slot, MacroCell::Scratch0},
+-				   ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
++				   ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
+ 
+     Cell const resultHigh = {result, MacroCell::Value1};
+     Cell const signBitFlag = Cell{slot, MacroCell::Scratch0};
+@@ -146,10 +146,9 @@ void Assembler::notSlot(Slot rhs) {
+   moveTo(rhs);
+ 
+   if (rhs.type()->usesValue1()) {
+-    not16Destructive(Cell{rhs, MacroCell::Value1},
+-		     Temps<1>::select(rhs, MacroCell::Scratch0));
++    not16Destructive(ws::promiseClean16(rhs));
+   } else {
+-    notDestructive(Temps<1>::select(rhs, MacroCell::Scratch0));
++    notDestructive(ws::promiseClean8(rhs));
+   }
+   
+   popPtr();
+@@ -163,10 +162,10 @@ void Assembler::boolSlot(Slot rhs) {
+   moveTo(rhs);
+ 
+   if (rhs.type()->usesValue1()) {
+-    bool16Destructive(Cell{rhs, MacroCell::Value1});
++    bool16Destructive(ws::promiseClean16(rhs));
+   } else {
+     zeroCell(Cell{rhs, MacroCell::Value1});
+-    boolDestructive(ws::promise(rhs, ws::Layout<ws::Data, ws::Zero>{}));
++    boolDestructive(ws::promise(rhs, ws::Layout<ws::Data<>, ws::Scratch>{}));
+   }
+   
+   popPtr();
+@@ -185,10 +184,10 @@ void Assembler::negateSlot(Slot rhs) {
+   moveTo(rhs, MacroCell::Value0);
+ 
+   if (rhs.type()->usesValue1()) {
+-    sub16Destructive(ws::promise(rhs, ws::Layout<ws::ZeroCells<7>>{}),
++    sub16Destructive(ws::promise(rhs, ws::Layout<ws::ScratchCells<7>>{}),
+ 		     ws::promiseClean16(copy));
+   } else {
+-    subDestructive(ws::promise(rhs, ws::Layout<ws::Zero> {}),
++    subDestructive(ws::promise(rhs, ws::Layout<ws::Scratch> {}),
+ 		   ws::promiseClean8(copy));
+   }
+ 
+@@ -208,7 +207,7 @@ void Assembler::absSlot(Slot rhs) {
+ 	    Cell{rhs, MacroCell::Scratch1});
+ 
+   signBitDestructive(ws::promise(Cell{rhs, MacroCell::Scratch0},
+-				 ws::Layout<ws::Data, ws::ZeroCells<4>>{}));
++				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
+   
+   // If the sign-bit was set, negate the slot
+   Cell const signBitFlag = Cell{rhs, MacroCell::Scratch0};
+@@ -230,6 +229,6 @@ void Assembler::signBitSlot(Slot rhs) {
+     zeroCell(Cell{rhs, MacroCell::Value1});
+   }
+ 
+-  signBitDestructive(ws::promise(rhs, ws::Layout<ws::Data<>, ws::ZeroCells<5>>{}));
++  signBitDestructive(ws::promise(rhs, ws::Layout<ws::Data<>, ws::ScratchCells<5>>{}));
+ }
+ 
+diff --git a/src/assembler/assembler_unary.tpp b/src/assembler/assembler_unary.tpp
+index 7a58f2c..8e6043d 100644
+--- a/src/assembler/assembler_unary.tpp
++++ b/src/assembler/assembler_unary.tpp
+@@ -1,10 +1,12 @@
+ 
+ template <ws::SignBitOperand W>
+ Assembler::SignBitResult<W> Assembler::signBitDestructive(W const &op) {
+-  auto const [Value, Counter, Result, Scratch] = op.cells();
++  auto const [Value, Counter, Result, Scratch] = op.template cells<4>();
+ 
+   setToValue(ws::promise(Counter, ws::Layout<ws::Data<0>, ws::Data<0>>{}), 128);
+   literalBf(Counter, "[->+<<+[>>-]>>[<[-]>>>]<<<]");
+   moveField(Result, Value);
+-  return {op.start()};
++  return op.template transformed<
++    ws::Replace<0, ws::Prepared<ws::Role::SignBit>>
++  >();
+ }
+diff --git a/testsuite/compiletime_testsuite.cc b/testsuite/compiletime_testsuite.cc
+index 00604b6..22d0f62 100644
+--- a/testsuite/compiletime_testsuite.cc
++++ b/testsuite/compiletime_testsuite.cc
+@@ -12,12 +12,43 @@
+ #include <sstream>
+ #include <string>
+ #include <string_view>
++#include <type_traits>
+ #include <utility>
+ #include <vector>
+ 
+ #include "acus.h"
+ using namespace acus::api;
+ 
++namespace {
++
++using TransformInput = acus::ws::Workspace<
++  acus::ws::Data<7>,
++  acus::ws::Scratch,
++  acus::ws::Prepared<acus::ws::Role::NumeratorLow>
++>;
++
++using TransformOutput = TransformInput::Transform<
++  acus::ws::Replace<0, acus::ws::Data<>>
++>;
++
++static_assert(std::is_same_v<
++  TransformOutput,
++  acus::ws::Workspace<
++    acus::ws::Data<>,
++    acus::ws::Scratch,
++    acus::ws::Prepared<acus::ws::Role::NumeratorLow>
++  >
++>);
++static_assert(std::is_same_v<TransformInput::Transform<>, TransformInput>);
++static_assert(acus::ws::impl::Satisfies<acus::ws::Scratch, acus::ws::Data<>>::value);
++static_assert(acus::ws::impl::Satisfies<acus::ws::Clobber, acus::ws::Data<>>::value);
++static_assert(!acus::ws::impl::Satisfies<acus::ws::Data<0>, acus::ws::Scratch>::value);
++static_assert(acus::ws::SingleAndScratch<
++  acus::ws::Workspace<acus::ws::Data<0>, acus::ws::Scratch>
++>);
++
++} // namespace
++
+ namespace ct {
+ 
+ using acus::error::ErrorCode;

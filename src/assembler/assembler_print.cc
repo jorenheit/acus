@@ -137,7 +137,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
   // Already add '0' to the 1's digit (at the base) to make sure there is at least 1 nonzero.
   // Plant a marker at the base of the array.
   moveTo(digits);
-  addConst('0');	  
+  addConst('0');
   setSeekMarker();
 	
   // Start at right-most digit and move left until first nonzero is found.
@@ -146,10 +146,25 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
 
   // Now just print every character until the start of the string has been reached (seekMarker).
   // Don't print the 1's digit in the loop.
-  switchField(MacroCell::SeekMarker);
-  notConstructive(Cell{_dp.current().offset, MacroCell::Flag},
-		  Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
-  switchField(MacroCell::Flag);
+  auto const writeNotSeekMarkerToFlag = [&] {
+    Cell const marker{_dp.current().offset, MacroCell::SeekMarker};
+    Cell const flag{_dp.current().offset, MacroCell::Flag};
+    Cell const scratch{_dp.current().offset, MacroCell::Scratch0};
+
+    copyField(marker, flag, scratch);
+    inc(scratch);
+    loop(flag, [&] {
+      dec(scratch);
+      zeroCell(flag);
+    });
+    loop(scratch, [&] {
+      dec(scratch);
+      inc(flag);
+    });
+    moveTo(flag);
+  };
+
+  writeNotSeekMarkerToFlag();
   loopOpen(); {
     zeroCell();
 
@@ -158,10 +173,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
     emit<primitive::Out>();
 	    
     emit<primitive::MovePointerRelative>(-1 * MacroCell::FieldCount);
-    switchField(MacroCell::SeekMarker);
-    notConstructive(Cell{_dp.current().offset, MacroCell::Flag},
-		    Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
-    switchField(MacroCell::Flag);
+    writeNotSeekMarkerToFlag();
   } loopClose();
 
   // At seekmarker -> print 1's digit and clear seekMarker
@@ -184,24 +196,39 @@ void Assembler::printDecimalSlotSigned(Slot slot) {
   assignSlot(valSlot, slot);
   
   pushPtr();
-  // Construct sign bit in the flag and use that to determine whether to print a - sign.
-  moveTo(valSlot, valSlot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(Cell{valSlot, MacroCell::Flag},
-		      Temps<4>::select(valSlot, MacroCell::Scratch0,
-				       valSlot, MacroCell::Scratch1,
-				       valSlot, MacroCell::Payload0,
-				       valSlot, MacroCell::Payload1));
 
-  moveTo(valSlot, MacroCell::Flag);
-  loopOpen(); {
+  // Construct sign bit in the flag field
+  copyField(Cell{valSlot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+	    Cell{valSlot, MacroCell::Scratch0},
+	    Cell{valSlot, MacroCell::Scratch1});
+
+  signBitDestructive(ws::promise(Cell{valSlot, MacroCell::Scratch0},
+				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
+  
+
+  
+  // // Construct sign bit in the flag and use that to determine whether to print a - sign.
+  // moveTo(valSlot, valSlot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
+  // Cell const minusSign = Cell{valSlot, MacroCell::Flag};
+  // signBitConstructive(minusSign,
+  // 		      Temps<3>::select(valSlot, MacroCell::Scratch0,
+  // 				       valSlot, MacroCell::Scratch1,
+  // 				       valSlot, MacroCell::Payload0));
+
+  Cell const minusSignFlag = {valSlot, MacroCell::Scratch0};
+  loop(minusSignFlag, [&]{
+    zeroCell(minusSignFlag);
+
     // Negate valSlot while we're here
     negateSlot(valSlot);
-    setToValue('-', Temps<1>::select(valSlot, MacroCell::Scratch0));
+    //    setToValue('-', Temps<1>::select(valSlot, MacroCell::Scratch0));
+    // Use  -cell to hold the minus sign
+    setToValue(ws::promise(minusSignFlag, ws::Layout<ws::Scratch, ws::Scratch>{}), '-');
     emit<primitive::Out>();
-    zeroCell();
-  } loopClose();
-  popPtr();
+    zeroCell(minusSignFlag);
+  });
 
+  popPtr();
   printDecimalSlotUnsigned(valSlot.unsignedView(), true);
   // valSlot will already be freed
 }
@@ -223,16 +250,17 @@ void Assembler::printString(Expression expr) {
 void Assembler::printStringConst(std::string const &str) {
 
   if (str.size() == 0) return;
-  
   Slot ch = getTemp(ts::u8());
-
+  
   pushPtr();
+  // moveTo(ch);
+  // setToValue(str[0], Temps<1>::select(ch, MacroCell::Scratch0));
+  setSlotToValue(ch, str[0]);
   moveTo(ch);
-  setToValue(str[0], Temps<1>::select(ch, MacroCell::Scratch0));
   emit<primitive::Out>();
   for (size_t i = 1; i != str.size(); ++i) {
     int const diff = str[i] - str[i - 1];
-    emit<primitive::ChangeBy>(diff);
+    emit<primitive::ChangeBy>(diff, 0, MacroCell::Value1 - MacroCell::Value0);
     emit<primitive::Out>();
   }
   zeroCell();

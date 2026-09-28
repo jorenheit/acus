@@ -49,59 +49,244 @@ void Assembler::endProgram(API_FUNC) {
 	      "entry function must be of type 'void()', but is of type '", entryFunctionType->str(), "'."); 
 	      
   
-
-  // Generate the metablocks, builtin functions, bootstrap and hatstrap sequences.
+  // Generate the metablocks and builtin functions
   constructBuiltinFunctions();
-  deferredFunctionCallTypeChecks();
   constructMetaBlocks();
+
+  // Check if all calls and jumps can be resolved properly
+  deferredFunctionCallTypeChecks();
   deferredLabelChecks();
 
+  // Mark reachability for all blocks
+  for (auto &fn: _program.functions) {
+    checkFunctionFlowValidity(fn, API_FWD);
+  }
+
+  // Gather reachable blocks
+  std::vector<Function::Block *> dispatchBlocks;
+  for (auto *block : _program.globalBlockOrder) {
+    if (block->reachable) {
+      dispatchBlocks.push_back(block);
+    }
+  }
+
+  API_REQUIRE(dispatchBlocks.size() <= 0xfeff, error::ErrorCode::TooManyBlocks,
+	      "Number of blocks exceeds maximum (0xfeff)");
+
+  // Start building result-sequence
+  primitive::Sequence result;
   
-  // To bootstrap the system, we need to do the following:
-  // 1. Mark cell 0 using the SeekMarker field to indicate that this is where
-  //    the global data frame starts, for easy navigation to this frame. 
-  // 2. Move the pointer to the first stackframe and reset the origin.
-  // 3. Initialize the first stack-frame, where we set the TargetBlock to the
-  //    index of the entry-function and the run-state to 1. It is assigned
-  //    FrameMarker 1, which from hereon will be copied and incremented for
-  //    deeper frames.
-  // 4. Open the main-loop and leave the pointer in cell 0 of the frame.
+  // Find optimal switch-shape
+  auto const [outerSwitchCaseCount, innerSwitchCaseCount] = [&] -> std::pair<int, int> {
 
-  setTargetSequence(&_program.bootstrap);
+    struct Result {
+      int outer;
+      int inner;
+      int sum;
+      int diff;
+      Result(int i, int j):
+	outer(std::min(i, j)),
+	inner(std::max(i, j)),
+	sum(i + j),
+	diff(inner - outer)
+      {}
+    };
 
+    Result best{0xfe, 0xff};
+
+    for (int inner = 1; inner <= 0x0100; ++inner) {
+      int outer = (dispatchBlocks.size() + inner - 1) / inner;
+      if (outer > 0x00ff) continue;
+
+      Result result{outer, inner};
+      if (result.sum <= best.sum) {
+	if (result.sum < best.sum || result.diff < best.diff) {
+	  best = result;
+	}
+      }
+    }
+    
+    return {best.outer, best.inner};
+  }();
+
+ 
+  // TODO: document how the switch works 
+  auto constructSwitches = [&](MacroCell::Field outerValueField,
+			       MacroCell::Field outerFlagField,
+			       MacroCell::Field innerValueField,
+			       MacroCell::Field innerFlagField) -> void {
+    
+    auto impl = [&](auto &&self,
+		    MacroCell::Field valueField,
+		    MacroCell::Field flagField,
+		    int caseCount,
+		    int caseIndex,
+		    auto &&caseBody) -> void
+    {
+      assert(caseCount > 0);
+      assert(caseIndex >= 0 && caseIndex < caseCount);
+      
+      switchField(valueField);
+      loopOpen(); {
+	if (caseIndex + 1 == caseCount) {
+	  // Default case: abort program	  
+	  // 1. Flush remainder of the valueField	  
+	  zeroCell();
+
+	  // 2. Clear TargetBlock high-byte
+	  switchField(MacroCell::Value1);
+	  zeroCell();
+
+	  // 3. Clear switch-flag
+	  switchField(flagField);
+	  dec();
+
+	  switchField(valueField);
+	}
+	else {
+	  // Recursive call to build all cases up to the default case above
+	  dec();      
+	  self(self, valueField, flagField, caseCount, caseIndex + 1, caseBody);
+	}
+      } loopClose();
+
+      // Case implementations
+      switchField(flagField);
+      loopOpen(); {
+	dec();
+
+	moveToOrigin();
+	caseBody(caseIndex);
+
+	// Make sure we end on the flag again to exit the case
+	moveTo(FrameLayout::TargetBlock, flagField);
+      } loopClose();
+      
+      switchField(valueField);
+    };
+
+    // Set flag
+    switchField(outerFlagField);
+    inc();
+    
+    // Initial decrement for the outer switch.    
+    switchField(outerValueField);
+    dec();
+
+    // Outer switch
+    impl(impl,
+	 outerValueField,
+	 outerFlagField,
+	 outerSwitchCaseCount,
+	 0,
+	 [&](int outerCaseIndex){
+
+	   int const thisInnerSwitchCaseCount =
+	     (outerCaseIndex + 1) < outerSwitchCaseCount
+	     ? innerSwitchCaseCount
+	     : ((dispatchBlocks.size() - 1) % innerSwitchCaseCount + 1);	   
+	   
+	   // Set flag
+	   switchField(innerFlagField);
+	   inc();
+	   // Inner switch
+	   impl(impl,
+		innerValueField,
+		innerFlagField,
+		thisInnerSwitchCaseCount,
+		0,
+		[&](int innerCaseIndex) {
+		  // Insert block body
+		  size_t const dispatchIndex = outerCaseIndex * innerSwitchCaseCount + innerCaseIndex;
+		  assert(dispatchIndex < dispatchBlocks.size());
+		  result.append(dispatchBlocks[dispatchIndex]->code);    
+		});
+	 });
+  };
+
+
+  auto copyTargetBlockToScratch = [&]{
+    // Use Daniel's algorithm to copy the TargetBlock into the scratch cells.
+    // TODO: modify move/copy to take multiple destinations and simplify this
+    //       in terms of those primitives.
+    
+    // 1: Move TargetBlock high byte value into Scratch1 and Flag
+    loopOpen(); {
+      switchField(MacroCell::Scratch1); inc();
+      switchField(MacroCell::Flag);     inc();
+      switchField(MacroCell::Value1);   dec();
+    } loopClose();
+    
+    // 2: Move TargetBlock low byte value into Value1 and Scratch0
+    switchField(MacroCell::Value0);
+    loopOpen(); {
+      switchField(MacroCell::Value1);   inc();
+      switchField(MacroCell::Scratch0); inc();
+      switchField(MacroCell::Value0);   dec();
+    } loopClose();
+    
+    // 3: Restore low byte in Value0
+    switchField(MacroCell::Value1);
+    loopOpen(); {
+      switchField(MacroCell::Value0); inc();
+      switchField(MacroCell::Value1); dec();
+    } loopClose();
+
+    // 4: Restore high byte in Value1
+    switchField(MacroCell::Flag);
+    loopOpen(); {
+      switchField(MacroCell::Value1); inc();
+      switchField(MacroCell::Flag);   dec();
+    } loopClose();
+  };
+
+  
+  // Construct final result
+  setTargetSequence(&result);
+
+  // Mark the first cell (start of global frame) with a SeekMarker and a FrameMarker
   _dp.set(0, static_cast<MacroCell::Field>(0));
   switchField(MacroCell::SeekMarker);
-  setToValue(1);
+  inc();
   switchField(MacroCell::FrameMarker);
-  setToValue(1);
+  inc();
 
+  // Mark the start of Frame 1 (main-function) with a FrameMarker
   moveTo(1 + _program.globalVariableFrameSize()); 
   _dp.set(0);
   switchField(MacroCell::FrameMarker);
-  setToValue(1);
+  inc();
 
-  setNextBlock(_program.entryFunctionName, "");
-  moveTo(FrameLayout::RunState, MacroCell::Value0);
-  setToValue(1);
-  loopOpen("main loop");
-  moveToOrigin();
+  // Populate the TargetBlock with the index corresponding to the entrypoint
+  setTargetBlock(_program.entryFunctionName, "");
+
+  // The high byte of the TargetBlock is the main loop-guard (Run-flag). 
+  moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
+  loopOpen("main loop"); {
+
+    // Make a temporary copy of the TargetBlock cells
+    copyTargetBlockToScratch();
+
+    // Construct switches that use the copied values to select the correct block
+    constructSwitches(MacroCell::Scratch1, MacroCell::Flag,      // outer switch fields
+		      MacroCell::Scratch0, MacroCell::Scratch1); // inner switch fields
   
-  // Also generate the hatstrap code. All this needs to do is move the pointer to
-  // the run-cell and close the loop.
-
-  setTargetSequence(&_program.hatstrap);
-  moveTo(FrameLayout::RunState, MacroCell::Value0);
-  loopClose("main loop");
+    // Close main loop
+    switchField(MacroCell::Value1);
+  } loopClose("main loop");
 
   _state.begun = false;
+  setTargetSequence(nullptr);
 
-  // Store resulting code
-  primitive::Context ctx = constructContext();  
+  // Primitive merging
+  mergeSequence(result);
   
-  auto prog = compilePrimitives(API_FWD);
-  simplifySequence(prog);
-  _txt[_program.name] = prog.dumpText(ctx);
-  _bf[_program.name] = simplifyBrainfuck(prog.dumpCode(ctx));
+  // Construct context for final generation passes
+  primitive::Context ctx = constructContext(dispatchBlocks, innerSwitchCaseCount);  
+
+  // Save results
+  _txt[_program.name] = result.dumpText(ctx);
+  _bf[_program.name] = simplifyBrainfuck(result.dumpCode(ctx));
 }
 
 Assembler::FunctionBuilder Assembler::function(std::string const &name, API_FUNC) {
@@ -164,9 +349,6 @@ void Assembler::endScope(API_FUNC) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  // TODO: should this actually be a cache boundary?
-  // Rather, cache entries should not be scoped?
-  //  _cache.controlBoundary();
   freeScope(_currentScope);
   _currentScope = _currentScope->parent;
 }

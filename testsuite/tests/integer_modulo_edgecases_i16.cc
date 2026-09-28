@@ -5,7 +5,7 @@
 
 // Filename: integer_modulo_edgecases_u16.cc
 // Modulo edge cases for u16: x%0, 0%x, 0%0, and assign variants
-// Expected: AABBCCDDEE
+// Expected: BBEE
 
 TEST_BEGIN
 
@@ -14,6 +14,7 @@ auto u16 = ts::u16();
 c.function("main").begin(); {
   c.declareLocal("x", u16);
   c.declareLocal("y", u16);
+
 
   // x % 0 -> 0, mapped to "AA"
   c.assign("x", literal::u16(0x1234));

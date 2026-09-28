@@ -59,7 +59,8 @@ namespace acus::error {
     BuilderNotFinalized,
     BuilderUsedAfterFinalize,    
     ReturnTypeSpecifiedMultipleTimes,
-    NoSuchProgram
+    NoSuchProgram,
+    TooManyBlocks
   };
   
 } // namespace acus::error

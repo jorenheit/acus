@@ -12,11 +12,42 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "acus.h"
 using namespace acus::api;
+
+namespace {
+
+using TransformInput = acus::ws::Workspace<
+  acus::ws::Data<7>,
+  acus::ws::Scratch,
+  acus::ws::Prepared<acus::ws::Role::NumeratorLow>
+>;
+
+using TransformOutput = TransformInput::Transform<
+  acus::ws::Replace<0, acus::ws::Data<>>
+>;
+
+static_assert(std::is_same_v<
+  TransformOutput,
+  acus::ws::Workspace<
+    acus::ws::Data<>,
+    acus::ws::Scratch,
+    acus::ws::Prepared<acus::ws::Role::NumeratorLow>
+  >
+>);
+static_assert(std::is_same_v<TransformInput::Transform<>, TransformInput>);
+static_assert(acus::ws::impl::Satisfies<acus::ws::Scratch, acus::ws::Data<>>::value);
+static_assert(acus::ws::impl::Satisfies<acus::ws::Clobber, acus::ws::Data<>>::value);
+static_assert(!acus::ws::impl::Satisfies<acus::ws::Data<0>, acus::ws::Scratch>::value);
+static_assert(acus::ws::SingleAndScratch<
+  acus::ws::Workspace<acus::ws::Data<0>, acus::ws::Scratch>
+>);
+
+} // namespace
 
 namespace ct {
 

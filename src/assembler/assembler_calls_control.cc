@@ -144,11 +144,8 @@ void Assembler::abortProgram(API_FUNC) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  moveTo(FrameLayout::RunState, MacroCell::Value0);
+  moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
   zeroCell();
-
-  // Sync and pop
-  popFrame();
 
   // Block boundary
   assert(_currentBlock != nullptr);
@@ -297,10 +294,7 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     moveTo(0, MacroCell::Value0);
     primitive::DInt const diff = currentFrameSize + paramStart + offset;
     emit<primitive::MovePointerRelative>(diff);
-    setToValue(value, Temps<1>::select(0, MacroCell::Scratch0));
-    switchField(MacroCell::Value1);
-    setToValue(val.type()->usesValue1() ? ((value >> 8) & 0xff) : 0, Temps<1>::select(0, MacroCell::Scratch0));
-    switchField(MacroCell::Value0);
+    setToValue16(ws::promise(_dp.current(), ws::Layout<ws::DataCells<2>>{}), value);
     emit<primitive::MovePointerRelative>(-diff);
     offset += MacroCell::FieldCount;
   };
@@ -311,15 +305,15 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     std::string const &functionName = literal::cast<types::FunctionPointerType>(val)->functionName();
     primitive::DInt const diff = currentFrameSize + paramStart + offset;
     emit<primitive::MovePointerRelative>(diff);
-    zeroCell();
-    emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
-      return ctx.getBlockIndex(functionName) & 0xff;
-    });
+    emit<primitive::ConstructConstant>([functionName](primitive::Context const &ctx) -> int {
+      return ctx.getDispatchIndex(functionName) & 0xff;
+    }, 0, MacroCell::Scratch0 - MacroCell::Value0);
+
     switchField(MacroCell::Value1);
-    zeroCell();
-    emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
-      return (ctx.getBlockIndex(functionName) >> 8) & 0xff;
-    });
+    emit<primitive::ConstructConstant>([functionName](primitive::Context const &ctx) -> int {
+      return (ctx.getDispatchIndex(functionName) >> 8) & 0xff;
+    }, 0, MacroCell::Scratch0 - MacroCell::Value1);
+
     switchField(MacroCell::Value0);
     emit<primitive::MovePointerRelative>(-diff);
     offset += MacroCell::FieldCount;
@@ -394,7 +388,7 @@ void Assembler::prepareNextFrame(std::string const &functionName, std::vector<Ex
 
   // Set target block in next frame
   emit<primitive::MovePointerRelative>(currentFrameSize); 
-  setNextBlock(functionName, "");
+  setTargetBlock(functionName, "");
   emit<primitive::MovePointerRelative>(-currentFrameSize);
 }
 
@@ -436,9 +430,8 @@ void Assembler::prepareNextFrame(Expression fptr, std::vector<Expression> const 
 }
 
 
-
-
 void Assembler::fetchReturnData() {
+  assert(false && "should not be necessary anymore");
   assert(_currentSeq != nullptr);  
   assert(_currentFunction != nullptr);
 
@@ -449,10 +442,24 @@ void Assembler::fetchReturnData() {
   pushPtr();
   
   // Get run-state
-  moveTo(FrameLayout::RunState);
+  moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
   emit<primitive::MovePointerRelative>(stackFrameSize);
-  emit<primitive::MoveData>(-stackFrameSize);
+
+  // On Value1 field of the call-frame -> if 0, set our own Value1 field to 0 as well
+  notDestructive(ws::promise(_dp.current(), ws::Layout<ws::Data<>, ws::Scratch>{}));
+  loop([&]{
+    dec();
+    emit<primitive::MovePointerRelative>(-stackFrameSize);
+    dec();
+    emit<primitive::MovePointerRelative>(stackFrameSize);
+  });
   emit<primitive::MovePointerRelative>(-stackFrameSize);
+  
+  
+  // moveTo(FrameLayout::RunState);
+  // emit<primitive::MovePointerRelative>(stackFrameSize);
+  // emit<primitive::MoveData>(-stackFrameSize);
+  // emit<primitive::MovePointerRelative>(-stackFrameSize);
 
   popPtr();
 }
@@ -481,48 +488,37 @@ void Assembler::fetchReturnData(Slot returnSlot) {
       emit<primitive::MovePointerRelative>(-diff);
     }
   }
-  fetchReturnData(); // fetch the rest
+  //  fetchReturnData(); // fetch the rest
   popPtr();
 }
 
 
 void Assembler::branchIfSlot(Slot slot, std::string const &trueLabel, std::string const &falseLabel) {
 
-  pushPtr();
+  Slot const tmp = getTemp(slot.type());
+  assignSlot(tmp, slot);
 
-  Slot tmp = getTemp(ts::u8());
-    
-  moveTo(slot);
   if (slot.type()->usesValue1()) {
-    orConstructive(Cell{tmp, MacroCell::Value0},
-		   Cell{slot, MacroCell::Value1},
-		   Temps<2>::select(tmp, MacroCell::Scratch0,
-				    tmp, MacroCell::Scratch1));
-  }
-  else {
-    copyField(Cell{tmp, MacroCell::Value0},
-	      Temps<1>::select(tmp, MacroCell::Scratch0));
+    orDestructive(SingleCell{Cell{tmp, MacroCell::Value0}},
+                  SingleCell{Cell{tmp, MacroCell::Value1}});
+  } else {
+    zeroCell(Cell{tmp, MacroCell::Value1});
   }
 
-  moveTo(tmp);
-  switchField(MacroCell::Flag);
-  setToValue(1);
-  switchField(MacroCell::Value0);
-  loopOpen(); {
-    zeroCell();
+  Cell const trueFlag  = {tmp, MacroCell::Value0};
+  Cell const falseFlag = {tmp, MacroCell::Value1};
+
+  setToValue(falseFlag, 1);
+  loop(trueFlag, [&]{
+    zeroCell(trueFlag);
+    zeroCell(falseFlag);
     setNextBlock(_currentFunction->name, trueLabel);
-    switchField(MacroCell::Flag);
-    setToValue(0);
-    switchField(MacroCell::Value0);	
-  }; loopClose();
-
-  switchField(MacroCell::Flag);
-  loopOpen(); {
-    zeroCell();
+  });
+  
+  loop(falseFlag ,[&] {
+    zeroCell(falseFlag);
     setNextBlock(_currentFunction->name, falseLabel);
-  } loopClose();
-
-  popPtr();
+  });
 
   freeTempSlot(tmp);
 }

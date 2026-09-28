@@ -17,7 +17,6 @@ struct FrameLayout {
 
   enum Offsets {
     TargetBlock,
-    RunState,
     ReturnValueStart
   };
 

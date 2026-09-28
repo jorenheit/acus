@@ -28,9 +28,7 @@ void Assembler::pushFrame() {
 
   moveTo(0, MacroCell::FrameMarker);
   emit<primitive::MovePointerRelative>(currentFrameSize);
-  setToValue(1);
-  moveTo(FrameLayout::RunState, MacroCell::Value0);
-  setToValue(1);
+  zeroCell(); inc();
   moveToOrigin();
 }
 
@@ -39,12 +37,13 @@ void Assembler::popFrame() {
   assert(_currentFunction != nullptr);
   assert(_currentSeq != nullptr);
 
-  // Check if function is the entry-point of the program. If so, we need to set the run-cell to 0
+  // Check if function is the entry-point of the program. If so, we need to set the
+  // TargetBlock's high-byte to 0 to abort the program.
   // If not, we do a dynamic move left until we hit the next frame marker.
 
   pushPtr();
   if (_currentFunction->name == _program.entryFunctionName) {
-    moveTo(FrameLayout::RunState, MacroCell::Value0);
+    moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
     zeroCell();
     moveToOrigin();
   }
@@ -60,23 +59,9 @@ void Assembler::popFrame() {
 
 
 void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Payload const &payload, bool checkCurrent) {  
-  int const stride = MacroCell::FieldCount * ((dir == primitive::Right) ? 1 : -1);
 
-  if (not checkCurrent) {
-    switchField(MacroCell::Flag);
-    setToValue(1);
-  }
-  else {
-    switchField(markerField);
-    notConstructive(Cell{_dp.current().offset, MacroCell::Flag},
-		    Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
-    switchField(MacroCell::Flag);
-  }
-
-  loopOpen(); {
-    zeroCell();
-    
-    // Move pointer and payload to the next cell
+  auto step = [&]{
+    int const stride = MacroCell::FieldCount * ((dir == primitive::Right) ? 1 : -1);    
     int const start = (dir == primitive::Right) ? payload.size() - 1 : 0;
     int const diff  = (dir == primitive::Right) ? -1 : 1;
     auto const cmp  = [&](int i)  { return (dir == primitive::Right) ? (i >= 0) : (i != payload.size()); };
@@ -94,20 +79,83 @@ void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Pay
     }
     popPtr();
     emit<primitive::MovePointerRelative>(stride);
+  };
+
+  bool const usingBinaryMarker = (markerField == MacroCell::SeekMarker ||
+				  markerField == MacroCell::FrameMarker);
+
+  pushPtr();
+  if (usingBinaryMarker) {
+    // For binary markers, we can use an optimized version of the seek-algorithm.
+    // Credits to Daniel. Basically (ignoring payload): -[+>>>>>>>>>-]+
     
-    // Check if flag was hit by storing NOT(SeekMarker) in Flag. If hit, flag0 becomes 0 and we exit the loop
+    // Set pointer at current marker-field
     switchField(markerField);
-    notConstructive(Cell{_dp.current().offset, MacroCell::Flag},
-		    Temps<1>::select(_dp.current().offset, MacroCell::Scratch0));
-    switchField(MacroCell::Flag);
-  } loopClose();
+
+    // If the seek starts at the next cell, skip the current one
+    if (not checkCurrent) {
+      step();
+    }
+
+    // Keep stepping until we hit the marker
+    dec();
+    loopOpen(); {
+      inc();
+      step();
+      dec();
+    } loopClose();
+    inc();
+  
+  } else {
+    // For other markers that can have values > 1, we need the more general algorithm
+    // That does a NOT operation on the marker-fields
+
+    auto const writeNotMarkerToFlag = [&] {
+      Cell const marker{_dp.current().offset, markerField};
+      Cell const flag{_dp.current().offset, MacroCell::Flag};
+      Cell const scratch{_dp.current().offset, MacroCell::Scratch0};
+
+      copyField(marker, flag, scratch);
+
+      // NOT(flag), using the clean scratch cell from the copy operation.
+      inc(scratch);
+      loop(flag, [&] {
+        dec(scratch);
+        zeroCell(flag);
+      });
+      loop(scratch, [&] {
+        dec(scratch);
+        inc(flag);
+      });
+
+      moveTo(flag);
+    };
+
+    if (not checkCurrent) {
+      switchField(MacroCell::Flag);
+      zeroCell(); inc();
+    }
+    else {
+      writeNotMarkerToFlag();
+    }
+
+    loopOpen(); {
+      zeroCell();
+      step();
+
+      // Store NOT(marker) in Flag. A nonzero marker clears Flag and exits the loop.
+      writeNotMarkerToFlag();
+    } loopClose();
+  }
+
+  popPtr();
 }
 
 
 void Assembler::setSeekMarker() {
   pushPtr();
   switchField(MacroCell::SeekMarker);
-  setToValue(1);
+  zeroCell(); inc();
   popPtr();
 }
 

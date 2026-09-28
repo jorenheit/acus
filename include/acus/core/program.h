@@ -23,8 +23,6 @@ namespace acus {
 
 struct Program {
 
-  primitive::Sequence bootstrap;
-  primitive::Sequence hatstrap;
   std::string name;
   std::string entryFunctionName;
   
@@ -58,6 +56,11 @@ struct Program {
   inline void registerBlock(Function::Block &block) {
     block.globalBlockIndex = globalBlockOrder.size();
     globalBlockOrder.push_back(&block);
+  }
+
+  inline Function::Block *getBlock(size_t blockIndex) {
+    if (blockIndex >= globalBlockOrder.size()) return nullptr;
+    return globalBlockOrder[blockIndex];
   }
 
   inline int globalVariableFrameSize() const {

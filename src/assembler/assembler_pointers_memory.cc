@@ -36,14 +36,16 @@ Slot Assembler::addressOfSlot(Slot pointeeSlot, API_CTX) {
   // Construct offset in second cell
   int const offset = pointeeSlot.offset();  
   moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value0);
-  setToValue(offset & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
-  moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value1);
-  setToValue((offset >> 8) & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
+  setToValue16(ws::promise(_dp.current(), ws::Layout<ws::DataCells<2>>{}), offset);
+  
+  // setToValue_(offset & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
+  // moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value1);
+  // setToValue_((offset >> 8) & 0xff, Temps<1>::select(ptrSlot + RuntimePointer::Offset, MacroCell::Scratch0));
 
   return ptrSlot;
 }
 
-void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot, TransferMode mode) {
+void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSlot, TransferMode dataTransferMode) {
   // TransferMode::Move is valid only when arrSlot is part of a source object
   // being consumed as a whole, e.g. a temp/cache slot being discarded.
   // It destructively extracts the selected element in this mode.
@@ -57,7 +59,7 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   pushPtr();
 
   // Prepare offset-payload (index * sizeof(T))
-  auto [scaledIndexSlot, freeScaledIndexSlot] = [&] -> std::pair<Slot, bool> {
+  auto [scaledIndexSlot, tempScaledIndexSlot] = [&] -> std::pair<Slot, bool> {
     if (indexSlot.type()->usesValue1() && elementType->size() == 1) {
       // Index can be used as-is
       return {indexSlot, false};
@@ -81,7 +83,8 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
 			 Cell{scaledIndexSlot, MacroCell::Value1},
 			 payload,
 			 primitive::Left,
-			 mode);
+			 dataTransferMode,
+			 tempScaledIndexSlot ? TransferMode::Move : TransferMode::Copy);
 
   // Move payload into element
   for (int i = 0; i != elementType->size(); ++i) {
@@ -96,7 +99,7 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   // Return to start of array
   moveTo(arrSlot);
   resetSeekMarker();
-  if (freeScaledIndexSlot) freeTempSlot(scaledIndexSlot);
+  if (tempScaledIndexSlot) freeTempSlot(scaledIndexSlot);
   popPtr();
 
 }
@@ -267,12 +270,17 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src, TransferMode mode) {
 
   // TODO: replace by getSignBit
   moveTo(dest, MacroCell::Scratch0);
-  setToValue(128, Temps<1>::select(dest, MacroCell::Scratch1));
-  moveTo(dest, MacroCell::Value1);
-  lessDestructive(Cell{dest, MacroCell::Scratch0},
-		  Temps<2>::select(dest, MacroCell::Scratch1,
-				   dest, MacroCell::Payload0));
-  dec();
+  setToValue(ws::promise(Cell{dest, MacroCell::Scratch0}, ws::Layout<ws::ScratchCells<2>>{}),
+             128);
+//  setToValue(128, Temps<1>::select(dest, MacroCell::Scratch1));
+  lessDestructive(
+    ws::promise(
+      Cell{dest, MacroCell::Value1},
+      ws::Layout<ws::Data<>, ws::Untouched, ws::Scratch>{}
+    ),
+    SingleCell{Cell{dest, MacroCell::Scratch0}}
+  );
+  dec(Cell{dest, MacroCell::Value1});
 
   popPtr();
 }
@@ -305,7 +313,7 @@ void Assembler::assignSlotBytewise(Slot dest, Slot src, TransferMode mode) {
     }
     else {
       moveTo(dest + i, MacroCell::Value1);
-      setToValue(0);
+      zeroCell();
     }
   }
   popPtr();
@@ -316,15 +324,16 @@ void Assembler::assignSlot(Slot slot, literal::Literal val) {
   pushPtr();
   if (types::isInteger(slot.type())) {
     int const x = literal::cast<types::IntegerType>(val)->encodedValue();
-    moveTo(slot, MacroCell::Value0);
-    setToValue(x & 0xff, Temps<1>::select(slot, MacroCell::Scratch0));
-    moveTo(slot, MacroCell::Value1);    
-    if (slot.type()->usesValue1()) {
-      setToValue((x >> 8) & 0xff, Temps<1>::select(slot, MacroCell::Scratch0));
-    }
-    else {
-      zeroCell();
-    }
+    setSlotToValue(slot, x);
+    // moveTo(slot, MacroCell::Value0);
+    // setToValue(x & 0xff, Temps<1>::select(slot, MacroCell::Scratch0));
+    // moveTo(slot, MacroCell::Value1);    
+    // if (slot.type()->usesValue1()) {
+    //   setToValue((x >> 8) & 0xff, Temps<1>::select(slot, MacroCell::Scratch0));
+    // }
+    // else {
+    //   zeroCell();
+    // }
   }
   else if (types::isArray(slot.type()) || types::isString(slot.type())) {
     // recursive call for each element
@@ -355,15 +364,16 @@ void Assembler::assignSlot(Slot slot, literal::Literal val) {
   else if (types::isFunctionPointer(slot.type())) {
     std::string const &functionName = literal::cast<types::FunctionPointerType>(val)->functionName();
 
-    moveTo(slot, MacroCell::Value0); zeroCell();
-    emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
-      return ctx.getBlockIndex(functionName) & 0xff;
-    });
+    // TODO: replace by ConstructConstant
+    moveTo(slot, MacroCell::Value0);
+    emit<primitive::ConstructConstant>([functionName](primitive::Context const &ctx) -> int {
+      return ctx.getDispatchIndex(functionName) & 0xff;
+    }, 0, MacroCell::Scratch0 - MacroCell::Value0);
 
-    moveTo(slot, MacroCell::Value1); zeroCell();
-    emit<primitive::ChangeBy>([functionName](primitive::Context const &ctx) -> int {
-      return (ctx.getBlockIndex(functionName) >> 8) & 0xff;
-    });
+    moveTo(slot, MacroCell::Value1); 
+    emit<primitive::ConstructConstant>([functionName](primitive::Context const &ctx) -> int {
+      return (ctx.getDispatchIndex(functionName) >> 8) & 0xff;
+    }, 0, MacroCell::Scratch0 - MacroCell::Value1);
   }
   else {
     assert(false && "not implemented");
@@ -435,7 +445,9 @@ void Assembler::moveToPointee(Slot ptrSlot) {
   } loopClose();
 
   // At the target frame -> move to offset indicated by pointer value in payload
-  moveToDynamicOffset(offsetLowPayload, offsetHighPayload);
+  // Because the dynamic algorithm below works from the scratch cells and needs the
+  // Payload cells empty, we can move them there instead of copying them.
+  moveToDynamicOffset(offsetLowPayload, offsetHighPayload, TransferMode::Move);
 }
 
 

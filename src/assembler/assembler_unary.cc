@@ -65,6 +65,7 @@ Expression Assembler::unOpImpl(Expression obj, API_CTX) {
   return Expression { result };
 }
 
+// Explicit instantiations for all of the unary operations
 #define INSTANTIATE_FOR(op)						\
   template Expression Assembler::unOpImpl<op>(Expression, API_CTX); \
   template Expression Assembler::unOpAssignImpl<op>(Expression, API_CTX);
@@ -108,17 +109,21 @@ Expression Assembler::castImpl(Expression obj, types::TypeHandle toType, API_CTX
   }
   // If we're widening S8, we need to sign-extend
   else if (slot.type()->tag() == types::S8 && toType->usesValue1()) {
-    moveTo(slot, MacroCell::Value0);    
-    signBitConstructive(Cell{slot, MacroCell::Flag},
-			Temps<4>::select(slot, MacroCell::Scratch0,
-					 slot, MacroCell::Scratch1,
-					 slot, MacroCell::Payload0,
-					 slot, MacroCell::Payload1));
-    moveTo(slot, MacroCell::Flag);
-    loopOpen(); {
-      moveTo(result, MacroCell::Value1); zeroCell(); dec();
-      moveTo(slot, MacroCell::Flag);     zeroCell();
-    } loopClose();
+
+    copyField(Cell{slot, MacroCell::Value0},
+	      Cell{slot, MacroCell::Scratch0},
+	      Cell{slot, MacroCell::Scratch1});
+
+    signBitDestructive(ws::promise(Cell{slot, MacroCell::Scratch0},
+				   ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
+
+    Cell const resultHigh = {result, MacroCell::Value1};
+    Cell const signBitFlag = Cell{slot, MacroCell::Scratch0};
+    loop(signBitFlag, [&]{
+      zeroCell(signBitFlag);
+      zeroCell(resultHigh);
+      dec(resultHigh);
+    });
   }
   // All other cases, just zero the high byte
   else {
@@ -141,10 +146,9 @@ void Assembler::notSlot(Slot rhs) {
   moveTo(rhs);
 
   if (rhs.type()->usesValue1()) {
-    not16Destructive(Cell{rhs, MacroCell::Value1},
-		     Temps<1>::select(rhs, MacroCell::Scratch0));
+    not16Destructive(ws::promiseClean16(rhs));
   } else {
-    notDestructive(Temps<1>::select(rhs, MacroCell::Scratch0));
+    notDestructive(ws::promiseClean8(rhs));
   }
   
   popPtr();
@@ -158,37 +162,37 @@ void Assembler::boolSlot(Slot rhs) {
   moveTo(rhs);
 
   if (rhs.type()->usesValue1()) {
-    bool16Destructive(Cell{rhs, MacroCell::Value1},
-		     Temps<1>::select(rhs, MacroCell::Scratch0));
+    bool16Destructive(ws::promiseClean16(rhs));
   } else {
-    boolDestructive(Temps<1>::select(rhs, MacroCell::Scratch0));
+    zeroCell(Cell{rhs, MacroCell::Value1});
+    boolDestructive(ws::promise(rhs, ws::Layout<ws::Data<>, ws::Scratch>{}));
   }
   
   popPtr();
 }
 
 void Assembler::negateSlot(Slot rhs) {
-  assert(rhs.size() == 1);
+  assert(types::isInteger(rhs.type()));
 
+  Slot const copy = getTemp(rhs.type());
+
+  // Move the original value out, leaving rhs zero.
+  assignSlot(copy, rhs, TransferMode::Move);
+
+  // rhs = 0 - original
   pushPtr();
-
   moveTo(rhs, MacroCell::Value0);
+
   if (rhs.type()->usesValue1()) {
-    Slot tmp = getTemp(ts::raw(1));
-    negate16Destructive(Cell{rhs, MacroCell::Value1},
-			Temps<6>::select(rhs, MacroCell::Scratch0,
-					 rhs, MacroCell::Scratch1,
-					 tmp, MacroCell::Scratch0,
-					 tmp, MacroCell::Scratch1,
-					 tmp, MacroCell::Payload0, 
-					 tmp, MacroCell::Payload1));
-    freeTempSlot(tmp);
+    sub16Destructive(ws::promise(rhs, ws::Layout<ws::ScratchCells<7>>{}),
+		     ws::promiseClean16(copy));
   } else {
-    negateDestructive(Temps<2>::select(rhs, MacroCell::Scratch0,
-				       rhs, MacroCell::Scratch1));
+    subDestructive(ws::promise(rhs, ws::Layout<ws::Scratch> {}),
+		   ws::promiseClean8(copy));
   }
 
   popPtr();
+  freeTempSlot(copy);
 }
 
 void Assembler::absSlot(Slot rhs) {
@@ -197,165 +201,33 @@ void Assembler::absSlot(Slot rhs) {
   if (types::isUnsignedInteger(rhs.type())) return;
 
   pushPtr();
-  // Construct the signbit in rhs.Flag
-  moveTo(rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitConstructive(Cell{rhs, MacroCell::Flag},
-		      Temps<4>::select(rhs, MacroCell::Scratch0, rhs, MacroCell::Scratch1,
-				       rhs, MacroCell::Payload0, rhs, MacroCell::Payload1));
 
+  copyField(Cell{rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+	    Cell{rhs, MacroCell::Scratch0},
+	    Cell{rhs, MacroCell::Scratch1});
+
+  signBitDestructive(ws::promise(Cell{rhs, MacroCell::Scratch0},
+				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
+  
   // If the sign-bit was set, negate the slot
-  moveTo(rhs, MacroCell::Flag);
-  loopOpen(); {
+  Cell const signBitFlag = Cell{rhs, MacroCell::Scratch0};
+  loop(signBitFlag, [&]{
     zeroCell();
     negateSlot(rhs);
-  } loopClose();
+  });
 
   popPtr();
 }
 
 void Assembler::signBitSlot(Slot rhs) {
+
   assert(types::isSignedInteger(rhs.type()));
-  
-  pushPtr();
-  moveTo(rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  signBitDestructive(Temps<3>::select(rhs, MacroCell::Scratch0,
-				      rhs, MacroCell::Scratch1,
-				      rhs, MacroCell::Payload0));
-
   if (rhs.type()->usesValue1()) {
-    moveField(Cell{rhs, MacroCell::Value0});
+    moveField(Cell{rhs, MacroCell::Value1},
+	      Cell{rhs, MacroCell::Value0});
+  } else {
+    zeroCell(Cell{rhs, MacroCell::Value1});
   }
-  popPtr();
+
+  signBitDestructive(ws::promise(rhs, ws::Layout<ws::Data<>, ws::ScratchCells<5>>{}));
 }
-
-void Assembler::signBitDestructive(Temps<3> tmp) {
-  Cell const current = _dp.current();
-  Cell const oneTwentyEight = tmp.get<0>();
-
-  pushPtr();
-  moveTo(oneTwentyEight);
-  setToValue(128, tmp.select<1>());
-  moveTo(current);
-  greaterOrEqualDestructive(oneTwentyEight, tmp.select<1, 2>());
-  popPtr();
-}
-
-void Assembler::signBitConstructive(Cell result, Temps<4> tmp) {
-  pushPtr();
-  copyField(result, tmp.get<0>());
-  moveTo(result);
-  signBitDestructive(tmp.select<1, 2, 3>());
-  popPtr();
-}
-
-
-void Assembler::boolDestructive(Temps<1> tmp) {
-  auto [current, tmp0] = getFieldIndices(_dp.current(), tmp.get<0>());
-  emit<primitive::Boolean>(current, tmp0);
-}
-
-void Assembler::bool16Destructive(Cell high, Temps<1> tmp) {
-  orDestructive(high, tmp.select<0>());
-}
-
-void Assembler::boolConstructive(Cell result, Temps<1> tmp) {
-  pushPtr();
-  copyField(result, tmp);
-  moveTo(result);
-  boolDestructive(tmp);
-  popPtr();
-}
-
-void Assembler::bool16Constructive(Cell high, Cell result, Temps<2> tmp) {
-  Cell const resultHigh = tmp.get<0>();
-  
-  pushPtr();
-  copyField(result, tmp.select<1>());
-  moveTo(high);
-  copyField(resultHigh, tmp.select<1>());
-  moveTo(result);
-  bool16Destructive(resultHigh, tmp.select<1>());
-  popPtr();  
-}
-
-
-void Assembler::notDestructive(Temps<1> tmp) {
-  auto [cur, tmp0] = getFieldIndices(_dp.current(), tmp.get<0>());
-  emit<primitive::Not>(cur, tmp0);
-}
-
-void Assembler::not16Destructive(Cell high, Temps<1> tmp) {
-  orDestructive(high, tmp.select<0>());
-  notDestructive(tmp.select<0>());
-}
-
-void Assembler::notConstructive(Cell result, Temps<1> tmp) {
-  pushPtr();
-  copyField(result, tmp);
-  moveTo(result);
-  notDestructive(tmp);
-  popPtr();
-}
-
-void Assembler::not16Constructive(Cell high, Cell result, Temps<2> tmp) {
-  Cell const resultHigh = tmp.get<0>();
-  
-  pushPtr();
-  copyField(result, tmp.select<1>());
-  moveTo(high);
-  copyField(resultHigh, tmp.select<1>());
-  moveTo(result);
-  not16Destructive(resultHigh, tmp.select<1>());
-  popPtr();  
-}
-
-void Assembler::negateDestructive(Temps<2> tmp) {
-  Cell const copy = tmp.get<0>();
-
-  pushPtr();
-  copyField(copy, tmp.select<1>());
-  zeroCell();
-  subDestructive(copy);
-  popPtr();
-}
-
-
-void Assembler::negateConstructive(Cell result, Temps<2> tmp) {
-  pushPtr();
-  copyField(result, tmp.select<0>());
-  moveTo(result);
-  negateDestructive(tmp);
-  popPtr();
-}
-
-void Assembler::negate16Destructive(Cell high, Temps<6> tmp) {
-  Cell const currentLow = _dp.current();
-  Cell const currentHigh = high;
-  Cell const copyLow = tmp.get<0>();
-  Cell const copyHigh = tmp.get<1>();
-
-  pushPtr();
-  moveTo(currentLow);
-  copyField(copyLow, tmp.select<2>());
-  zeroCell();
-  moveTo(currentHigh);
-  copyField(copyHigh, tmp.select<2>());
-  zeroCell();
-
-  moveTo(currentLow);
-  sub16Destructive(currentHigh, copyLow, copyHigh, tmp.select<2, 3, 4, 5>());
-  popPtr();
-}
-
-void Assembler::negate16Constructive(Cell high, Cell result, Temps<7> tmp) {
-  Cell const resultHigh = tmp.get<0>();
-  
-  pushPtr();
-  copyField(result, tmp.select<1>());
-  moveTo(high);
-  copyField(resultHigh, tmp.select<1>());
-  moveTo(result);
-  negate16Destructive(resultHigh, tmp.select<1, 2, 3, 4, 5, 6>());
-  popPtr();  
-}
-

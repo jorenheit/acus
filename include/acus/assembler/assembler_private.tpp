@@ -17,33 +17,49 @@ auto Assembler::getFieldIndices(Args... args) {
   return std::make_tuple(getFieldIndex(static_cast<Cell>(args))...);
 }
 
+
 template <typename TrueBranch, typename FalseBranch>
-void Assembler::branchOnSignBit(Slot slot, Cell const &flagCell, TrueBranch&& trueBranch, FalseBranch&& falseBranch) {
+void Assembler::branchOnSignBit(Slot slot, TrueBranch&& trueBranch, FalseBranch&& falseBranch) {
 
   pushPtr();
-  moveTo(slot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);    
-  signBitConstructive(flagCell,
-		      Temps<4>::select(slot, MacroCell::Scratch0,
-				       slot, MacroCell::Scratch1,
-				       slot, MacroCell::Payload0,
-				       slot, MacroCell::Payload1));
-  moveTo(slot, MacroCell::Scratch0);
-  setToValue(1);
-  moveTo(flagCell);
+
+  Slot const tmp = getTemp(ts::s8());
+  moveTo(slot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
+  copyField(Cell{tmp, MacroCell::Value0}, Temps<1>::select(tmp, MacroCell::Scratch0));
+  
+  signBitSlot(tmp);
+  moveTo(tmp, MacroCell::Value1); inc();
+  moveTo(tmp, MacroCell::Value0);
   loopOpen(); {
-    moveTo(slot, MacroCell::Scratch0); zeroCell();
-    moveTo(flagCell); zeroCell();
     trueBranch();
-    moveTo(flagCell);
+    moveTo(tmp, MacroCell::Value1); zeroCell();
+    moveTo(tmp, MacroCell::Value0); zeroCell();
   } loopClose();
 
-  moveTo(slot, MacroCell::Scratch0);
+  moveTo(tmp, MacroCell::Value1);
   loopOpen(); {
-    moveTo(slot, MacroCell::Scratch0);  zeroCell();
     falseBranch();
-    moveTo(slot, MacroCell::Scratch0);
+    moveTo(tmp, MacroCell::Value1); zeroCell();
+  } loopClose();
+  popPtr();
+
+  freeSlot(tmp);
+}
+
+// Loop on specific cell
+void Assembler::loop(Cell flag, auto&& body) {
+  pushPtr();
+  moveTo(flag);
+  loopOpen(); {
+    body();
+    moveTo(flag);
   } loopClose();
   popPtr();
 }
 
+// Loop on current cell
+void Assembler::loop(auto&& body) {
+  Cell const flag = _dp.current();
+  loop(flag, body);
+}
 } // namespace acus
