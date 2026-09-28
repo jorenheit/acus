@@ -59,15 +59,19 @@ void Assembler::mulSlotBySlot(Slot lhs, Slot rhs) {
 }
 
 void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {
-  assert(lhs != rhs);
+
+  if (lhs == rhs) {
+    assert(destroyRhs == false);
+    return squareSlot(lhs);
+  }
 
   auto const withValueWorkspace = [&](Slot slot, auto &&action) {
+    // Work-area is the scratch space of this slot
+    auto const work = ws::promise(Cell{slot, MacroCell::Scratch0}, ws::Layout<ws::ScratchCells<5>>{});
     if (slot.type()->usesValue1()) {
-      auto const work = ws::promiseClean16(slot);
-      action(DoubleCell{work}, work);
+      action(DoubleCell{ws::promiseClean16(slot)}, work);
     } else {
-      auto const work = ws::promiseClean8(slot);
-      action(SingleCell{work}, work);
+      action(SingleCell{ws::promiseClean8(slot)}, work);
     }
   };
 
@@ -86,3 +90,12 @@ void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs)
     }
   });
 }
+
+void Assembler::squareSlot(Slot slot) {
+  if (slot.type()->usesValue1()) {
+    square16Destructive(ws::promiseClean16(slot));
+  } else {
+    squareDestructive(ws::promiseClean8(slot));
+  }  
+}
+

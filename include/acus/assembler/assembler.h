@@ -376,6 +376,8 @@ private:
   void mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
   void mulSlotBySlotSigned(Slot lhs, Slot rhs);
 
+  void squareSlot(Slot slot);
+  
   void divSlotByConst(Slot lhs, int denom);
   void divSlotByConst(Slot lhs, int denom, Slot modSlot);
   void divSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> const &modSlot = {});
@@ -571,19 +573,20 @@ private:
   // Multiplication workspace helper (assembler_mul.{cc,tpp}). The value views
   // are deliberately normalized to one or two cells so their N encodes the
   // arithmetic width; Work is the preserved slot that supplies clean scratch.
-  template <ws::IsWorkspace Result, ws::IsWorkspace Consumed,
-            ws::IsWorkspace Preserved, ws::IsWorkspace Work>
-  requires (
-    (Result::N == 1 || Result::N == 2) &&
-    (Consumed::N == 1 || Consumed::N == 2) &&
-    (Preserved::N == 1 || Preserved::N == 2) &&
-    Result::template Data<0, Result::N> &&
-    Consumed::template Data<0, Consumed::N> &&
-    Preserved::template Data<0, Preserved::N> &&
-    Work::template Scratch<2, 5>
-  )
-  void multiplyInto(Result const &result, Consumed const &consumed,
-                    Preserved const &preserved, Work const &work);
+  template <ws::MulValue Result, ws::MulValue Consumed, ws::MulValue Preserved, ws::MulWork Work>
+  Result multiplyInto(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
+
+  template <ws::MulValue Result, ws::MulValue Consumed, ws::MulValue Preserved, ws::MulWork Work>
+  requires (Result::N == 1)
+  Result multiplyInto8(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
+
+  template <ws::MulValue Result, ws::MulValue Consumed, ws::MulValue Preserved, ws::MulWork Work>
+  requires (Result::N == 2)
+  Result multiplyInto16(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
+
+  template <ws::SquareOperand W>   Data8Result<W>  squareDestructive(W const &lhs);
+  template <ws::Square16Operand W> Data16Result<W> square16Destructive(W const &lhs);
+  
 
   // DivMod (assembler_divmod.{cc,tpp})
   template <ws::DivModNum N>      DivModResult<N> divModDestructive(N const &num, SingleCell const &denom, TransferMode rhsMode);

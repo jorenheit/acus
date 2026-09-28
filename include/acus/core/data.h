@@ -751,6 +751,9 @@ namespace acus {
       >;
 
     template <typename W>
+    concept Dec16Operand = Inc16Operand<W>;
+
+    template <typename W>
     concept Add16Operand =
       DoubleAndScratch<W> && W::template Satisfies<
         DataCells<2>,
@@ -762,47 +765,59 @@ namespace acus {
       DoubleCell<W> && W::template Scratch<2, 2>;
 
     template <typename W>
-    concept Dec16Operand = Inc16Operand<W>;
-
-    template <typename W>
     concept Sub16Operand = Add16Operand<W>;
 
     template <typename W>
-    concept DivModNum =
-      SingleCell<W> && W::template Satisfies<
-        Data<>,
-        Clobber,
-        ScratchCells<5>
-      >;
+    concept DivModNum = SingleCell<W> && W::template Satisfies<
+      Data<>,
+      Clobber,
+      ScratchCells<5>
+    >;
 
     template <typename W>
-    concept DivMod16Num =
-      DoubleCell<W> && W::template Satisfies<
-        DataCells<2>,
-        ScratchCells<5>
-      >;
+    concept DivMod16Num = DoubleCell<W> && W::template Satisfies<
+      DataCells<2>,
+      ScratchCells<5>
+    >;
 
     template <typename W>
-    concept DivMod16Den =
-      DoubleCell<W> && W::template Satisfies<
-        DataCells<2>,
-        ScratchCells<3>
-      >;
+    concept DivMod16Den = DoubleCell<W> && W::template Satisfies<
+      DataCells<2>,
+      ScratchCells<3>
+    >;
     
     template <typename W>
-    concept DivModPrepared =
-      impl::IsWorkspace<W> && W::template Satisfies<
-        Prepared<Role::NumeratorLow>,
-        Prepared<Role::DenominatorLow>,
-        ScratchCells<4>
-      >;
+    concept DivModPrepared = impl::IsWorkspace<W> && W::template Satisfies<
+      Prepared<Role::NumeratorLow>,
+      Prepared<Role::DenominatorLow>,
+      ScratchCells<4>
+    >;
+    template <typename W>
+    concept MulValue = impl::IsWorkspace<W> && (W::N == 1 || W::N == 2) &&  W::template Data<0, W::N>;
 
     template <typename W>
-    concept SignBitOperand =
-      SingleCell<W> && W::template Satisfies<
-        Data<>,
-        ScratchCells<3>
-      >;
+    concept MulWork = impl::IsWorkspace<W> && W::template Scratch<0, 5>;
+
+    template <typename W>
+    concept SignBitOperand = SingleCell<W> && W::template Satisfies<
+      Data<>,
+      ScratchCells<3>
+    >;
+
+    template <typename W>
+    concept SquareOperand = SingleCell<W> && W::template Satisfies<
+      Data<>,
+      Untouched,
+      ScratchCells<3>
+    >;
+
+    template <typename W>
+    concept Square16Operand = DoubleCell<W> && W::template Satisfies<
+      DataCells<2>,
+      ScratchCells<3>
+    >;
+    
+    
 
     template <typename ... Args>
     requires (std::is_base_of_v<impl::RegionBase, Args> && ...)

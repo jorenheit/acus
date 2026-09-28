@@ -1381,6 +1381,11 @@ tests.push_back(expectOutput("Integer Multiplication i16",
 #include "tests/integer_multiplication_i16.cc"
                              }));
 
+tests.push_back(expectOutput("Integer Multiplication Self Assign",
+                             "Q!!", []() {
+#include "tests/integer_multiplication_self_assign.cc"
+                             }));
+
 tests.push_back(expectOutput("Integer Multiplication Mixed i16/i8",
                              "\"\"DD", []() {
 #include "tests/integer_multiplication_mixed_i16_i8.cc"
