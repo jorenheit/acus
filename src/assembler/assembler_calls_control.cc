@@ -12,7 +12,7 @@ Assembler::FunctionCallBuilder Assembler::callFunction(std::string const &functi
 }
 
 void Assembler::callFunctionImpl(std::string const &functionName, std::optional<Expression> const &returnSlot,
-				 std::vector<Expression> const &args, API_CTX) {
+                                 std::vector<Expression> const &args, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
@@ -26,12 +26,12 @@ void Assembler::callFunctionImpl(std::string const &functionName, std::optional<
     + std::to_string(_metaBlocks.size());
 
   _metaBlocks.push_back(MetaBlock{
-      .name = metaBlockName,
-      .caller = _currentFunction->name,
-      .callee = functionName,
-      .returnSlot = returnSlot ? std::optional<SlotProxy>(returnSlot->slot()) : std::nullopt,
-      .nextBlockName = nextBlockName,
-    });
+                          .name = metaBlockName,
+                          .caller = _currentFunction->name,
+                          .callee = functionName,
+                          .returnSlot = returnSlot ? std::optional<SlotProxy>(returnSlot->slot()) : std::nullopt,
+                          .nextBlockName = nextBlockName,
+  });
 
   setNextBlock(_currentFunction->name, metaBlockName);
 
@@ -50,7 +50,7 @@ void Assembler::callFunctionImpl(std::string const &functionName, std::optional<
 }
 
 void Assembler::callFunctionImpl(Expression fPtr, std::optional<Expression> const &returnSlot,
-				 std::vector<Expression> const &args, API_CTX) {
+                                 std::vector<Expression> const &args, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_FUNCTION_POINTER(fPtr.type());
@@ -68,12 +68,12 @@ void Assembler::callFunctionImpl(Expression fPtr, std::optional<Expression> cons
 
   // Build MetaBlock
   _metaBlocks.push_back(MetaBlock{
-      .name = metaBlockName,
-      .caller = _currentFunction->name,
-      .callee = functionType,
-      .returnSlot = returnSlot ? std::optional<SlotProxy>(returnSlot->slot()) : std::nullopt,
-      .nextBlockName = nextBlockName,
-    });
+                          .name = metaBlockName,
+                          .caller = _currentFunction->name,
+                          .callee = functionType,
+                          .returnSlot = returnSlot ? std::optional<SlotProxy>(returnSlot->slot()) : std::nullopt,
+                          .nextBlockName = nextBlockName,
+  });
 
   // Prepare frame (set target, copy args) and push next frame onto the stack
   _cache.controlBoundary();
@@ -90,20 +90,20 @@ void Assembler::callFunctionImpl(Expression fPtr, std::optional<Expression> cons
 void Assembler::functionCallTypeCheck(types::FunctionType const *functionType, std::vector<Expression> const &args, API_CTX) {
   auto const &paramTypes = functionType->paramTypes();
   API_REQUIRE(paramTypes.size() == args.size(),
-	      error::ErrorCode::InvalidFunctionPointerCall,
-	      "invalid number of arguments in function-call through function-pointer: " 
-	      "expected ", paramTypes.size(), ", got ", args.size(), ".");
+              error::ErrorCode::InvalidFunctionPointerCall,
+              "invalid number of arguments in function-call through function-pointer: " 
+              "expected ", paramTypes.size(), ", got ", args.size(), ".");
   for (size_t i = 0; i != args.size(); ++i) {
     API_REQUIRE_ASSIGNABLE(paramTypes[i], args[i].type());
   }
 }
 
 void Assembler::deferFunctionCallTypeCheck(std::string const &callee, std::vector<Expression> const &args, API_CTX) {
-    _deferredFunctionCallTypeChecks.emplace_back(FunctionCallInfo {
-      .API_CTX_NAME = API_FWD,
-      .callee = callee,
-      .args = args
-    });
+  _deferredFunctionCallTypeChecks.emplace_back(FunctionCallInfo {
+                                                 .API_CTX_NAME = API_FWD,
+                                                 .callee = callee,
+                                                 .args = args
+  });
 }
 
 void Assembler::deferredFunctionCallTypeChecks() {
@@ -123,10 +123,10 @@ void Assembler::labelCheck(std::string const &functionName, std::string const &l
 
 void Assembler::deferLabelCheck(std::string const &functionName, std::string const &labelName, API_CTX) {
   _deferredLabelChecks.emplace_back( LabelCheck {
-      .API_CTX_NAME = API_FWD,
-      .functionName = functionName,
-      .labelName = labelName
-    });
+                                       .API_CTX_NAME = API_FWD,
+                                       .functionName = functionName,
+                                       .labelName = labelName
+  });
 }
 
 void Assembler::deferredLabelChecks() {
@@ -144,8 +144,8 @@ void Assembler::abortProgram(API_FUNC) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
-  moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
-  zeroCell();
+  Cell const run = Cell{FrameLayout::TargetBlock, MacroCell::Value1};
+  zeroCell(run);
 
   // Block boundary
   assert(_currentBlock != nullptr);
@@ -171,11 +171,11 @@ void Assembler::returnFromFunctionImpl(std::optional<Expression> const &ret, API
     // Copy the variable into the return-slot. 
     auto returnSlot = Slot {
       SlotData {
-	.name = "__return_slot",
-	.type = ret->type(),
-	.kind = Slot::Dummy,
-	.offset = FrameLayout::ReturnValueStart,
-	.scope = nullptr
+        .name = "__return_slot",
+        .type = ret->type(),
+        .kind = Slot::Dummy,
+        .offset = FrameLayout::ReturnValueStart,
+        .scope = nullptr
       }
     };
       
@@ -191,7 +191,7 @@ void Assembler::returnFromFunctionImpl(std::optional<Expression> const &ret, API
 }
 
 void Assembler::initializeArguments(primitive::DInt const currentFrameSize, primitive::DInt const paramStart,
-				  std::vector<Expression> const &args, API_CTX) {
+                                    std::vector<Expression> const &args, API_CTX) {
 
   auto const copySlotToNextFrame = [&](Slot slot, int &offset) {
     for (int i = 0; i != slot.type()->size(); ++i) {
@@ -203,12 +203,12 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
       emit<primitive::CopyData>(varIndex0, paramIndex0, scratchIndex);
       moveTo(slot + i, MacroCell::Value1);
       if (slot.type()->usesValue1()) {
-	int const varIndex1 = getFieldIndex(slot + i, MacroCell::Value1);
-	primitive::DInt const paramIndex1 = currentFrameSize + paramStart + offset + MacroCell::Value1;
-	emit<primitive::CopyData>(varIndex1, paramIndex1, scratchIndex);
+        int const varIndex1 = getFieldIndex(slot + i, MacroCell::Value1);
+        primitive::DInt const paramIndex1 = currentFrameSize + paramStart + offset + MacroCell::Value1;
+        emit<primitive::CopyData>(varIndex1, paramIndex1, scratchIndex);
       }
       else {
-	emit<primitive::ZeroCell>();
+        emit<primitive::ZeroCell>();
       }
       offset += MacroCell::FieldCount;
     }
@@ -223,12 +223,12 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
       emit<primitive::MoveData>(varIndex0, paramIndex0);
       moveTo(slot + i, MacroCell::Value1);
       if (slot.type()->usesValue1()) {
-	int const varIndex1 = getFieldIndex(slot + i, MacroCell::Value1);
-	primitive::DInt const paramIndex1 = currentFrameSize + paramStart + offset + MacroCell::Value1;
-	emit<primitive::MoveData>(varIndex1, paramIndex1);
+        int const varIndex1 = getFieldIndex(slot + i, MacroCell::Value1);
+        primitive::DInt const paramIndex1 = currentFrameSize + paramStart + offset + MacroCell::Value1;
+        emit<primitive::MoveData>(varIndex1, paramIndex1);
       }
       else {
-	emit<primitive::ZeroCell>();
+        emit<primitive::ZeroCell>();
       }
       offset += MacroCell::FieldCount;
     }
@@ -257,12 +257,12 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
 	
     for (int i = 0; i != arrayType->length(); ++i) {
       auto const elementSlot = Slot {
-	SlotData {
-	  .name = "dummy",
-	  .type = elementType,
-	  .kind = Slot::Dummy,
-	  .offset = slot.offset() + i * elementType->size()
-	}
+        SlotData {
+          .name = "dummy",
+          .type = elementType,
+          .kind = Slot::Dummy,
+          .offset = slot.offset() + i * elementType->size()
+        }
       };
 
       init(init, offset, rValue(elementSlot, API_FWD));
@@ -276,12 +276,12 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     for (int i = 0; i != structType->fieldCount(); ++i) {
       auto fieldType = structType->fieldType(i);
       auto const fieldSlot = Slot {
-	SlotData {
-	  .name = "dummy",
-	  .type = fieldType,
-	  .kind = Slot::Dummy,
-	  .offset = slot.offset() + structType->fieldOffset(i)
-	}
+        SlotData {
+          .name = "dummy",
+          .type = fieldType,
+          .kind = Slot::Dummy,
+          .offset = slot.offset() + structType->fieldOffset(i)
+        }
       };
       init(init, offset, rValue(fieldSlot, API_FWD));
     }
@@ -330,34 +330,34 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     if (arg.hasSlot()) { // Already stored on tape -> copy to next frame
       Slot const argSlot = materialize(arg.slot());
       switch (argSlot.type()->tag()) {
-      case types::U8:
-      case types::U16:
-      case types::S8:
-      case types::S16:
-      case types::STRING:
-      case types::FUNCTION_POINTER: copyOrMoveSlotToNextFrame(argSlot, offset);         break;
-      case types::POINTER:          copyOrMovePointerToNextFrame(argSlot, offset);      break;
-      case types::ARRAY:            copyOrMoveArrayToNextFrame(self, argSlot, offset);  break;
-      case types::STRUCT:           copyOrMoveStructToNextFrame(self, argSlot, offset); break;
-      default:
-	assert(false && "What type is this?");
-	std::unreachable();
+        case types::U8:
+        case types::U16:
+        case types::S8:
+        case types::S16:
+        case types::STRING:
+        case types::FUNCTION_POINTER: copyOrMoveSlotToNextFrame(argSlot, offset);         break;
+        case types::POINTER:          copyOrMovePointerToNextFrame(argSlot, offset);      break;
+        case types::ARRAY:            copyOrMoveArrayToNextFrame(self, argSlot, offset);  break;
+        case types::STRUCT:           copyOrMoveStructToNextFrame(self, argSlot, offset); break;
+        default:
+          assert(false && "What type is this?");
+          std::unreachable();
       } // switch (tag)
     }
     else { // anonymous value -> construct in-place
       types::TypeHandle argType = arg.type();
       switch(argType->tag()) {
-      case types::U8:
-      case types::S8:
-      case types::U16:
-      case types::S16:              constructInteger(arg.literal(), offset);         break;
-      case types::FUNCTION_POINTER: constructFunctionPointer(arg.literal(), offset); break;
-      case types::ARRAY:
-      case types::STRING:           constructArrayOrString(self, arg.literal(), offset);   break;
-      case types::POINTER:
-      default:
-	assert(false && "Unsupported type");
-	std::unreachable();
+        case types::U8:
+        case types::S8:
+        case types::U16:
+        case types::S16:              constructInteger(arg.literal(), offset);         break;
+        case types::FUNCTION_POINTER: constructFunctionPointer(arg.literal(), offset); break;
+        case types::ARRAY:
+        case types::STRING:           constructArrayOrString(self, arg.literal(), offset);   break;
+        case types::POINTER:
+        default:
+          assert(false && "Unsupported type");
+          std::unreachable();
       } // switch (tag)
     }
   };
@@ -454,12 +454,6 @@ void Assembler::fetchReturnData() {
     emit<primitive::MovePointerRelative>(stackFrameSize);
   });
   emit<primitive::MovePointerRelative>(-stackFrameSize);
-  
-  
-  // moveTo(FrameLayout::RunState);
-  // emit<primitive::MovePointerRelative>(stackFrameSize);
-  // emit<primitive::MoveData>(-stackFrameSize);
-  // emit<primitive::MovePointerRelative>(-stackFrameSize);
 
   popPtr();
 }

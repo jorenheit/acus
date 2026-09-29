@@ -36,17 +36,17 @@ void Assembler::endProgram(API_FUNC) {
   API_REQUIRE_INSIDE_PROGRAM_BLOCK();
   API_REQUIRE_OUTSIDE_FUNCTION_BLOCK();
   API_REQUIRE(_program.functions.size() > 0,
-	      error::ErrorCode::EmptyProgram,
-	      "a program should contain at least one function.");
+              error::ErrorCode::EmptyProgram,
+              "a program should contain at least one function.");
 
   API_REQUIRE(_program.isFunctionDefined(_program.entryFunctionName),
-	      error::ErrorCode::EntryFunctionNotDefined,
-	      "entry function '", _program.entryFunctionName, "' was never defined.");
+              error::ErrorCode::EntryFunctionNotDefined,
+              "entry function '", _program.entryFunctionName, "' was never defined.");
 
   auto const entryFunctionType = _program.function(_program.entryFunctionName).type;
   API_REQUIRE(entryFunctionType == ts::void_function(),
-	      error::ErrorCode::WrongEntryFunctionType,
-	      "entry function must be of type 'void()', but is of type '", entryFunctionType->str(), "'."); 
+              error::ErrorCode::WrongEntryFunctionType,
+              "entry function must be of type 'void()', but is of type '", entryFunctionType->str(), "'."); 
 	      
   
   // Generate the metablocks and builtin functions
@@ -71,7 +71,7 @@ void Assembler::endProgram(API_FUNC) {
   }
 
   API_REQUIRE(dispatchBlocks.size() <= 0xfeff, error::ErrorCode::TooManyBlocks,
-	      "Number of blocks exceeds maximum (0xfeff)");
+              "Number of blocks exceeds maximum (0xfeff)");
 
   // Start building result-sequence
   primitive::Sequence result;
@@ -85,10 +85,10 @@ void Assembler::endProgram(API_FUNC) {
       int sum;
       int diff;
       Result(int i, int j):
-	outer(std::min(i, j)),
-	inner(std::max(i, j)),
-	sum(i + j),
-	diff(inner - outer)
+        outer(std::min(i, j)),
+        inner(std::max(i, j)),
+        sum(i + j),
+        diff(inner - outer)
       {}
     };
 
@@ -100,9 +100,9 @@ void Assembler::endProgram(API_FUNC) {
 
       Result result{outer, inner};
       if (result.sum <= best.sum) {
-	if (result.sum < best.sum || result.diff < best.diff) {
-	  best = result;
-	}
+        if (result.sum < best.sum || result.diff < best.diff) {
+          best = result;
+        }
       }
     }
     
@@ -110,134 +110,111 @@ void Assembler::endProgram(API_FUNC) {
   }();
 
  
-  // TODO: document how the switch works 
-  auto constructSwitches = [&](MacroCell::Field outerValueField,
-			       MacroCell::Field outerFlagField,
-			       MacroCell::Field innerValueField,
-			       MacroCell::Field innerFlagField) -> void {
+  auto constructSwitches = [&] {
+
+    Cell const outerValue = {_dp.current(), MacroCell::Scratch1};
+    Cell const outerFlag  = {_dp.current(), MacroCell::Flag};
+    Cell const innerValue = {_dp.current(), MacroCell::Scratch0};
+    Cell const innerFlag  = {_dp.current(), MacroCell::Scratch1}; // re-use
+
     
-    auto impl = [&](auto &&self,
-		    MacroCell::Field valueField,
-		    MacroCell::Field flagField,
-		    int caseCount,
-		    int caseIndex,
-		    auto &&caseBody) -> void
-    {
+    auto impl = [&](auto &&self, Cell const value, Cell const flag,
+                    int caseCount, int caseIndex, auto &&caseBody) -> void {
+      
       assert(caseCount > 0);
       assert(caseIndex >= 0 && caseIndex < caseCount);
+
       
-      switchField(valueField);
-      loopOpen(); {
-	if (caseIndex + 1 == caseCount) {
-	  // Default case: abort program	  
-	  // 1. Flush remainder of the valueField	  
-	  zeroCell();
-
-	  // 2. Clear TargetBlock high-byte
-	  switchField(MacroCell::Value1);
-	  zeroCell();
-
-	  // 3. Clear switch-flag
-	  switchField(flagField);
-	  dec();
-
-	  switchField(valueField);
-	}
-	else {
-	  // Recursive call to build all cases up to the default case above
-	  dec();      
-	  self(self, valueField, flagField, caseCount, caseIndex + 1, caseBody);
-	}
-      } loopClose();
+      loop(value, [&]{
+        if (caseIndex + 1 == caseCount) {
+          // Default case: abort program	  
+          // 1. Flush remainder of the valueField	  
+          // 2. Clear TargetBlock high-byte
+          // 3. Clear switch-flag
+          Cell const targetBlockHigh = {_dp.current(), MacroCell::Value1};
+          zeroCell(value);
+          zeroCell(targetBlockHigh);
+          dec(flag);
+        }
+        else {
+          // Recursive call to build all cases up to the default case above
+          dec(value);      
+          self(self, value, flag, caseCount, caseIndex + 1, caseBody);
+        }
+      });
 
       // Case implementations
-      switchField(flagField);
-      loopOpen(); {
-	dec();
-
-	moveToOrigin();
-	caseBody(caseIndex);
-
-	// Make sure we end on the flag again to exit the case
-	moveTo(FrameLayout::TargetBlock, flagField);
-      } loopClose();
-      
-      switchField(valueField);
+      loop(flag, [&]{
+        dec(flag);
+        moveToOrigin();
+        caseBody(caseIndex);
+      });
     };
 
-    // Set flag
-    switchField(outerFlagField);
-    inc();
-    
-    // Initial decrement for the outer switch.    
-    switchField(outerValueField);
-    dec();
+    // Set flag and do initial decrement for the outer switch.    
+    inc(outerFlag);
+    dec(outerValue);
 
     // Outer switch
     impl(impl,
-	 outerValueField,
-	 outerFlagField,
-	 outerSwitchCaseCount,
-	 0,
-	 [&](int outerCaseIndex){
+         outerValue,
+         outerFlag,
+         outerSwitchCaseCount,
+         0,
+         [&](int outerCaseIndex){
 
-	   int const thisInnerSwitchCaseCount =
-	     (outerCaseIndex + 1) < outerSwitchCaseCount
-	     ? innerSwitchCaseCount
-	     : ((dispatchBlocks.size() - 1) % innerSwitchCaseCount + 1);	   
+           int const thisInnerSwitchCaseCount =
+             (outerCaseIndex + 1) < outerSwitchCaseCount
+             ? innerSwitchCaseCount
+             : ((dispatchBlocks.size() - 1) % innerSwitchCaseCount + 1);	   
 	   
-	   // Set flag
-	   switchField(innerFlagField);
-	   inc();
-	   // Inner switch
-	   impl(impl,
-		innerValueField,
-		innerFlagField,
-		thisInnerSwitchCaseCount,
-		0,
-		[&](int innerCaseIndex) {
-		  // Insert block body
-		  size_t const dispatchIndex = outerCaseIndex * innerSwitchCaseCount + innerCaseIndex;
-		  assert(dispatchIndex < dispatchBlocks.size());
-		  result.append(dispatchBlocks[dispatchIndex]->code);    
-		});
-	 });
+           // Set flag
+           inc(innerFlag);
+
+           // Inner switch
+           impl(impl,
+                innerValue,
+                innerFlag,
+                thisInnerSwitchCaseCount,
+                0,
+                [&](int innerCaseIndex) {
+                  // Insert block body
+                  size_t const dispatchIndex = outerCaseIndex * innerSwitchCaseCount + innerCaseIndex;
+                  assert(dispatchIndex < dispatchBlocks.size());
+                  result.append(dispatchBlocks[dispatchIndex]->code);    
+                });
+         });
   };
 
 
   auto copyTargetBlockToScratch = [&]{
-    // Use Daniel's algorithm to copy the TargetBlock into the scratch cells.
-    // TODO: modify move/copy to take multiple destinations and simplify this
-    //       in terms of those primitives.
+
+    Cell const targetBlock = {FrameLayout::TargetBlock, MacroCell::Value0};
+    auto tb = ws::promise(targetBlock, ws::Layout<ws::DataCells<2>, ws::ScratchCells<5>>{})
+      .view("low", "high", "lowCopy", "highCopy", "highCopy2");
+
+    // 1: Move TargetBlock high byte value into copy cells 
+    loop(tb["high"], [&]{
+      inc(tb["highCopy"]);
+      inc(tb["highCopy2"]);
+      dec(tb["high"]);
+    });
+    tb.rename("high", "lowCopy2");
     
-    // 1: Move TargetBlock high byte value into Scratch1 and Flag
-    loopOpen(); {
-      switchField(MacroCell::Scratch1); inc();
-      switchField(MacroCell::Flag);     inc();
-      switchField(MacroCell::Value1);   dec();
-    } loopClose();
-    
-    // 2: Move TargetBlock low byte value into Value1 and Scratch0
-    switchField(MacroCell::Value0);
-    loopOpen(); {
-      switchField(MacroCell::Value1);   inc();
-      switchField(MacroCell::Scratch0); inc();
-      switchField(MacroCell::Value0);   dec();
-    } loopClose();
+    // 2: Move TargetBlock low byte value into copy cells
+    loop(tb["low"], [&]{
+      inc(tb["lowCopy2"]);
+      inc(tb["lowCopy"]);
+      dec(tb["low"]);
+    });
     
     // 3: Restore low byte in Value0
-    switchField(MacroCell::Value1);
-    loopOpen(); {
-      switchField(MacroCell::Value0); inc();
-      switchField(MacroCell::Value1); dec();
-    } loopClose();
+    moveField(tb["lowCopy2"], tb["low"]);
+    tb.rename("lowCopy2", "high");
+    moveField(tb["highCopy2"], tb["high"]);
 
-    // 4: Restore high byte in Value1
-    switchField(MacroCell::Flag);
-    loopOpen(); {
-      switchField(MacroCell::Value1); inc();
-      switchField(MacroCell::Flag);   dec();
-    } loopClose();
+    // Final state:
+    // L | H | L | H | 0 |
   };
 
   
@@ -246,34 +223,23 @@ void Assembler::endProgram(API_FUNC) {
 
   // Mark the first cell (start of global frame) with a SeekMarker and a FrameMarker
   _dp.set(0, static_cast<MacroCell::Field>(0));
-  switchField(MacroCell::SeekMarker);
-  inc();
-  switchField(MacroCell::FrameMarker);
-  inc();
+  inc(Cell{0, MacroCell::SeekMarker});
+  inc(Cell{0, MacroCell::FrameMarker});
 
   // Mark the start of Frame 1 (main-function) with a FrameMarker
   moveTo(1 + _program.globalVariableFrameSize()); 
   _dp.set(0);
-  switchField(MacroCell::FrameMarker);
-  inc();
+  inc(Cell{0, MacroCell::FrameMarker});
 
   // Populate the TargetBlock with the index corresponding to the entrypoint
   setTargetBlock(_program.entryFunctionName, "");
 
-  // The high byte of the TargetBlock is the main loop-guard (Run-flag). 
-  moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
-  loopOpen("main loop"); {
-
-    // Make a temporary copy of the TargetBlock cells
+  // MAIN LOOP on run-flag (TargetBlock.high)
+  Cell const run = {FrameLayout::TargetBlock, MacroCell::Value1 };
+  loop(run, [&]{
     copyTargetBlockToScratch();
-
-    // Construct switches that use the copied values to select the correct block
-    constructSwitches(MacroCell::Scratch1, MacroCell::Flag,      // outer switch fields
-		      MacroCell::Scratch0, MacroCell::Scratch1); // inner switch fields
-  
-    // Close main loop
-    switchField(MacroCell::Value1);
-  } loopClose("main loop");
+    constructSwitches();
+  });
 
   _state.begun = false;
   setTargetSequence(nullptr);
@@ -312,8 +278,8 @@ void Assembler::beginFunctionImpl(std::string const &name, types::TypeHandle typ
     std::string const &name = params[i];
     auto [_, unique] = paramSet.insert(name);
     API_REQUIRE(unique,
-		error::ErrorCode::DuplicateFunctionParameters,
-		"parameter name '", name, "' used more than once.");
+                error::ErrorCode::DuplicateFunctionParameters,
+                "parameter name '", name, "' used more than once.");
     declareLocal(name, fType->paramTypes()[i]);
   }
 

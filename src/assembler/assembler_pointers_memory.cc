@@ -250,7 +250,6 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src, TransferMode mode) {
   if (not srcInt->isSigned()) return assignSlotBytewise(dest, src, mode);
 
   // Signed widening
-  // pushPtr();
 
   // Copy low byte to both fields of destination
   Cell const srcLow  = {src, MacroCell::Value0};
@@ -358,7 +357,6 @@ void Assembler::assignSlot(Slot slot, literal::Literal val) {
   else if (types::isFunctionPointer(slot.type())) {
     std::string const &functionName = literal::cast<types::FunctionPointerType>(val)->functionName();
 
-    // TODO: replace by ConstructConstant
     moveTo(slot, MacroCell::Value0);
     emit<primitive::ConstructConstant>([functionName](primitive::Context const &ctx) -> int {
       return ctx.getDispatchIndex(functionName) & 0xff;

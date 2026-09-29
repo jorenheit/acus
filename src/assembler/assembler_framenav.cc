@@ -28,7 +28,8 @@ void Assembler::pushFrame() {
 
   moveTo(0, MacroCell::FrameMarker);
   emit<primitive::MovePointerRelative>(currentFrameSize);
-  zeroCell(); inc();
+  zeroCell();
+  inc();
   moveToOrigin();
 }
 
