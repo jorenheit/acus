@@ -8,10 +8,7 @@
 void Assembler::mulSlotByConst(Slot lhs, int factor) {
   assert(types::isInteger(lhs.type()));
 
-  if (factor == 0) {
-    zeroCell();
-    return;
-  }
+  if (factor == 0) return setSlotToValue(lhs, 0);
   if (factor == 1) return;
 
   bool negate = false;
@@ -35,27 +32,17 @@ void Assembler::mulSlotBySlot(Slot lhs, Slot rhs) {
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
 
-  pushPtr();
-
-  if (types::isSignedInteger(lhs.type())
-      && lhs.type()->usesValue1()
-      && !rhs.type()->usesValue1()) {
-
+  if (types::isSignedInteger(lhs.type()) && lhs.type()->usesValue1() && !rhs.type()->usesValue1()) {
     Slot rhsWide = getTemp(ts::s16());
     assignSlot(rhsWide, rhs);  // existing signed widening -> sign extension
 
     // rhsWide may be destroyed
     mulSlotBySlotUnsigned(lhs.unsignedView(), rhsWide.unsignedView(), true);
-
     freeTempSlot(rhsWide);
   }
   else {
-    mulSlotBySlotUnsigned(
-        lhs.unsignedView(),
-        rhs.unsignedView());
+    mulSlotBySlotUnsigned(lhs.unsignedView(), rhs.unsignedView());
   }
-
-  popPtr();
 }
 
 void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {

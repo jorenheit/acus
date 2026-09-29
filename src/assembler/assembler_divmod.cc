@@ -10,7 +10,6 @@ void Assembler::divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
   assert(types::isUnsignedInteger(lhs.type()));
   assert(types::isUnsignedInteger(rhs.type()));
 
-  pushPtr();
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     bool freeRhsWork = false;
     Slot rhsWork = rhs;
@@ -25,8 +24,7 @@ void Assembler::divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
     }
 
     [[maybe_unused]] auto const [qlo, qhi, rlo, rhi] =
-      divMod16Destructive(ws::promiseClean16(lhs),
-                          ws::promiseClean16(rhsWork)).cells<4>();
+      divMod16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsWork)).cells<4>();
 
     if (modSlot.has_value()) {
       moveField(rlo, Cell{*modSlot, MacroCell::Value0});
@@ -40,17 +38,16 @@ void Assembler::divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
       freeTempSlot(rhsWork);
   } else {
     [[maybe_unused]] auto const [quotient, remainder] =
-      divModDestructive(ws::promiseClean8(lhs),
-                        ws::promiseClean8(rhs),
-                        destroyRhs ? TransferMode::Move : TransferMode::Copy).cells<2>();
+      divModDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhs),
+                        destroyRhs ? TransferMode::Move : TransferMode::Copy)
+      .cells<2>();
+    
     if (modSlot.has_value()) {
       moveField(remainder, Cell{*modSlot, MacroCell::Value0});
     } else {
       zeroCell(remainder);
     }
   }
-
-  popPtr();
 }
 
 void Assembler::divSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> const &modSlot) {
@@ -76,8 +73,6 @@ void Assembler::divSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> 
 void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot) {
   assert(types::isSignedInteger(lhs.type()));
   assert(types::isSignedInteger(rhs.type()));
-
-  pushPtr();
 
   // Construct sign-bit in lhs::Scratch0
   copyField(Cell{lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
@@ -137,7 +132,6 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
     negateSlot(lhs);
   });
 
-  popPtr();
   freeTempSlot(tmp);
 }
 
@@ -163,7 +157,6 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
 
   // For signed integers, check if the value is negative. If so, take the
   // absolute value but remember the sign.
-  pushPtr();
 
   // Create a new slot and move the sign-byte to its Value1 field
   Slot signBit = getTemp(ts::raw(1));
@@ -212,7 +205,6 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
     });
   }
 
-  popPtr();
   freeSlot(signBit);
 }
 
@@ -220,7 +212,6 @@ void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
   assert(types::isUnsignedInteger(lhs.type()));
   assert(types::isUnsignedInteger(rhs.type()));
 
-  pushPtr();
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     bool freeRhsWork = false;
@@ -263,14 +254,12 @@ void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
     moveField(remainder, quotient);
   }
 
-  popPtr();
 }
 
 void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot) {
   assert(types::isSignedInteger(lhs.type()));
   assert(types::isSignedInteger(rhs.type()));
 
-  pushPtr();
 
   // Construct sign-bit in lhs::Scratch0
   copyField(Cell{lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
@@ -306,7 +295,6 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
     negateSlot(lhs);
   });
 
-  popPtr();
   freeTempSlot(tmp);
 }
 
@@ -360,7 +348,6 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
 
   // For signed integers, check if the value is negative. If so, take the
   // absolute value but remember the sign.
-  pushPtr();
 
   // Copy lhs into a temp and reduce it to its sign bit.
   Slot signBit = getTemp(ts::u8());
@@ -396,10 +383,7 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   // Fix division sign.
   if (divSlot) {
     if (denom < 0) {
-      notDestructive(ws::promise(
-        SCopy2,
-        ws::Layout<ws::Data<>, ws::Scratch>{}
-      ));
+      notDestructive(ws::promise(SCopy2, ws::Layout<ws::Data<>, ws::Scratch>{}));
     }
     loop(SCopy1, [&] {
       zeroCell(SCopy1);
@@ -407,7 +391,6 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
     });
   }
 
-  popPtr();
   freeSlot(signBit);
 }
 
