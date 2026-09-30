@@ -476,15 +476,16 @@ private:
   void loopOpen(std::string const &tag = defaultOpenTag());
   void loopClose(std::string const &tag = defaultCloseTag());
 
-  void moveToDynamicOffset(Cell offsetLow, Cell offsetHigh, TransferMode mode = TransferMode::Copy);
-  void fetchFromDynamicOffset(Cell offsetLow, Cell offsetHigh, Payload const &payload, primitive::Direction seekDir,
+  template <ws::DoubleCell Offset, ws::DynamicMoveWorkspace Work>
+  void moveToDynamicOffset(Offset const &offset, Work const &work, TransferMode mode);
+
+  template <ws::DoubleCell Offset>
+  void fetchFromDynamicOffset(Offset const &offset, Payload const &payload, primitive::Direction seekDir,
                               TransferMode dataTransferMode, TransferMode offsetTransferMode);
   
-  void moveField(Cell dest);
+//  void moveField(Cell dest);
   void moveField(Cell from, Cell to);
-  void copyField(Cell dest, Temps<1>);
   void copyField(Cell from, Cell to, Cell tmp);
-  void copyOrMoveField(TransferMode mode, Cell dest, Temps<1>);
   void copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp);
 
   // Workspaces for the implementations
@@ -534,6 +535,12 @@ private:
     ws::Replace<0, ws::Prepared<ws::Role::SignBit>>
   >;
 
+  template <ws::IsWorkspace W>
+  using SignExtendResult = typename W::template Transform<
+    ws::Replace<1, ws::Data<>>
+  >;
+
+  
   // inc/dec (assembler_algorithms.cc)
   SingleCell inc(size_t n = 1);
   SingleCell inc(Cell target, size_t n = 1);
@@ -545,6 +552,9 @@ private:
   template <ws::SingleCell W>   Data8Result<W>  dec(W const &, size_t n = 1);
   template <ws::Dec16Operand W> Data16Result<W> dec16(W const &);
 
+  template <ws::SignExtendOperand W> SignExtendResult<W> signExtend(W const &w, bool const copyLowByte = true);
+
+  
   // setToValue (assembler_algorithms.{cc,tpp} // TODO: other file
   SingleCell setToValue(int value);
   SingleCell setToValue(Cell target, int value);

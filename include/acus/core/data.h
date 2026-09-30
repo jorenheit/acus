@@ -177,7 +177,9 @@ namespace acus {
       QuotientLow,
       QuotientHigh,
       RemainderLow,
-      RemainderHigh
+      RemainderHigh,
+      OffsetLow,
+      OffsetHigh
     };
     
     template <Role R> struct Prepared: impl::Region<1, Prepared<R>> {};
@@ -805,6 +807,13 @@ namespace acus {
     >;
 
     template <typename W>
+    concept SignExtendOperand = SingleCell<W> && W::template Satisfies<
+      Data<>,
+      Clobber,
+      ScratchCells<3>
+    >;
+    
+    template <typename W>
     concept SquareOperand = SingleCell<W> && W::template Satisfies<
       Data<>,
       Untouched,
@@ -816,7 +825,14 @@ namespace acus {
       DataCells<2>,
       ScratchCells<3>
     >;
-    
+
+    template <typename W>
+    concept DynamicOffset = DoubleCell<W>;
+
+    template <typename W>
+    concept DynamicMoveWorkspace = impl::IsWorkspace<W> && W::template Satisfies<
+      ScratchCells<5>
+    >;
     
 
     template <typename ... Args>

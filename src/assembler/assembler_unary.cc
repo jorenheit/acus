@@ -98,40 +98,25 @@ Expression Assembler::castImpl(Expression obj, types::TypeHandle toType, API_CTX
   
   // All other cases: construct a temp to return and populate it based on the type conversion
   // First byte can be copied without modification.
-  pushPtr();
-  moveTo(slot, MacroCell::Value0);
-  copyField(Cell{result, MacroCell::Value0}, Temps<1>::select(result, MacroCell::Scratch0));
-
-  // If both types (from and to) are 16-bits, we need to copy the high byte as well:
+  copyField(Cell{slot, MacroCell::Value0},
+            Cell{result, MacroCell::Value0},
+            Cell{slot, MacroCell::Scratch0});
+  
   if (slot.type()->usesValue1() && toType->usesValue1()) {
-    moveTo(slot, MacroCell::Value1);
-    copyField(Cell{result, MacroCell::Value1}, Temps<1>::select(result, MacroCell::Scratch0));    
+    // If both types (from and to) are 16-bits, we need to copy the high byte as well:
+    copyField(Cell{slot, MacroCell::Value1},
+              Cell{result, MacroCell::Value1},
+              Cell{slot, MacroCell::Scratch0});
   }
-  // If we're widening S8, we need to sign-extend
   else if (slot.type()->tag() == types::S8 && toType->usesValue1()) {
-
-    copyField(Cell{slot, MacroCell::Value0},
-	      Cell{slot, MacroCell::Scratch0},
-	      Cell{slot, MacroCell::Scratch1});
-
-    signBitDestructive(ws::promise(Cell{slot, MacroCell::Scratch0},
-				   ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
-
-    Cell const resultHigh = {result, MacroCell::Value1};
-    Cell const signBitFlag = Cell{slot, MacroCell::Scratch0};
-    loop(signBitFlag, [&]{
-      zeroCell(signBitFlag);
-      zeroCell(resultHigh);
-      dec(resultHigh);
-    });
+    // If we're widening S8, we need to sign-extend
+    signExtend(ws::promiseClean16(result));
   }
-  // All other cases, just zero the high byte
   else {
-    moveTo(result, MacroCell::Value1);
-    zeroCell();
+    // All other cases, just zero the high byte
+    zeroCell(Cell{result, MacroCell::Value1});
   }
 
-  popPtr();
   return Expression{result};
 }
 
@@ -142,81 +127,61 @@ Expression Assembler::castImpl(Expression obj, types::TypeHandle toType, API_CTX
 void Assembler::notSlot(Slot rhs) {
   assert(rhs.size() == 1);
 
-  pushPtr();
-  moveTo(rhs);
-
   if (rhs.type()->usesValue1()) {
     not16Destructive(ws::promiseClean16(rhs));
   } else {
     notDestructive(ws::promiseClean8(rhs));
   }
-  
-  popPtr();
 }
 
 
 void Assembler::boolSlot(Slot rhs) {
   assert(rhs.size() == 1);
   
-  pushPtr();
-  moveTo(rhs);
-
   if (rhs.type()->usesValue1()) {
     bool16Destructive(ws::promiseClean16(rhs));
   } else {
     zeroCell(Cell{rhs, MacroCell::Value1});
     boolDestructive(ws::promise(rhs, ws::Layout<ws::Data<>, ws::Scratch>{}));
   }
-  
-  popPtr();
 }
 
 void Assembler::negateSlot(Slot rhs) {
   assert(types::isInteger(rhs.type()));
 
-  Slot const copy = getTemp(rhs.type());
-
   // Move the original value out, leaving rhs zero.
+  Slot const copy = getTemp(rhs.type());
   assignSlot(copy, rhs, TransferMode::Move);
 
   // rhs = 0 - original
-  pushPtr();
-  moveTo(rhs, MacroCell::Value0);
-
   if (rhs.type()->usesValue1()) {
     sub16Destructive(ws::promise(rhs, ws::Layout<ws::ScratchCells<7>>{}),
-		     ws::promiseClean16(copy));
+                     ws::promiseClean16(copy));
   } else {
     subDestructive(ws::promise(rhs, ws::Layout<ws::Scratch> {}),
-		   ws::promiseClean8(copy));
+                   ws::promiseClean8(copy));
   }
 
-  popPtr();
   freeTempSlot(copy);
 }
 
 void Assembler::absSlot(Slot rhs) {
   assert(types::isInteger(rhs.type()));
-
   if (types::isUnsignedInteger(rhs.type())) return;
 
-  pushPtr();
-
   copyField(Cell{rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
-	    Cell{rhs, MacroCell::Scratch0},
-	    Cell{rhs, MacroCell::Scratch1});
+            Cell{rhs, MacroCell::Scratch0},
+            Cell{rhs, MacroCell::Scratch1});
 
   signBitDestructive(ws::promise(Cell{rhs, MacroCell::Scratch0},
-				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
+                                 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
   
   // If the sign-bit was set, negate the slot
   Cell const signBitFlag = Cell{rhs, MacroCell::Scratch0};
   loop(signBitFlag, [&]{
-    zeroCell();
+    zeroCell(signBitFlag);
     negateSlot(rhs);
   });
-
-  popPtr();
 }
 
 void Assembler::signBitSlot(Slot rhs) {
@@ -224,7 +189,7 @@ void Assembler::signBitSlot(Slot rhs) {
   assert(types::isSignedInteger(rhs.type()));
   if (rhs.type()->usesValue1()) {
     moveField(Cell{rhs, MacroCell::Value1},
-	      Cell{rhs, MacroCell::Value0});
+              Cell{rhs, MacroCell::Value0});
   } else {
     zeroCell(Cell{rhs, MacroCell::Value1});
   }

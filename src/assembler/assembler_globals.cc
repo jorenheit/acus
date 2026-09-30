@@ -21,14 +21,13 @@ void Assembler::fetchGlobal(Slot globalSlot, Slot localSlot) {
   seek(MacroCell::SeekMarker, primitive::Left, {}, false);
 
   for (int i = 0; i != size; ++i) {
-    moveTo(globalSlot + i, MacroCell::Value0);
-    copyField(Cell{globalSlot + i, MacroCell::Payload0},
-	      Temps<1>::select(globalSlot + i, MacroCell::Scratch0));
-    
+    copyField(Cell{globalSlot + i, MacroCell::Value0},
+              Cell{globalSlot + i, MacroCell::Payload0},
+              Cell{globalSlot + i, MacroCell::Scratch0});
     if (useValue1) {
-      moveTo(globalSlot + i, MacroCell::Value1); 
-      copyField(Cell{globalSlot + i, MacroCell::Payload1},
-		Temps<1>::select(globalSlot + i, MacroCell::Scratch0));
+      copyField(Cell{globalSlot + i, MacroCell::Value1},
+                Cell{globalSlot + i, MacroCell::Payload1},
+                Cell{globalSlot + i, MacroCell::Scratch0});
     }
   }
 
@@ -43,11 +42,11 @@ void Assembler::fetchGlobal(Slot globalSlot, Slot localSlot) {
     
   // Move the payload into the local slot
   for (int i = 0; i != size; ++i) {
-    moveTo(i, MacroCell::Payload0);
-    moveField(Cell{localSlot + i, MacroCell::Value0});
+    moveField(Cell{i, MacroCell::Payload0},
+              Cell{localSlot + i, MacroCell::Value0});
     if (useValue1) {
-      moveTo(i, MacroCell::Payload1);
-      moveField(Cell{localSlot + i, MacroCell::Value1});
+      moveField(Cell{i, MacroCell::Payload1},
+                Cell{localSlot + i, MacroCell::Value1});
     }
   }
   
@@ -64,14 +63,15 @@ void Assembler::putGlobal(Slot globalSlot, Slot localSlot, TransferMode mode) {
 
   // Copy value into payload slots starting at the origin
   for (int i = 0; i != size; ++i) {
-    moveTo(localSlot + i, MacroCell::Value0);
-    copyOrMoveField(mode, Cell{i, MacroCell::Payload0},
-		    Temps<1>::select(i, MacroCell::Scratch0));
-
+    copyOrMoveField(mode,
+                    Cell{localSlot + i, MacroCell::Value0},
+                    Cell{i, MacroCell::Payload0},
+                    Cell{localSlot + i, MacroCell::Scratch0});
     if (useValue1) {
-      moveTo(localSlot + i, MacroCell::Value1);
-      copyOrMoveField(mode, Cell{i, MacroCell::Payload1},
-		      Temps<1>::select(i, MacroCell::Scratch0));
+      copyOrMoveField(mode,
+                      Cell{localSlot + i, MacroCell::Value1},
+                      Cell{i, MacroCell::Payload1},
+                      Cell{localSlot + i, MacroCell::Scratch0});
     }
   }
 
@@ -85,11 +85,11 @@ void Assembler::putGlobal(Slot globalSlot, Slot localSlot, TransferMode mode) {
   
   // Move payload into global slot
   for (int i = 0; i != size; ++i) {
-    moveTo(i, MacroCell::Payload0);
-    moveField(Cell{globalSlot + i, MacroCell::Value0});
+    moveField(Cell{i, MacroCell::Payload0},
+              Cell{globalSlot + i, MacroCell::Value0});
     if (useValue1) {
-      moveTo(i, MacroCell::Payload1);
-      moveField(Cell{globalSlot + i, MacroCell::Value1});
+      moveField(Cell{i, MacroCell::Payload1},
+                Cell{globalSlot + i, MacroCell::Value1});
     }
   }
   
