@@ -259,26 +259,7 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src, TransferMode mode) {
   Cell const dstHigh = {dest, MacroCell::Value1};
   Cell const tmp = {dest, MacroCell::Scratch0};
 
-  zeroCell(dstLow);
-  zeroCell(dstHigh);
-
-  // TODO: replace by moveOrCopy(src, {dest1, dest2}, mode)
-  loop(srcLow, [&]{
-    dec(srcLow);
-    inc(dstLow);
-    inc(dstHigh);
-    if (mode == TransferMode::Copy) {
-      inc(tmp);
-    }
-  });
-
-  if (mode == TransferMode::Copy) {
-    loop(tmp, [&]{
-      dec(tmp);
-      inc(srcLow);
-    });
-  }
-
+  copyOrMoveField(mode, srcLow, {dstLow, dstHigh}, tmp);
   signExtend(ws::promiseClean16(dest), false);
 }
 

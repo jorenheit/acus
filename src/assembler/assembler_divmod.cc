@@ -160,7 +160,7 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
 
   // Create a new slot and move the sign-byte to its Value1 field
   Slot signBit = getTemp(ts::raw(1));
-  auto const [_, S, SCopy1, SCopy2] = ws::promiseClean16(signBit).cells<4>();
+  auto const [_, S, SCopy1, SCopy2, copyTmp] = ws::promiseClean16(signBit).cells<5>();
   
   Cell const lhsSignByte {
     lhs,
@@ -170,10 +170,11 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   signBitDestructive(ws::promise(S, ws::Layout<ws::Data<>, ws::ScratchCells<5>>{}));
 
   // Copy sign bit to adjacent cells so we have enough independent copies.
-  literalBf(S, modSlot
-	       ? "[->+>+>+<<<]>>>[-<<<+>>>]<<<" // copy to SCopy1 and SCopy2
-	       : "[->+>+<<]>>[-<<+>>]<<");      // only to SCopy1
-
+  if (modSlot) {
+    copyField(S, {SCopy1, SCopy2}, copyTmp);
+  } else {
+    copyField(S, SCopy1, SCopy2);
+  }
   // If lhs was negative, negate it before passing it to the unsigned algorithm.
   loop(S, [&] {
     zeroCell(S);
@@ -351,7 +352,7 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
 
   // Copy lhs into a temp and reduce it to its sign bit.
   Slot signBit = getTemp(ts::u8());
-  auto const [_, S, SCopy1, SCopy2] = ws::promiseClean8(signBit).cells<4>();
+  auto const [_, S, SCopy1, SCopy2, copyTmp] = ws::promiseClean8(signBit).cells<5>();
 
   Cell const lhsSignByte {
     lhs,
@@ -362,9 +363,11 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   signBitDestructive(ws::promise(S, ws::Layout<ws::Data<>, ws::ScratchCells<5>>{}));
 
   // Copy sign bit to adjacent cells so we have enough independent copies.
-  literalBf(S, divSlot
-	       ? "[->+>+>+<<<]>>>[-<<<+>>>]<<<" // copy to SCopy1 and SCopy2
-	       : "[->+>+<<]>>[-<<+>>]<<");      // only to SCopy1
+  if (divSlot) {
+    copyField(S, {SCopy1, SCopy2}, copyTmp);
+  } else {
+    copyField(S, SCopy1, SCopy2);
+  }
 
   // If lhs was negative, negate it before passing it to the unsigned algorithm.
   loop(S, [&] {

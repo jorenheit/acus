@@ -193,20 +193,12 @@ void Assembler::endProgram(API_FUNC) {
     auto tb = ws::promise(targetBlock, ws::Layout<ws::DataCells<2>, ws::ScratchCells<5>>{})
       .view("low", "high", "lowCopy", "highCopy", "highCopy2");
 
-    // 1: Move TargetBlock high byte value into copy cells 
-    loop(tb["high"], [&]{
-      inc(tb["highCopy"]);
-      inc(tb["highCopy2"]);
-      dec(tb["high"]);
-    });
+    // 1: Move TargetBlock high byte value into copy cells
+    moveField(tb["high"], {tb["highCopy"], tb["highCopy2"]});
     tb.rename("high", "lowCopy2");
     
     // 2: Move TargetBlock low byte value into copy cells
-    loop(tb["low"], [&]{
-      inc(tb["lowCopy2"]);
-      inc(tb["lowCopy"]);
-      dec(tb["low"]);
-    });
+    moveField(tb["low"], {tb["lowCopy2"], tb["lowCopy"]});
     
     // 3: Restore low byte in Value0
     moveField(tb["lowCopy2"], tb["low"]);

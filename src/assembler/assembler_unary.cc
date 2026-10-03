@@ -98,29 +98,30 @@ Expression Assembler::castImpl(Expression obj, types::TypeHandle toType, API_CTX
   
   // All other cases: construct a temp to return and populate it based on the type conversion
   // First byte can be copied without modification.
-  copyField(Cell{slot, MacroCell::Value0},
-            Cell{result, MacroCell::Value0},
-            Cell{slot, MacroCell::Scratch0});
+  Cell const srcLow = Cell{slot, MacroCell::Value0};
+  Cell const srcHigh = Cell{slot, MacroCell::Value1};
+  Cell const resultLow = Cell{result, MacroCell::Value0};
+  Cell const resultHigh = Cell{result, MacroCell::Value1};
+  Cell const tmp = Cell{slot, MacroCell::Scratch0};
   
   if (slot.type()->usesValue1() && toType->usesValue1()) {
     // If both types (from and to) are 16-bits, we need to copy the high byte as well:
-    copyField(Cell{slot, MacroCell::Value1},
-              Cell{result, MacroCell::Value1},
-              Cell{slot, MacroCell::Scratch0});
+    copyField(srcLow, resultLow, tmp);
+    copyField(srcHigh, resultHigh, tmp);
   }
   else if (slot.type()->tag() == types::S8 && toType->usesValue1()) {
     // If we're widening S8, we need to sign-extend
-    signExtend(ws::promiseClean16(result));
+    copyField(srcLow, {resultLow, resultHigh}, tmp);
+    signExtend(ws::promiseClean16(result), false);
   }
   else {
     // All other cases, just zero the high byte
-    zeroCell(Cell{result, MacroCell::Value1});
+    copyField(srcLow, resultLow, tmp);
+    zeroCell(resultHigh);
   }
 
   return Expression{result};
 }
-
-
 
 // Unary algorithm implementations
 
