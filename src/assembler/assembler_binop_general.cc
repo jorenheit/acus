@@ -5,9 +5,15 @@
 
 #include "assembler.ih"
 
-template <typename Operator>
-void Assembler::binOpAssignSlot(Slot const lhs, Slot const rhs) {
+bool Assembler::canDestroy(Expression const &expr) {
+  return expr.hasSlot() && expr.slot().direct() &&
+         materialize(expr.slot()).kind() == Slot::Temp;
+}
 
+template <typename Operator>
+void Assembler::binOpAssignSlot(Slot const lhs, Slot const rhs, bool destroyRhs) {
+
+ destroyRhs = destroyRhs && lhs != rhs;
  pushPtr();
 
  auto [targetSlot, operandSlot, freeOperandSlot] = [&] -> std::tuple<Slot, Slot, bool> {
@@ -18,7 +24,7 @@ void Assembler::binOpAssignSlot(Slot const lhs, Slot const rhs) {
    if (stride == 1) return {targetSlot, rhs, false};
 
    auto const [operandSlot, freeOperandSlot] = [&] -> std::pair<Slot, bool> {
-     if (rhs.kind() == Slot::Temp) return {rhs, false};
+     if (destroyRhs) return {rhs, false};
      Slot const copy = getTemp(rhs.type());
      assignSlot(copy, rhs);
      return {copy, true};
@@ -28,7 +34,7 @@ void Assembler::binOpAssignSlot(Slot const lhs, Slot const rhs) {
    return {targetSlot, operandSlot, freeOperandSlot};
  }();
 
- Operator::applyWithSlot(*this, targetSlot, operandSlot);
+ Operator::applyWithSlot(*this, targetSlot, operandSlot, destroyRhs || freeOperandSlot);
  if (freeOperandSlot) freeTempSlot(operandSlot);
 
  popPtr();
@@ -67,7 +73,9 @@ Expression Assembler::binOpAssignImpl(Expression lhs, Expression rhs, API_CTX) {
 
   Slot const lhsSlot = materialize(lhs.slot());
   _cache.write(lhs.slot(), [&](Slot const &dest) {
-    if (rhs.hasSlot()) binOpAssignSlot<Operator>(dest, materialize(rhs.slot()));
+    if (rhs.hasSlot()) {
+      binOpAssignSlot<Operator>(dest, materialize(rhs.slot()), canDestroy(rhs));
+    }
     else binOpAssignConst<Operator>(dest, rhs.literal());
   });
     
@@ -119,7 +127,7 @@ Expression Assembler::binOpImpl(Expression lhs, Expression rhs, API_CTX) {
 #define INSTANTIATE_FOR(op)						\
   template Expression Assembler::binOpImpl<op>(Expression, Expression, API_CTX); \
   template Expression Assembler::binOpAssignImpl<op>(Expression, Expression, API_CTX); \
-  template void Assembler::binOpAssignSlot<op>(Slot lhs, Slot rhs); \
+  template void Assembler::binOpAssignSlot<op>(Slot lhs, Slot rhs, bool destroyRhs); \
   template void Assembler::binOpAssignConst<op>(Slot lhs, literal::Literal rhs);
 
 INSTANTIATE_FOR(Assembler::Add);

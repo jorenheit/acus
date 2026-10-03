@@ -353,16 +353,9 @@ Expression Assembler::assignImpl(Expression lhs, Expression rhs, API_CTX) {
   API_REQUIRE_ASSIGNABLE(lhs.type(), rhs.type());
   assert(not lhs.isLiteral());
 
-  
   SlotProxy const dest = lhs.slot();
   if (rhs.hasSlot()) {
-
-    TransferMode mode = [&] {
-      if (not rhs.slot().direct()) return TransferMode::Copy;
-      if (materialize(rhs.slot()).kind() != Slot::Temp) return TransferMode::Copy;
-      return TransferMode::Move;
-    }();
-    
+    TransferMode const mode = canDestroy(rhs) ? TransferMode::Move : TransferMode::Copy;
     _cache.write(dest, rhs.slot(), mode);
   }
   else _cache.write(dest, rhs.literal());

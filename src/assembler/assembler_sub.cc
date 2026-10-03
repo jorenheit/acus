@@ -14,12 +14,11 @@ void Assembler::subConstFromSlot(Slot lhs, int delta) {
   }
 }
 
-// TODO: do these need destroyRhs? Even if that means API consistency this should be the case.
-// check after new API has converged.
-void Assembler::subSlotFromSlot(Slot lhs, Slot rhs) {
+void Assembler::subSlotFromSlot(Slot lhs, Slot rhs, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   pushPtr();
-  Slot rhsCopy = getTemp(rhs.type());
-  assignSlot(rhsCopy, rhs);
+  Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
+  if (!destroyRhs) assignSlot(rhsCopy, rhs);
   moveTo(lhs, MacroCell::Value0);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     sub16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
@@ -27,7 +26,7 @@ void Assembler::subSlotFromSlot(Slot lhs, Slot rhs) {
     subDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
   popPtr();
-  freeTempSlot(rhsCopy);
+  if (!destroyRhs) freeTempSlot(rhsCopy);
 }
 
 Assembler::SingleCell Assembler::subConst(int delta) {

@@ -28,24 +28,26 @@ void Assembler::mulSlotByConst(Slot lhs, int factor) {
 }
 
 
-void Assembler::mulSlotBySlot(Slot lhs, Slot rhs) {
+void Assembler::mulSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
 
   if (types::isSignedInteger(lhs.type()) && lhs.type()->usesValue1() && !rhs.type()->usesValue1()) {
     Slot rhsWide = getTemp(ts::s16());
-    assignSlot(rhsWide, rhs);  // existing signed widening -> sign extension
+    assignSlot(rhsWide, rhs, destroyRhs ? TransferMode::Move : TransferMode::Copy);  // existing signed widening -> sign extension
 
     // rhsWide may be destroyed
     mulSlotBySlotUnsigned(lhs.unsignedView(), rhsWide.unsignedView(), true);
     freeTempSlot(rhsWide);
   }
   else {
-    mulSlotBySlotUnsigned(lhs.unsignedView(), rhs.unsignedView());
+    mulSlotBySlotUnsigned(lhs.unsignedView(), rhs.unsignedView(), destroyRhs);
   }
 }
 
-void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs) {
+void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
 
   if (lhs == rhs) {
     assert(destroyRhs == false);

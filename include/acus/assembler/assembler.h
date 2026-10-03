@@ -363,18 +363,20 @@ private:
   void signBitSlot(Slot rhs);
   void printIntegerSlotDestructive(Slot valSlot);
     
-  void addSlotToSlot(Slot lhs, Slot rhs);
+  // destroyRhs permits consuming RHS values; it never transfers slot ownership.
+  // The caller remains responsible for freeing its temporaries.
+  void addSlotToSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void addConstToSlot(Slot lhs, int delta);
-  void subSlotFromSlot(Slot lhs, Slot rhs);
+  void subSlotFromSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void subConstFromSlot(Slot lhs, int delta);
 
   void mulSlotByConst(Slot lhs, int factor);
   void mulSlotByConstUnsigned(Slot lhs, int factor);
   void mulSlotByConstSigned(Slot lhs, int factor);
 
-  void mulSlotBySlot(Slot lhs, Slot rhs);
+  void mulSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
-  void mulSlotBySlotSigned(Slot lhs, Slot rhs);
+  void mulSlotBySlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
 
   void squareSlot(Slot slot);
   
@@ -401,33 +403,33 @@ private:
   void modSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> const &divSlot = {});
   void modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> const &divSlot = {});
 
-  void divSlotBySlot(Slot lhs, Slot rhs);
-  void divSlotBySlot(Slot lhs, Slot rhs, Slot modSlot);
+  void divSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void divSlotBySlot(Slot lhs, Slot rhs, Slot modSlot, bool destroyRhs = false);
   void divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot = {}, bool const destroyRhs = false);
-  void divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot = {});
+  void divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot = {}, bool destroyRhs = false);
 
-  void modSlotBySlot(Slot lhs, Slot rhs);
-  void modSlotBySlot(Slot lhs, Slot rhs, Slot divSlot);
+  void modSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void modSlotBySlot(Slot lhs, Slot rhs, Slot divSlot, bool destroyRhs = false);
   void modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot = {}, bool const destroyRhs = false);
-  void modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot = {});
+  void modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot = {}, bool destroyRhs = false);
 
   void andSlotWithConst(Slot lhs, int val);
-  void andSlotWithSlot(Slot lhs, Slot rhs);
+  void andSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void nandSlotWithConst(Slot lhs, int val);
-  void nandSlotWithSlot(Slot lhs, Slot rhs);
+  void nandSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void orSlotWithConst(Slot lhs, int val);
-  void orSlotWithSlot(Slot lhs, Slot rhs);
+  void orSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void norSlotWithConst(Slot lhs, int val);
-  void norSlotWithSlot(Slot lhs, Slot rhs);
+  void norSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void xorSlotWithConst(Slot lhs, int val);
-  void xorSlotWithSlot(Slot lhs, Slot rhs);
+  void xorSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void xnorSlotWithConst(Slot lhs, int val);
-  void xnorSlotWithSlot(Slot lhs, Slot rhs);
+  void xnorSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
 
   void slotEqualConst(Slot lhs, int val);
-  void slotEqualSlot(Slot lhs, Slot rhs);
+  void slotEqualSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void slotNotEqualConst(Slot lhs, int val);
-  void slotNotEqualSlot(Slot lhs, Slot rhs);
+  void slotNotEqualSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
 
   void slotLessConst(Slot lhs, int val);
   void slotLessConstSigned(Slot lhs, int val);
@@ -445,21 +447,21 @@ private:
   void slotGreaterEqualConstSigned(Slot lhs, int val);
   void slotGreaterEqualConstUnsigned(Slot lhs, int val);
 
-  void slotLessSlot(Slot lhs, Slot rhs);
+  void slotLessSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void slotLessSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
-  void slotLessSlotSigned(Slot lhs, Slot rhs);
+  void slotLessSlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
 
-  void slotLessEqualSlot(Slot lhs, Slot rhs);
+  void slotLessEqualSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void slotLessEqualSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
-  void slotLessEqualSlotSigned(Slot lhs, Slot rhs);
+  void slotLessEqualSlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
 
-  void slotGreaterSlot(Slot lhs, Slot rhs);
+  void slotGreaterSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void slotGreaterSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
-  void slotGreaterSlotSigned(Slot lhs, Slot rhs);
+  void slotGreaterSlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
 
-  void slotGreaterEqualSlot(Slot lhs, Slot rhs);
+  void slotGreaterEqualSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
   void slotGreaterEqualSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
-  void slotGreaterEqualSlotSigned(Slot lhs, Slot rhs);
+  void slotGreaterEqualSlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
     
   // Algorithms: all applied to the current DP (assembler_algorithms.cc)
   void literalBf(std::string const &bf);
@@ -542,7 +544,6 @@ private:
     ws::Replace<1, ws::Data<>>
   >;
 
-  
   // inc/dec (assembler_algorithms.cc)
   SingleCell inc(size_t n = 1);
   SingleCell inc(Cell target, size_t n = 1);
@@ -556,8 +557,7 @@ private:
 
   template <ws::SignExtendOperand W> SignExtendResult<W> signExtend(W const &w, bool const copyLowByte = true);
 
-  
-  // setToValue (assembler_algorithms.{cc,tpp} // TODO: other file
+  // setToValue (assembler_algorithms.{cc,tpp}
   SingleCell setToValue(int value);
   SingleCell setToValue(Cell target, int value);
   
@@ -731,7 +731,8 @@ private:
   template <typename Operator> Expression unOpImpl(Expression obj, API_CTX);
   template <typename Operator> Expression binOpAssignImpl(Expression lhs, Expression rhs, API_CTX);
   template <typename Operator> Expression binOpImpl(Expression lhs, Expression rhs, API_CTX);
-  template <typename Operator> void binOpAssignSlot(Slot const lhs, Slot const rhs);
+  bool canDestroy(Expression const &expr);
+  template <typename Operator> void binOpAssignSlot(Slot const lhs, Slot const rhs, bool destroyRhs = false);
   template <typename Operator> void binOpAssignConst(Slot const lhs, literal::Literal const rhs);
 
   template <typename Ret> struct UnaryOperator  { using ReturnType = Ret; };
@@ -757,8 +758,8 @@ private:
 #define DEFINE_BINARY_OPERATOR(name, type, ret, foldExpr, slotOp, constOp) \
   struct name: BinaryOperator<ret> {                                    \
     static ret fold(int x, int y) { return foldExpr; }                  \
-    static void applyWithSlot(Assembler &self, Slot lhs, Slot rhs) {    \
-      return self.slotOp(lhs, rhs);                                     \
+    static void applyWithSlot(Assembler &self, Slot lhs, Slot rhs, bool destroyRhs) {    \
+      return self.slotOp(lhs, rhs, destroyRhs);                                     \
     }                                                                   \
     static void applyWithConst(Assembler &self, Slot lhs, int rhs) {    \
       return self.constOp(lhs, rhs);                                    \
@@ -818,7 +819,7 @@ private:
   struct BinaryOperatorAfterOperandSwap<name, Dummy>: name {            \
     static constexpr bool Allowed = true;                               \
     static name::ReturnType fold(int x, int y) { return swapOp::fold(x, y); } \
-    static void applyWithSlot(Assembler &, Slot, Slot) { std::unreachable(); } \
+    static void applyWithSlot(Assembler &, Slot, Slot, bool) { std::unreachable(); } \
     static void applyWithConst(Assembler &self, Slot slot, int value) { \
       swapOp::applyWithConst(self, slot, value);                        \
     }                                                                   \
@@ -834,7 +835,7 @@ private:
   struct BinaryOperatorAfterOperandSwap<Sub, Dummy>: Sub {		
     static constexpr bool Allowed = true;				
     static int fold(int x, int y) { return -Sub::fold(x, y); } 
-    static void applyWithSlot(Assembler &, Slot, Slot) { std::unreachable(); } 
+    static void applyWithSlot(Assembler &, Slot, Slot, bool) { std::unreachable(); } 
     static void applyWithConst(Assembler &self, Slot slot, int value) {
       Sub::applyWithConst(self, slot, value);
       self.negateSlot(slot);

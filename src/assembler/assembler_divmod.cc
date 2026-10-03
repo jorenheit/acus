@@ -6,7 +6,8 @@
 #include "assembler.ih"
 
 
-void Assembler::divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot, bool const destroyRhs) {
+void Assembler::divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isUnsignedInteger(lhs.type()));
   assert(types::isUnsignedInteger(rhs.type()));
 
@@ -70,7 +71,8 @@ void Assembler::divSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> 
   freeTempSlot(tmp);
 }
 
-void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot) {
+void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isSignedInteger(lhs.type()));
   assert(types::isSignedInteger(rhs.type()));
 
@@ -82,9 +84,9 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   signBitDestructive(ws::promise(Cell{lhs, MacroCell::Scratch0},
 				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
 
-  Slot tmp = getTemp(ts::raw(2));
+  Slot tmp = getTemp(ts::raw(destroyRhs ? 1 : 2));
   Slot const resultNegative = tmp.sub(ts::u8(), 0);
-  Slot const rhsCopy = tmp.sub(rhs.type(), 1);
+  Slot const rhsCopy = destroyRhs ? rhs : tmp.sub(rhs.type(), 1);
   Cell const resultNegativeFlag = {tmp, MacroCell::Value0};
   zeroCell(resultNegativeFlag);
   
@@ -101,7 +103,7 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
 
 
   // Construct sign-bit of rhs in rhsCopy::Scratch0
-  assignSlot(rhsCopy, rhs);
+  if (!destroyRhs) assignSlot(rhsCopy, rhs);
   copyField(Cell{rhsCopy, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
 	    Cell{rhsCopy, MacroCell::Scratch0},
 	    Cell{rhsCopy, MacroCell::Scratch1});
@@ -209,7 +211,8 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   freeSlot(signBit);
 }
 
-void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot, bool const destroyRhs) {
+void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isUnsignedInteger(lhs.type()));
   assert(types::isUnsignedInteger(rhs.type()));
 
@@ -257,7 +260,8 @@ void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
 
 }
 
-void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot) {
+void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isSignedInteger(lhs.type()));
   assert(types::isSignedInteger(rhs.type()));
 
@@ -270,9 +274,9 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   signBitDestructive(ws::promise(Cell{lhs, MacroCell::Scratch0},
 				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
 
-  Slot tmp = getTemp(ts::raw(2));
+  Slot tmp = getTemp(ts::raw(destroyRhs ? 1 : 2));
   Slot const resultNegative = tmp.sub(rhs.type(), 0);
-  Slot const rhsCopy = tmp.sub(rhs.type(), 1);
+  Slot const rhsCopy = destroyRhs ? rhs : tmp.sub(rhs.type(), 1);
 
   Cell const resultNegativeFlag = {resultNegative, MacroCell::Value0};
   Cell const signBitFlag  = {lhs, MacroCell::Scratch0 };
@@ -284,7 +288,7 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
     negateSlot(lhs);
   });
 
-  assignSlot(rhsCopy, rhs);
+  if (!destroyRhs) assignSlot(rhsCopy, rhs);
   if (types::isSignedInteger(rhs.type())) {
     absSlot(rhsCopy);
   }
@@ -397,25 +401,27 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   freeSlot(signBit);
 }
 
-void Assembler::divSlotBySlot(Slot lhs, Slot rhs) {
+void Assembler::divSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
   assert(types::cast<types::IntegerType>(lhs.type())->signedness() ==
 	 types::cast<types::IntegerType>(rhs.type())->signedness());
     
-  if (types::isUnsignedInteger(lhs.type())) return divSlotBySlotUnsigned(lhs, rhs);
-  if (types::isSignedInteger(lhs.type()))   return divSlotBySlotSigned(lhs, rhs);
+  if (types::isUnsignedInteger(lhs.type())) return divSlotBySlotUnsigned(lhs, rhs, {}, destroyRhs);
+  if (types::isSignedInteger(lhs.type()))   return divSlotBySlotSigned(lhs, rhs, {}, destroyRhs);
   std::unreachable();
 }
 
-void Assembler::divSlotBySlot(Slot lhs, Slot rhs, Slot modSlot) {
+void Assembler::divSlotBySlot(Slot lhs, Slot rhs, Slot modSlot, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
   assert(types::cast<types::IntegerType>(lhs.type())->signedness() ==
 	 types::cast<types::IntegerType>(rhs.type())->signedness());
     
-  if (types::isUnsignedInteger(lhs.type())) return divSlotBySlotUnsigned(lhs, rhs, modSlot);
-  if (types::isSignedInteger(lhs.type()))   return divSlotBySlotSigned(lhs, rhs, modSlot);
+  if (types::isUnsignedInteger(lhs.type())) return divSlotBySlotUnsigned(lhs, rhs, modSlot, destroyRhs);
+  if (types::isSignedInteger(lhs.type()))   return divSlotBySlotSigned(lhs, rhs, modSlot, destroyRhs);
   std::unreachable();
 }
 
@@ -450,25 +456,27 @@ void Assembler::modSlotByConst(Slot lhs, int denom) {
   std::unreachable();
 }
 
-void Assembler::modSlotBySlot(Slot lhs, Slot rhs, Slot divSlot) {
+void Assembler::modSlotBySlot(Slot lhs, Slot rhs, Slot divSlot, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
   assert(types::cast<types::IntegerType>(lhs.type())->signedness() ==
 	 types::cast<types::IntegerType>(rhs.type())->signedness());
     
-  if (types::isUnsignedInteger(lhs.type())) return modSlotBySlotUnsigned(lhs, rhs, divSlot);
-  if (types::isSignedInteger(lhs.type()))   return modSlotBySlotSigned(lhs, rhs, divSlot);
+  if (types::isUnsignedInteger(lhs.type())) return modSlotBySlotUnsigned(lhs, rhs, divSlot, destroyRhs);
+  if (types::isSignedInteger(lhs.type()))   return modSlotBySlotSigned(lhs, rhs, divSlot, destroyRhs);
   std::unreachable();
 }
 
-void Assembler::modSlotBySlot(Slot lhs, Slot rhs) {
+void Assembler::modSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
   assert(types::cast<types::IntegerType>(lhs.type())->signedness() ==
 	 types::cast<types::IntegerType>(rhs.type())->signedness());
     
-  if (types::isUnsignedInteger(lhs.type())) return modSlotBySlotUnsigned(lhs, rhs);
-  if (types::isSignedInteger(lhs.type()))   return modSlotBySlotSigned(lhs, rhs);
+  if (types::isUnsignedInteger(lhs.type())) return modSlotBySlotUnsigned(lhs, rhs, {}, destroyRhs);
+  if (types::isSignedInteger(lhs.type()))   return modSlotBySlotSigned(lhs, rhs, {}, destroyRhs);
   std::unreachable();
 }
 

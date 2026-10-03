@@ -5,10 +5,11 @@
 
 #include "assembler.ih"
 
-void Assembler::addSlotToSlot(Slot lhs, Slot rhs) {
+void Assembler::addSlotToSlot(Slot lhs, Slot rhs, bool destroyRhs) {
+  destroyRhs = destroyRhs && lhs != rhs;
   pushPtr();
-  Slot rhsCopy = getTemp(rhs.type());
-  assignSlot(rhsCopy, rhs);
+  Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
+  if (!destroyRhs) assignSlot(rhsCopy, rhs);
 
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
@@ -19,7 +20,7 @@ void Assembler::addSlotToSlot(Slot lhs, Slot rhs) {
                    ws::promiseClean8(rhsCopy));
   }
   popPtr();
-  freeTempSlot(rhsCopy);
+  if (!destroyRhs) freeTempSlot(rhsCopy);
 }
 
 void Assembler::addConstToSlot(Slot lhs, int delta) {

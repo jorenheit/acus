@@ -456,6 +456,16 @@ using namespace acus::api;
 
 static std::vector<bftest::TestCase> buildTests() {
   std::vector<bftest::TestCase> tests;
+  tests.push_back(expectOutput("Consumable pointer offset", "ACBCBA2", [] {
+#include "tests/destroy_rhs_pointer.cc"
+  }));
+  tests.push_back(expectOutput("Mixed-width consumable RHS", std::string(42, 'T'), [] {
+#include "tests/destroy_rhs_mixed_width.cc"
+  }));
+  tests.push_back(expectOutput("Consumable RHS and preserved operands", std::string(953, 'T'), [] {
+#include "tests/destroy_rhs.cc"
+  }));
+
 
 tests.push_back(expectOutput("Global cache internal boundary",
                              "T", [] {
