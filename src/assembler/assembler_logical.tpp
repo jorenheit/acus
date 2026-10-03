@@ -1,18 +1,13 @@
 template <ws::SingleAndScratch W>
 Assembler::Data8Result<W> Assembler::boolDestructive(W const &op) {
   constexpr size_t scratch = W::template ScratchOffset<1>;
-  loop(op[0], [&]{
-    zeroCell(op[0]);
-    inc(op[scratch]);
-  });
-
-  addDestructive(SingleCell{op[0]}, SingleCell{op[scratch]});
+  boolDestructive(op[0], op[scratch]);
   return op;
 }
 
-template <ws::DoubleCell W>
+template <ws::Bool16Operand W>
 Assembler::Bool16Result<W> Assembler::bool16Destructive(W const &op) {
-  orDestructive(SingleCell{op[0]}, SingleCell{op[1]});
+  orDestructive(op[0], op[1]);
   return op.template transformed<
     ws::Replace<0, ws::Data<>>,
     ws::Replace<1, ws::Data<0>>
@@ -23,200 +18,55 @@ template <ws::SingleAndScratch W>
 Assembler::Data8Result<W> Assembler::notDestructive(W const &op) {
   Cell const x = op[0];
   Cell const tmp = op[W::template ScratchOffset<1>];
-
-  inc(tmp);
-  loop(x, [&]{
-    dec(tmp);
-    zeroCell(x);
-  });
-
-  // x = 0, tmp = not(x)
-  addDestructive(SingleCell{x}, tmp);
+  notDestructive(x, tmp);
   return op;
 }
 
 template <ws::DoubleCell W>
 Assembler::Bool16Result<W> Assembler::not16Destructive(W const &op) {
   auto result = bool16Destructive(op);
-  notDestructive(result.template transformed<ws::Replace<1, ws::Scratch>>());
+  notDestructive(result[0], result[1]);
   return result;
 }
 
-template <ws::SingleCell W>
-Assembler::Data8Result<W> Assembler::orDestructive(W const &lhs, SingleCell const &rhs) {
-
-  Cell const x = lhs[0];
-  Cell const y = rhs[0];
-  
-  loop(x, [&]{
-    zeroCell(x);
-    setToValue(y, 1);
-  });
-
-  loop(y, [&]{
-    zeroCell(y);
-    inc(x);
-  });
-
-  return lhs;
-}
-
-template <ws::DoubleCell W>
-Assembler::Bool16Result<W> Assembler::or16Destructive(W const &lhs, DoubleCell const &rhs) {
-  auto result = bool16Destructive(lhs);
+template <ws::BinaryLogic16Operand L, ws::BinaryLogic16Operand R>
+Assembler::Bool16Result<L> Assembler::logic16Destructive(L const &lhs, R const &rhs, auto &&logicOp) {
+  auto lhsBool = bool16Destructive(lhs);
   auto rhsBool = bool16Destructive(rhs);
-  orDestructive(SingleCell{result[0]}, SingleCell{rhsBool[0]});
-  return result;
+  return logicOp(lhsBool, rhsBool);
 }
 
-template <ws::SingleAndScratch W>
-Assembler::Data8Result<W> Assembler::andDestructive(W const &lhs, SingleCell const &rhs) {
-  Cell const x = lhs[0];
-  Cell const y = rhs[0];
-  Cell const tmp = lhs[W::template ScratchOffset<1>];
+#define LOGIC_8_IMPL(op)                                                \
+  template <ws::BinaryLogic8Operand W>                                  \
+  Assembler::Data8Result<W> Assembler::op##Destructive(W const &lhs, SingleCell const &rhs) { \
+    auto const [x, y, tmp] = lhs.template cells<3>();                   \
+    moveField(rhs[0], y);                                               \
+    op##Destructive(x, y, tmp);                                         \
+    return lhs.template transformed<ws::Replace<1, ws::Data<0>>>();     \
+  }
 
-  addConst(tmp, 2);  // tmp is scratch -> known 0
-  loop(x, [&]{
-    zeroCell(x);
-    dec(tmp);
-  });
-  inc(x);
+#define LOGIC_16_IMPL(op)                                               \
+  template <ws::BinaryLogic16Operand L, ws::BinaryLogic16Operand R>     \
+  Assembler::Bool16Result<L> Assembler::op##16Destructive(L const &lhs, R const &rhs) { \
+    return logic16Destructive(lhs, rhs, [&](auto const &lhsBool, auto const &rhsBool) { \
+      return op##Destructive(lhsBool, rhsBool);                         \
+    });                                                                 \
+  }
 
-  loop(y, [&]{
-    zeroCell(y);
-    dec(tmp);
-  });
+LOGIC_8_IMPL(and);
+LOGIC_8_IMPL(nand);
+LOGIC_8_IMPL(or);
+LOGIC_8_IMPL(nor);
+LOGIC_8_IMPL(xor);
+LOGIC_8_IMPL(xnor);
 
-  loop(tmp, [&]{
-    zeroCell(tmp);
-    dec(x);
-  });
-  
-  return lhs;
-}
 
-template <ws::DoubleCell W>
-Assembler::Bool16Result<W> Assembler::and16Destructive(W const &lhs, DoubleCell const &rhs) {
-  auto result = bool16Destructive(lhs);
-  auto rhsBool = bool16Destructive(rhs);
-  andDestructive(
-    result.template transformed<ws::Replace<1, ws::Scratch>>(),
-    SingleCell{rhsBool[0]}
-  );
-  return result;
-}
+LOGIC_16_IMPL(and);
+LOGIC_16_IMPL(nand);
+LOGIC_16_IMPL(or);
+LOGIC_16_IMPL(nor);
+LOGIC_16_IMPL(xor);
+LOGIC_16_IMPL(xnor);
 
-template <ws::SingleAndScratch W>
-Assembler::Data8Result<W> Assembler::xorDestructive(W const &lhs, SingleCell const &rhs) {
-  Cell const x = lhs[0];
-  Cell const y = rhs[0];
-  Cell const tmp = lhs[W::template ScratchOffset<1>];
-
-  loop(x, [&]{
-    zeroCell(x);
-    dec(tmp);
-  });
-
-  loop(y, [&]{
-    zeroCell(y);
-    inc(tmp);
-  });
-
-  loop(tmp, [&]{
-    inc(tmp); // in case tmp == 255
-    zeroCell(tmp);
-    inc(x);
-  });
-
-  return lhs;
-}
-
-template <ws::DoubleCell W>
-Assembler::Bool16Result<W> Assembler::xor16Destructive(W const &lhs, DoubleCell const &rhs) {
-  auto result = bool16Destructive(lhs);
-  auto rhsBool = bool16Destructive(rhs);
-  xorDestructive(
-    result.template transformed<ws::Replace<1, ws::Scratch>>(),
-    SingleCell{rhsBool[0]}
-  );
-  return result;
-}
-
-template <ws::SingleAndScratch W>
-Assembler::Data8Result<W> Assembler::nandDestructive(W const &lhs, SingleCell const &rhs) {
-
-  Cell const x = lhs[0];
-  Cell const y = rhs[0];
-  Cell const tmp = lhs[W::template ScratchOffset<1>];
-
-  addConst(tmp, 2); // tmp is scratch -> guaranteed 0
-  loop(x, [&]{
-    zeroCell(x);
-    dec(tmp);
-  });
-
-  loop(y, [&]{
-    zeroCell(y);
-    dec(tmp);
-  });
-
-  loop(tmp, [&]{
-    zeroCell(tmp);
-    inc(x);
-  });
-  
-  return lhs;
-}
-
-template <ws::DoubleCell W>
-Assembler::Bool16Result<W> Assembler::nand16Destructive(W const &lhs, DoubleCell const &rhs) {
-  auto result = bool16Destructive(lhs);
-  auto rhsBool = bool16Destructive(rhs);
-  nandDestructive(
-    result.template transformed<ws::Replace<1, ws::Scratch>>(),
-    SingleCell{rhsBool[0]}
-  );
-  return result;
-}
-
-template <ws::SingleCell W>
-Assembler::Data8Result<W> Assembler::norDestructive(W const &lhs, SingleCell const &rhs) {
-
-  Cell const x = lhs[0];
-  Cell const y = rhs[0];
-
-  loop(x, [&]{
-    zeroCell(x);
-    setToValue(y, 1);
-  });
-  inc(x);
-
-  loop(y, [&]{
-    zeroCell(y);
-    dec(x);
-  });
-
-  return lhs;
-}
-
-template <ws::DoubleCell W>
-Assembler::Bool16Result<W> Assembler::nor16Destructive(W const &lhs, DoubleCell const &rhs) {
-  auto result  = bool16Destructive(lhs);
-  auto rhsBool = bool16Destructive(rhs);
-  norDestructive(SingleCell{result[0]}, SingleCell{rhsBool[0]});
-  return result;
-}
-
-template <ws::SingleAndScratch W>
-Assembler::Data8Result<W> Assembler::xnorDestructive(W const &lhs, SingleCell const &rhs) {
-  auto result = xorDestructive(lhs, rhs);
-  notDestructive(result);
-  return result;
-}
-
-template <ws::DoubleCell W>
-Assembler::Bool16Result<W> Assembler::xnor16Destructive(W const &lhs, DoubleCell const &rhs) {
-  auto result = xor16Destructive(lhs, rhs);
-  notDestructive(result.template transformed<ws::Replace<1, ws::Scratch>>());
-  return result;
-}
+#undef LOGIC_8_IMPL
+#undef LOGIC_16_IMPL

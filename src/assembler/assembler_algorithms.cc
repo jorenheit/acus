@@ -105,8 +105,7 @@ Assembler::SingleCell Assembler::dec(Cell target, size_t n) {
 }
 
 void Assembler::moveField(Cell from, Cell to) {
-  auto [src, dst] = getFieldIndices(from, to);
-  if (src == dst) return;
+  if (from.offset == to.offset && from.field == to.field) return;
 
   zeroCell(to);
   loop(from, [&]{
@@ -115,17 +114,33 @@ void Assembler::moveField(Cell from, Cell to) {
   });
 }
 
+void Assembler::moveField(Cell from, std::vector<Cell> const &to) {
+  for (Cell const &c: to) zeroCell(c);
+  loop(from, [&]{
+    dec(from);
+    for (Cell const &c: to) inc(c); // TODO: optimize the order
+  });
+}
+
 void Assembler::copyField(Cell from, Cell to, Cell tmp) {
-  auto [src, dst, tmp0] = getFieldIndices(from, to, tmp);
-  if (src == dst) return;
-  
-  pushPtr();
-  moveTo(from);
-  emit<primitive::CopyData>(src, dst, tmp0);
-  popPtr();
+  if (from.offset == to.offset && from.field == to.field) return;
+  moveField(from, {to, tmp});
+  moveField(tmp, from);
+}
+
+
+void Assembler::copyField(Cell from, std::vector<Cell> const &to, Cell tmp) {
+  auto vec = to; vec.push_back(tmp);
+  moveField(from, vec);
+  moveField(tmp, from);
 }
 
 void Assembler::copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp) {
+  if (mode == TransferMode::Move) moveField(from, to);
+  else copyField(from, to, tmp);  
+}
+
+void Assembler::copyOrMoveField(TransferMode mode, Cell from, std::vector<Cell> const &to, Cell tmp) {
   if (mode == TransferMode::Move) moveField(from, to);
   else copyField(from, to, tmp);  
 }

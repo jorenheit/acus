@@ -155,3 +155,113 @@ void Assembler::xnorSlotWithSlot(Slot lhs, Slot rhs) {
   }
   freeTempSlot(rhsCopy);
 }
+
+// Cell level stuff
+
+void Assembler::boolDestructive(Cell target, Cell tmp) {
+  loop(target, [&]{
+    zeroCell(target);
+    inc(tmp);
+  });
+  moveField(tmp, target);
+}
+  
+void Assembler::notDestructive(Cell x, Cell tmp) {
+  inc(tmp);
+  loop(x, [&]{
+    dec(tmp);
+    zeroCell(x);
+  });
+  // x = 0, tmp = not(x)
+  moveField(tmp, x);
+}
+
+void Assembler::orDestructive(Cell lhs, Cell rhs) {
+  loop(lhs, [&]{
+    zeroCell(lhs);
+    setToValue(rhs, 1);
+  });
+  
+  loop(rhs, [&]{
+    zeroCell(rhs);
+    inc(lhs);
+  });
+}
+
+void Assembler::orDestructive(Cell lhs, Cell rhs, Cell) {
+  orDestructive(lhs, rhs);
+}
+
+void Assembler::andDestructive(Cell x, Cell y, Cell tmp) {
+  addConst(tmp, 2);  // tmp is scratch -> known 0
+  loop(x, [&]{
+    zeroCell(x);
+    dec(tmp);
+  });
+  inc(x);
+
+  loop(y, [&]{
+    zeroCell(y);
+    dec(tmp);
+  });
+
+  loop(tmp, [&]{
+    zeroCell(tmp);
+    dec(x);
+  });
+}
+
+void Assembler::xorDestructive(Cell x, Cell y, Cell tmp) {
+  loop(x, [&]{
+    zeroCell(x);
+    dec(tmp);
+  });
+
+  loop(y, [&]{
+    zeroCell(y);
+    inc(tmp);
+  });
+
+  loop(tmp, [&]{
+    inc(tmp); // in case tmp == 255
+    zeroCell(tmp);
+    inc(x);
+  });
+}
+
+void Assembler::nandDestructive(Cell x, Cell y, Cell tmp) {
+  addConst(tmp, 2); // tmp is scratch -> guaranteed 0
+  loop(x, [&]{
+    zeroCell(x);
+    dec(tmp);
+  });
+
+  loop(y, [&]{
+    zeroCell(y);
+    dec(tmp);
+  });
+
+  loop(tmp, [&]{
+    zeroCell(tmp);
+    inc(x);
+  });
+}
+
+void Assembler::norDestructive(Cell x, Cell y, Cell) {
+  loop(x, [&]{
+    zeroCell(x);
+    setToValue(y, 1);
+  });
+  inc(x);
+
+  loop(y, [&]{
+    zeroCell(y);
+    dec(x);
+  });
+}
+
+void Assembler::xnorDestructive(Cell x, Cell y, Cell tmp) {
+  // tmp may overlap with y
+  xorDestructive(x, y, tmp);
+  notDestructive(x, y); // use whichever is closest to x (y or tmp)
+}

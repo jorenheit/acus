@@ -763,8 +763,39 @@ namespace acus {
       >;
 
     template <typename W>
-    concept Compare16Lhs =
-      DoubleCell<W> && W::template Scratch<2, 2>;
+    concept BinaryLogic8Operand = impl::IsWorkspace<W> && W::template Satisfies<
+      Data<>,
+      Clobber,
+      Scratch
+    >;
+    
+    template <typename W>
+    concept Bool16Operand = DoubleCell<W>;
+
+    template <typename W>
+    concept BinaryLogic16Operand = DoubleCell<W> && W::template Satisfies<
+      DataCells<2>,
+      Scratch
+    >;
+
+    template <typename W>
+    concept Compare8Operand = impl::IsWorkspace<W> && W::template Satisfies<
+      Data<>,
+      Clobber,
+      Scratch
+    >;
+
+    template <typename W>
+    concept Eq16Operand = DoubleCell<W> && W::template Satisfies<
+      DataCells<2>,
+      ScratchCells<2>
+    >;
+
+    template <typename W>
+    concept Compare16Operand = DoubleCell<W> && W::template Satisfies<
+      DataCells<2>,
+      ScratchCells<5>
+    >;
 
     template <typename W>
     concept Sub16Operand = Add16Operand<W>;
@@ -825,7 +856,7 @@ namespace acus {
       DataCells<2>,
       ScratchCells<3>
     >;
-
+    
     template <typename W>
     concept DynamicOffset = DoubleCell<W>;
 
@@ -833,7 +864,6 @@ namespace acus {
     concept DynamicMoveWorkspace = impl::IsWorkspace<W> && W::template Satisfies<
       ScratchCells<5>
     >;
-    
 
     template <typename ... Args>
     requires (std::is_base_of_v<impl::RegionBase, Args> && ...)

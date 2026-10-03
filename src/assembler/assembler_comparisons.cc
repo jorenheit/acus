@@ -538,3 +538,71 @@ void Assembler::slotGreaterEqualSlotSigned(Slot lhs, Slot rhs) {
 				    });
 		  });   
 }
+
+void Assembler::eqDestructive(Cell x, Cell y) {
+  loop(x, [&] {
+    dec(x);
+    dec(y);
+  });
+  inc(x);
+
+  loop(y, [&] {
+    zeroCell(y);
+    dec(x);
+  });
+}
+
+void Assembler::lessDestructive(Cell x, Cell y, Cell tmp) {
+  // Decrement x and y in lockstep. If y is still non-zero when x reaches
+  // zero, x < y. tmp temporarily holds y while forcing the inner loop to run
+  // only once per x decrement.
+  loop(x, [&] {
+    dec(x);
+    loop(y, [&] {
+      dec(y);
+      moveField(y, tmp);
+    });
+    moveField(tmp, y);
+  });
+
+  loop(y, [&] {
+    zeroCell(y);
+    inc(x);
+  });
+}
+
+void Assembler::greaterDestructive(Cell x, Cell y, Cell tmp) {
+  // Decrement y while parking the remainder of x in tmp. If x has anything
+  // left when y reaches zero, x > y. The result is zero or non-zero; callers
+  // do not require it to be normalized to exactly one.
+  loop(y, [&] {
+    dec(y);
+
+    // Restore the remainder from the previous iteration. x is known zero
+    // here after the first iteration; on the first iteration tmp is zero.
+    loop(tmp, [&] {
+      dec(tmp);
+      inc(x);
+    });
+
+    loop(x, [&] {
+      dec(x);
+      moveField(x, tmp);
+    });
+  });
+
+  loop(tmp, [&] {
+    zeroCell(tmp);
+    inc(x);
+  });
+}
+
+void Assembler::lessOrEqualDestructive(Cell x, Cell y, Cell tmp) {
+  greaterDestructive(x, y, tmp);
+  notDestructive(x, y); // TODO: use whichever is closest to x
+}
+
+void Assembler::greaterOrEqualDestructive(Cell x, Cell y, Cell tmp) {
+  lessDestructive(x, y, tmp);
+  notDestructive(x, y); // TODO: use whichever is closest to x
+}
