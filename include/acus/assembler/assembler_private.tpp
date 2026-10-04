@@ -5,61 +5,60 @@
 
 namespace acus {
 
-  template <typename Primitive, typename ... Args>
-  void Assembler::emit(Args&& ... args) {
-    assert(_currentSeq != nullptr);
-    _currentSeq->emplace<Primitive>(std::forward<Args>(args)...);
+template <typename Primitive, typename ... Args>
+void Assembler::emit(Args&& ... args) {
+  assert(_currentSeq != nullptr);
+  _currentSeq->emplace<Primitive>(std::forward<Args>(args)...);
   
-  }
+}
 
-  template <typename... Args> requires ((std::convertible_to<Args, Cell>) && ...)
-  auto Assembler::getFieldIndices(Args... args) {
-    return std::make_tuple(getFieldIndex(static_cast<Cell>(args))...);
-  }
+template <typename... Args> requires ((std::convertible_to<Args, Cell>) && ...)
+auto Assembler::getFieldIndices(Args... args) {
+  return std::make_tuple(getFieldIndex(static_cast<Cell>(args))...);
+}
 
 
-  template <typename TrueBranch, typename FalseBranch>
-  void Assembler::branchOnSignBit(Slot slot, TrueBranch&& trueBranch, FalseBranch&& falseBranch) {
+template <typename TrueBranch, typename FalseBranch>
+void Assembler::branchOnSignBit(Slot slot, TrueBranch&& trueBranch, FalseBranch&& falseBranch) {
 
-    Slot const tmp = getTemp(ts::s8());
-    Cell const signBit = {tmp, MacroCell::Value0};
-    Cell const elseBit = {tmp, MacroCell::Value1};
+  Slot const tmp = getTemp(ts::s8());
+  Cell const signBit = {tmp, MacroCell::Value0};
+  Cell const elseBit = {tmp, MacroCell::Value1};
 
-    copyField(Cell{slot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
-              signBit,
-              Cell{slot, MacroCell::Scratch0});
+  copyField(Cell{slot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+            signBit,
+            Cell{slot, MacroCell::Scratch0});
   
-    signBitSlot(tmp);
-    setToValue(elseBit, 1);
-    loop(signBit, [&]{
-      dec(signBit);
-      dec(elseBit);
-      trueBranch();
-    });
+  signBitSlot(tmp);
+  setToValue(elseBit, 1);
+  loop(signBit, [&]{
+    dec(signBit);
+    dec(elseBit);
+    trueBranch();
+  });
 
-    loop(elseBit, [&]{
-      dec(elseBit);
-      falseBranch();
-    });
+  loop(elseBit, [&]{
+    dec(elseBit);
+    falseBranch();
+  });
   
-    freeSlot(tmp);
-  }
+  freeSlot(tmp);
+}
 
 // Loop on specific cell
-  void Assembler::loop(Cell flag, auto&& body) {
-    pushPtr();
+void Assembler::loop(Cell flag, auto&& body) {
+  pushPtr();
+  moveTo(flag);
+  loopOpen(); {
+    body();
     moveTo(flag);
-    loopOpen(); {
-      body();
-      moveTo(flag);
-    } loopClose();
-    popPtr();
-  }
+  } loopClose();
+  popPtr();
+}
 
 // Loop on current cell
-  void Assembler::loop(auto&& body) {
-    Cell const flag = _dp.current();
-    loop(flag, body);
-  }
-  
+void Assembler::loop(auto&& body) {
+  Cell const flag = _dp.current();
+  loop(flag, body);
+}
 } // namespace acus

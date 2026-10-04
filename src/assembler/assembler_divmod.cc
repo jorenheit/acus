@@ -38,11 +38,9 @@ void Assembler::divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
     if (freeRhsWork)
       freeTempSlot(rhsWork);
   } else {
-    [[maybe_unused]] auto const [quotient, remainder] =
-      divModDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhs),
-                        destroyRhs ? TransferMode::Move : TransferMode::Copy)
-      .cells<2>();
-    
+    auto const result = divModDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhs),
+                                          destroyRhs ? TransferMode::Move : TransferMode::Copy);
+    Cell const remainder = result.template cell<ws::Role::RemainderLow>();
     if (modSlot.has_value()) {
       moveField(remainder, Cell{*modSlot, MacroCell::Value0});
     } else {
@@ -63,6 +61,13 @@ void Assembler::divSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> 
       setSlotToValue(lhs, 0xffff);
     }
     return;
+  }
+
+  if (denom == 2) {
+    return halfSlot(lhs, modSlot);
+  }
+  if (not modSlot.has_value() && util::math::isPowerOfTwo(denom)) {
+    return divSlotByPowerOfTwo(lhs, util::math::getPowerOfTwo(denom));
   }
   
   Slot tmp = getTemp(denom > 0xff ? ts::u16() : ts::u8());
@@ -246,15 +251,14 @@ void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
       freeTempSlot(rhsWork);
 
   } else {
-    auto const [quotient, remainder] =
-      divModDestructive(ws::promiseClean8(lhs),
-			ws::promiseClean8(rhs),
-			destroyRhs ? TransferMode::Move : TransferMode::Copy).cells<2>();;
-
+    auto const result = divModDestructive(ws::promiseClean8(lhs),
+                                          ws::promiseClean8(rhs),
+                                          destroyRhs ? TransferMode::Move : TransferMode::Copy);
+    Cell const quotient  = result.template cell<ws::Role::QuotientLow>();
+    Cell const remainder = result.template cell<ws::Role::RemainderLow>();
     if (divSlot.has_value()) {
       moveField(quotient, Cell{*divSlot, MacroCell::Value0});
     }
-
     moveField(remainder, quotient);
   }
 
@@ -322,6 +326,13 @@ void Assembler::modSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> 
     setSlotToValue(lhs, 0);
     return;
   }
+
+  if (denom == 2) {
+    return paritySlot(lhs, divSlot);
+  }
+  if (not divSlot.has_value() && util::math::isPowerOfTwo(denom)) {
+    return modSlotByPowerOfTwo(lhs, util::math::getPowerOfTwo(denom));
+  }
   
   Slot tmp = getTemp(denom > 0xff ? ts::u16() : ts::u8());
   setSlotToValue(tmp, denom);
@@ -364,7 +375,7 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   };
 
   copyField(lhsSignByte, S, SCopy1);
-  signBitDestructive(ws::promise(S, ws::Layout<ws::Data<>, ws::ScratchCells<5>>{}));
+  signBitDestructive(ws::promiseClean8(signBit).template subset<1>());
 
   // Copy sign bit to adjacent cells so we have enough independent copies.
   if (divSlot) {
@@ -392,8 +403,8 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
     if (denom < 0) {
       notDestructive(ws::promise(SCopy2, ws::Layout<ws::Data<>, ws::Scratch>{}));
     }
-    loop(SCopy1, [&] {
-      zeroCell(SCopy1);
+    loop(SCopy2, [&] {
+      zeroCell(SCopy2);
       negateSlot(*divSlot);
     });
   }
@@ -480,6 +491,67 @@ void Assembler::modSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs) {
   std::unreachable();
 }
 
+void Assembler::halfSlot(Slot slot, std::optional<Slot> const &modSlot) {
+  if (slot.type()->usesValue1()) {
+    auto ws = ws::promiseClean16(slot);
+    if (modSlot.has_value()) {
+      auto result = half16WithParityDestructive(ws);
+      moveField(result.cell<ws::Role::ParityBit>(),
+                Cell{modSlot->offset(), MacroCell::Value0});
+      zeroCell(Cell{modSlot->offset(), MacroCell::Value1});
+    } else {
+      half16Destructive(ws);
+    }
+  } else {
+    auto ws = ws::promiseClean8(slot);
+    if (modSlot.has_value()) {
+      auto result = halfWithParityDestructive(ws);
+      moveField(result.cell<ws::Role::ParityBit>(),
+                Cell{modSlot->offset(), MacroCell::Value0});
+      zeroCell(Cell{modSlot->offset(), MacroCell::Value1});      
+    } else {
+      halfDestructive(ws);
+    }
+  }
+}
 
 
+void Assembler::paritySlot(Slot slot, std::optional<Slot> const &divSlot) {
+  if (slot.type()->usesValue1()) {
+    auto result = half16WithParityDestructive(ws::promiseClean16(slot));
+    if (divSlot.has_value()) {
+      // slot now contains result of division, assign to divSlot
+      assignSlot(*divSlot, slot);
+    }
+    Cell const parityCell = result.cell<ws::Role::ParityBit>();
+    moveField(parityCell, result[0]);
+    zeroCell(result[1]);
+    
+  } else {
+    auto result = halfWithParityDestructive(ws::promiseClean8(slot));
+    if (divSlot.has_value()) {
+      // slot now contains result of division, assign to divSlot
+      assignSlot(*divSlot, slot);
+    }
+    // Parity is in cell with index 4. Move that to Value0 and clear Value1
+    Cell const parityCell = result.cell<ws::Role::ParityBit>();
+    moveField(parityCell, result[0]);
+    zeroCell(result[1]);
+  }
+}
 
+void Assembler::divSlotByPowerOfTwo(Slot slot, size_t p) {
+  if (slot.type()->usesValue1()) {
+    divByPowerOfTwo16Destructive(ws::promiseClean16(slot), p);
+  } else {
+    divByPowerOfTwoDestructive(ws::promiseClean8(slot), p);
+  }
+}
+
+void Assembler::modSlotByPowerOfTwo(Slot slot, size_t p) {
+  if (slot.type()->usesValue1()) {
+    modByPowerOfTwo16Destructive(ws::promiseClean16(slot), p);
+  } else {
+    modByPowerOfTwoDestructive(ws::promiseClean8(slot), p);
+  }
+}

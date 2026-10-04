@@ -260,9 +260,7 @@ Assembler::SignExtendResult<W> Assembler::signExtend(W const &w, bool const copy
   if (copyLowByte) copyField(lo, hi, tmp);
 
   // Construct the signbit in the Value1 field
-  auto const [value1, zero, sync] =
-    signBitDestructive(ws::promise(hi, ws::Layout<ws::Data<>, ws::ScratchCells<3>>{}))
-    .template cells<3>();
+  auto const [value1, zero, sync] = signBitDestructive(w.template subset<1>()).template cells<3>();
     
   inc(sync);
   literalBf(value1, "[>]>[<<-->]<");

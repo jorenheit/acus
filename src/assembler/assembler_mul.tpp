@@ -239,3 +239,70 @@ Assembler::Data16Result<W> Assembler::square16Destructive(W const &lhs) {
   return lhs;
 }
 
+template <ws::SingleAndScratch W>
+Assembler::Data8Result<W>  Assembler::twiceDestructive(W const &lhs) {
+  twiceDestructive(lhs[0], lhs[W::template ScratchOffset<1>]);
+  return lhs;
+}
+
+template <ws::Twice16Operand W>
+Assembler::Data16Result<W>  Assembler::twice16Destructive(W const &lhs) {
+  // Double high byte, ignoring overflow
+  twiceDestructive(lhs[1], lhs[2]);
+
+  // Double low byte, overflowing into high
+  auto const [low, highResult, lowResult, zero, sync]
+    = lhs.template cells<5>();
+  
+  inc(sync);
+  loop(low, [&]{
+    dec(low);
+    inc(highResult, 2);
+    literalBf(lowResult, "+[<->>]>[<]<"
+                         "+[<->>]>[<]<");
+  });
+  dec(sync);
+  moveField(lowResult, low);
+
+  return lhs;
+}
+
+template <ws::MulByPowerOfTwoOperand W>
+Assembler::Data8Result<W>  Assembler::mulByPowerOfTwoDestructive(W const &lhs, size_t p) {
+  assert(p > 1);
+  auto const [x, pow, tmp] = lhs.template cells<3>();
+
+  if (p >= 8) {
+    zeroCell(x);
+    return lhs;
+  }
+  
+  setToValue(pow, p);
+  mulByPowerOfTwoDestructive(x, pow, tmp);
+  return lhs;
+}
+  
+
+template <ws::MulByPowerOfTwo16Operand W>
+Assembler::Data16Result<W> Assembler::mulByPowerOfTwo16Destructive(W const &lhs, size_t p) {
+  assert(p > 1);
+  if (p >= 16) {
+    zeroCell(lhs[0]);
+    zeroCell(lhs[1]);
+    return lhs;
+  }
+  
+  static constexpr size_t powCellIndex = 5; // Cell 0 through 4 are used by the doubling algorithm
+  Cell const powCell = lhs[powCellIndex];
+  setToValue(powCell, p); 
+  auto const doublingWorkspace = lhs.template transformed<
+    ws::Replace<powCellIndex, ws::Untouched>
+  >();
+
+  loop(powCell, [&]{
+    dec(powCell);
+    twice16Destructive(doublingWorkspace);
+  });
+  
+  return lhs;
+}

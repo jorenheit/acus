@@ -7,24 +7,57 @@
 
 void Assembler::mulSlotByConst(Slot lhs, int factor) {
   assert(types::isInteger(lhs.type()));
-
-  if (factor == 0) return setSlotToValue(lhs, 0);
-  if (factor == 1) return;
-
   bool negate = false;
   if (factor < 0) {
     factor = -factor;
     negate = true;
   }
-  
+
+  // Special cases
+  if (factor == 0)  {
+    setSlotToValue(lhs, 0);
+    return;
+  }
+  if (factor == 1)  {
+    if (negate) negateSlot(lhs);
+    return;
+  }
+  if (factor == 2) {
+    twiceSlot(lhs);
+    if (negate) negateSlot(lhs);
+    return;
+  }
+  if (util::math::isPowerOfTwo(factor)) {
+    mulSlotByPowerOfTwo(lhs, util::math::getPowerOfTwo(factor));
+    if (negate) negateSlot(lhs);
+    return;
+  }
+  if (factor > 3 && util::math::isPowerOfTwo(factor - 1)) {
+    Slot const copy = getTemp(lhs.type());
+    assignSlot(copy, lhs);
+    mulSlotByPowerOfTwo(lhs, util::math::getPowerOfTwo(factor - 1));
+    addSlotToSlot(lhs, copy, true);
+    if (negate) negateSlot(lhs);
+    freeTempSlot(copy);
+    return;
+  }
+  if (util::math::isPowerOfTwo(factor + 1)) {
+    Slot const copy = getTemp(lhs.type());
+    assignSlot(copy, lhs);
+    mulSlotByPowerOfTwo(lhs, util::math::getPowerOfTwo(factor + 1));
+    subSlotFromSlot(lhs, copy, true);
+    if (negate) negateSlot(lhs);
+    freeTempSlot(copy);
+    return;
+  }
+
+  // General multiplication
   Slot factorSlot = getTemp(lhs.type());
   setSlotToValue(factorSlot, factor);
   mulSlotBySlotUnsigned(lhs, factorSlot, true);
-  freeSlot(factorSlot);
+  if (negate) negateSlot(lhs);
 
-  if (negate) {
-    negateSlot(lhs);
-  }
+  freeSlot(factorSlot);
 }
 
 
@@ -88,3 +121,33 @@ void Assembler::squareSlot(Slot slot) {
   }  
 }
 
+void Assembler::twiceSlot(Slot slot) {
+  if (slot.type()->usesValue1()) {
+    twice16Destructive(ws::promiseClean16(slot));
+  } else {
+    twiceDestructive(ws::promiseClean8(slot));
+  }    
+}
+
+void Assembler::mulSlotByPowerOfTwo(Slot slot, size_t power) {
+  if (slot.type()->usesValue1()) {
+    mulByPowerOfTwo16Destructive(ws::promiseClean16(slot), power);
+  } else {
+    mulByPowerOfTwoDestructive(ws::promiseClean8(slot), power);
+  }    
+}
+
+void Assembler::twiceDestructive(Cell x, Cell tmp) {
+  loop(x, [&]{
+    dec(x);
+    inc(tmp, 2);
+  });
+  addDestructive(SingleCell{x}, tmp);
+}
+
+void Assembler::mulByPowerOfTwoDestructive(Cell x, Cell p, Cell tmp) {
+  loop(p, [&]{
+    dec(p);
+    twiceDestructive(x, tmp);
+  });
+}

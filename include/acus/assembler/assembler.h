@@ -98,13 +98,14 @@ public:
   Expression subAssign(auto const &lhs, auto const &rhs, API_FUNC);
   Expression mulAssign(auto const &lhs, auto const &rhs, API_FUNC);
   Expression divAssign(auto const &lhs, auto const &rhs, API_FUNC);  
-  Expression modAssign(auto const &lhs, auto const &rhs, API_FUNC);  
+  Expression modAssign(auto const &lhs, auto const &rhs, API_FUNC);
 
   Expression add(auto const &lhs, auto const &rhs, API_FUNC);
   Expression sub(auto const &lhs, auto const &rhs, API_FUNC);  
   Expression mul(auto const &lhs, auto const &rhs, API_FUNC);
   Expression div(auto const &lhs, auto const &rhs, API_FUNC);
   Expression mod(auto const &lhs, auto const &rhs, API_FUNC);  
+  // TODO: divMod that returns 2 expressions
   
   Expression landAssign(auto const &lhs, auto const &rhs, API_FUNC);
   Expression lnandAssign(auto const &lhs, auto const &rhs, API_FUNC);  
@@ -379,6 +380,12 @@ private:
   void mulSlotBySlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
 
   void squareSlot(Slot slot);
+  void twiceSlot(Slot slot);
+  void halfSlot(Slot slot, std::optional<Slot> const &modSlot);
+  void paritySlot(Slot slot, std::optional<Slot> const &divSlot);
+  void mulSlotByPowerOfTwo(Slot slot, size_t power);
+  void divSlotByPowerOfTwo(Slot slot, size_t power);
+  void modSlotByPowerOfTwo(Slot slot, size_t power);
   
   void branchIfSlot(Slot slot, std::string const &trueLabel, std::string const &falseLabel);
   void copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot, TransferMode mode = TransferMode::Copy);
@@ -542,8 +549,14 @@ private:
   template <ws::IsWorkspace W>
   using SignExtendResult = typename W::template Transform<
     ws::Replace<1, ws::Data<>>
-  >;
+    >;
 
+  template <ws::IsWorkspace W, size_t ParityBitIndex>
+  using HalfWithParityResult = typename W::template Transform<
+    ws::Replace<ParityBitIndex, ws::Prepared<ws::Role::ParityBit>>
+    >;
+
+  
   // inc/dec (assembler_algorithms.cc)
   SingleCell inc(size_t n = 1);
   SingleCell inc(Cell target, size_t n = 1);
@@ -598,9 +611,28 @@ private:
   requires (Result::N == 2)
   Result multiplyInto16(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
 
-  template <ws::SquareOperand W>   Data8Result<W>  squareDestructive(W const &lhs);
-  template <ws::Square16Operand W> Data16Result<W> square16Destructive(W const &lhs);
+
+  void twiceDestructive(Cell x, Cell tmp);
+  void mulByPowerOfTwoDestructive(Cell x, Cell p, Cell tmp);
   
+  template <ws::SquareOperand W>            Data8Result<W>             squareDestructive(W const &lhs);
+  template <ws::Square16Operand W>          Data16Result<W>            square16Destructive(W const &lhs);
+
+  template <ws::HalfOperand1 W>             Data8Result<W>             halfDestructive(W const &lhs);
+  template <ws::HalfOperand2 W>             Data8Result<W>             halfDestructive(W const &lhs);
+  template <ws::HalfWithParityOperand1 W>   HalfWithParityResult<W, 4> halfWithParityDestructive(W const &lhs);
+  template <ws::HalfWithParityOperand2 W>   HalfWithParityResult<W, 5> halfWithParityDestructive(W const &lhs);
+  template <ws::Half16Operand W>            Data16Result<W>            half16Destructive(W const &lhs);
+  template <ws::Half16WithParityOperand W>  HalfWithParityResult<W, 5> half16WithParityDestructive(W const &lhs);
+  
+  template <ws::SingleAndScratch W>         Data8Result<W>           twiceDestructive(W const &lhs);
+  template <ws::Twice16Operand W>           Data16Result<W>          twice16Destructive(W const &lhs);
+  template <ws::MulByPowerOfTwoOperand W>   Data8Result<W>           mulByPowerOfTwoDestructive(W const &lhs, size_t p);
+  template <ws::MulByPowerOfTwo16Operand W> Data16Result<W>          mulByPowerOfTwo16Destructive(W const &lhs, size_t p);
+  template <ws::DivByPowerOfTwoOperand W>   Data8Result<W>           divByPowerOfTwoDestructive(W const &lhs, size_t p);
+  template <ws::DivByPowerOfTwo16Operand W> Data16Result<W>          divByPowerOfTwo16Destructive(W const &lhs, size_t p);
+  template <ws::ModByPowerOfTwoOperand W>   Data8Result<W>           modByPowerOfTwoDestructive(W const &lhs, size_t p);
+  template <ws::ModByPowerOfTwo16Operand W> Data16Result<W>          modByPowerOfTwo16Destructive(W const &lhs, size_t p);
 
   // DivMod (assembler_divmod.{cc,tpp})
   template <ws::DivModNum N>      DivModResult<N> divModDestructive(N const &num, SingleCell const &denom, TransferMode rhsMode);
@@ -858,6 +890,10 @@ private:
   template <typename... Args> requires ((std::convertible_to<Args, Cell>) && ...)
   auto getFieldIndices(Args... args);
 
+  template <typename Fallback, typename ... Alternatives>
+  requires (std::is_invocable_v<Fallback> && (std::is_invocable_v<Alternatives> && ...))
+  void pickBest(Fallback&& fallback, Alternatives&& ... alternatives);
+  
   static std::string defaultOpenTag();
   static std::string defaultCloseTag();  
 }; // Assembler

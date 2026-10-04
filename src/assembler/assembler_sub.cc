@@ -33,12 +33,6 @@ Assembler::SingleCell Assembler::subConst(int delta) {
   return subConst(_dp.current(), delta);
 }
 
-
-
-
-
-
-
 Assembler::SingleCell Assembler::subConst(Cell lhs, int delta) {
   return subConst(SingleCell{lhs}, delta);
 }

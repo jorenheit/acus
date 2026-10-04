@@ -21,12 +21,12 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
     dec(v["ZeroFlag"]);
 
     auto prepared = ws::promise(v["N"], ws::Layout<
-				ws::Prepared<ws::Role::NumeratorLow>,
-				ws::Prepared<ws::Role::DenominatorLow>,
-				ws::ScratchCells<5>>{});
+                                                   ws::Prepared<ws::Role::NumeratorLow>,
+                                ws::Prepared<ws::Role::DenominatorLow>,
+                                ws::ScratchCells<5>>{});
 
     v = divModPreparedDestructive(prepared)
-      .view("Q", "R", ws::At<6>{"ZeroFlag"});
+        .view("Q", "R", ws::At<6>{"ZeroFlag"});
   });
 
   loop(v["ZeroFlag"], [&] {
@@ -43,7 +43,7 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
   return num.template transformed<
     ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
     ws::Replace<1, ws::Prepared<ws::Role::RemainderLow>>
-  >();
+    >();
 }
 
 template <ws::DivModPrepared W>
@@ -114,7 +114,7 @@ Assembler::DivModResult<W> Assembler::divModPreparedDestructive(W const &prep) {
   return prep.template transformed<
     ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
     ws::Replace<1, ws::Prepared<ws::Role::RemainderLow>>
-  >();
+    >();
 }
 
 template <ws::DivMod16Num N, ws::DivMod16Den D>
@@ -125,7 +125,7 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
     ws::Scratch,
     ws::Untouched,
     ws::ScratchCells<2>
-  >;
+    >;
   
   auto const dec17 = [&](Dec17Operand const &op) -> Dec17Operand {
     auto const [low, high, guard, sentinel, _, highBorrow, lowBorrow] = op.cells();
@@ -202,11 +202,11 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
   
   auto currentRemainder =
     ws::promise(Rlo, ws::Layout<
-		ws::Prepared<ws::Role::RemainderLow>,
-		ws::Prepared<ws::Role::RemainderHigh>,
-		ws::ScratchCells<3>,
-		ws::Untouched // Q
-		>{});
+                                ws::Prepared<ws::Role::RemainderLow>,
+                ws::Prepared<ws::Role::RemainderHigh>,
+                ws::ScratchCells<3>,
+                ws::Untouched // Q
+                >{});
 
   // The subtraction loop deliberately overshot by one denominator,
   // so add D back to the remainder.  
@@ -218,7 +218,7 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
     ws::Replace<0, ws::Prepared<ws::Role::RemainderLow>>,
     ws::Replace<1, ws::Prepared<ws::Role::RemainderHigh>>,
     ws::Replace<5, ws::Prepared<ws::Role::QuotientLow>>
-  >();
+    >();
 }
 
 
@@ -242,7 +242,7 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
     dec(tv["ElseFlag"]);
 
     nv = divMod16Digit(num, den)
-      .view("Rlo", "Rhi", ws::At<5>{"Qlo"});
+         .view("Rlo", "Rhi", ws::At<5>{"Qlo"});
 
     // Move remainder to cells 2 and 3 and quotient to cell 0
     moveField(nv["Rlo"], nv[2]);
@@ -267,7 +267,7 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
 
       // Calulate Nhi / Dlo
       tv = divModDestructive(ws::promiseClean8(tv["Nhi"]), dv["Dlo"], TransferMode::Copy)
-	.view("Qhi", "Carry");
+           .view("Qhi", "Carry");
 
       // The Qhi that was returned by the 8-bit algorithm is already final -> move into final position
       moveField(tv["Qhi"], nv[1]);
@@ -277,7 +277,7 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
       tv.renameAll("Nlo", "Carry");
       moveField(nv["Nlo"], tv["Nlo"]);
       tv = divMod16Digit(ws::promiseClean16(tv["Nlo"]), ws::promiseClean16(dv["Dlo"]))
-	.view("Rlo", "Rhi", ws::At<5>{"Qlo"});
+           .view("Rlo", "Rhi", ws::At<5>{"Qlo"});
 
       nv.renameAll("Qlo", "Qhi", "Rlo", "Rhi");
       moveField(tv["Rlo"], nv["Rlo"]);
@@ -306,5 +306,217 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
     ws::Replace<1, ws::Prepared<ws::Role::QuotientHigh>>,
     ws::Replace<2, ws::Prepared<ws::Role::RemainderLow>>,
     ws::Replace<3, ws::Prepared<ws::Role::RemainderHigh>>
-  >();
+    >();
 }
+
+// TODO: factor this stuff (maybe)
+
+template <ws::HalfOperand1 W> // consecutive
+Assembler::Data8Result<W>  Assembler::halfDestructive(W const &lhs) {
+  auto const [x, remaining, zero, sync] = lhs.template cells<4>();
+  moveField(x, remaining);
+  inc(sync);
+  loop(remaining, [&]{
+    literalBf(remaining, "-[<+>->]>[<]<");
+  });
+  dec(sync);
+
+  return lhs;
+}
+
+template <ws::HalfOperand2 W> // gapped
+Assembler::Data8Result<W>  Assembler::halfDestructive(W const &lhs) {
+  auto const [x, _, remaining, zero, sync] = lhs.template cells<5>();
+  
+  moveField(x, remaining);
+  inc(sync);
+  loop(remaining, [&]{
+    literalBf(remaining, "-[<<+>>->]>[<]<");
+  });
+  dec(sync);
+
+  return lhs;
+}
+
+
+template <ws::HalfWithParityOperand1 W> // consecutive
+Assembler::HalfWithParityResult<W, 4>  Assembler::halfWithParityDestructive(W const &lhs) {
+  auto const [x, remaining, zero, sync, parity] = lhs.template cells<5>();
+  moveField(x, remaining); // remaining might not be zero in this version
+  inc(sync);
+  loop(remaining, [&]{
+    inc(parity);
+    literalBf(remaining, "-[<+>->>>-<<]>[<]<");
+  });
+  dec(sync);
+
+  return lhs.template transformed<
+    ws::Replace<4, ws::Prepared<ws::Role::ParityBit>>
+    >();
+}
+
+template <ws::HalfWithParityOperand2 W> // gapped
+Assembler::HalfWithParityResult<W, 5>  Assembler::halfWithParityDestructive(W const &lhs) {
+  auto const [x, _, remaining, zero, sync, parity] = lhs.template cells<6>();
+  addDestructive(SingleCell{remaining}, x); // remaining is zero in this version
+  inc(sync);
+  loop(remaining, [&]{
+    inc(parity);
+    literalBf(remaining, "-[<<+>>->>>-<<]>[<]<");
+  });
+  dec(sync);
+
+  return lhs.template transformed<
+    ws::Replace<5, ws::Prepared<ws::Role::ParityBit>>
+    >();
+}
+
+template <ws::Half16Operand W>
+Assembler::Data16Result<W> Assembler::half16Destructive(W const &lhs) {
+  auto const [low, high] = lhs.template cells<2>();
+
+  // Calculate high/2, store parity bit
+  auto highResult = halfWithParityDestructive(lhs.template subset<1>());
+  // Calculate low/2, don't touch previous results (high/2 and parity bit)
+  static constexpr size_t ParityBitIndex = highResult.template indexOfRole<ws::Role::ParityBit>() + 1;
+  halfDestructive(lhs.template transformed<ws::Replace<1, ws::Untouched>,
+                  ws::Replace<ParityBitIndex, ws::Untouched>
+                  >());
+
+  // If parity bit set, add 128 to the result of low/2
+  Cell const highParity = highResult.template cell<ws::Role::ParityBit>();
+  loop(highParity, [&]{
+    dec(highParity);
+    addConst(low, 128);
+  });
+
+  return lhs;
+}
+
+template <ws::Half16WithParityOperand W>
+Assembler::HalfWithParityResult<W, 5> Assembler::half16WithParityDestructive(W const &lhs) {
+  auto const [low, high, _1, _2, _3, parity, parityHigh] = lhs.template cells<7>();
+
+  // Calculate high/2, store parity bit
+  halfWithParityDestructive(lhs.template subset<1>());
+  moveField(parity, parityHigh);
+  // Calculate low/2, this parity bit will be returned at index 5
+  halfWithParityDestructive(lhs.template transformed<ws::Replace<1, ws::Untouched>,
+                            ws::Replace<6, ws::Untouched>
+                            >()); // make sure result and parity are not touched
+
+  // If parity-high bit set, add 128 to the result of low/2
+  loop(parityHigh, [&]{
+    dec(parityHigh);
+    addConst(low, 128);
+  });
+
+  return lhs.template transformed<ws::Replace<5, ws::Prepared<ws::Role::ParityBit>>>();
+}
+
+template <ws::DivByPowerOfTwoOperand W>
+Assembler::Data8Result<W> Assembler::divByPowerOfTwoDestructive(W const &lhs, size_t p) {
+  assert(p > 1);
+  
+  if (p >= 8) {
+    zeroCell(lhs[0]);
+    return lhs;
+  }
+
+  static constexpr size_t powCellIndex = 5; // Cell 0 through 4 are used by the halving algorithm
+  Cell const powCell = lhs.template cell<powCellIndex>();
+  setToValue(powCell, p); 
+  auto const halvingWorkspace = lhs.template transformed<
+    ws::Replace<powCellIndex, ws::Untouched>
+  >();
+
+  loop(powCell, [&]{
+    dec(powCell);
+    halfDestructive(halvingWorkspace);
+  });
+  
+  return lhs;
+}
+
+
+template <ws::DivByPowerOfTwo16Operand W>
+Assembler::Data16Result<W> Assembler::divByPowerOfTwo16Destructive(W const &lhs, size_t p) {
+  assert(p > 1);
+  
+  if (p >= 16) {
+    zeroCell(lhs[0]);
+    zeroCell(lhs[1]);
+    return lhs;
+  }
+
+  static constexpr size_t powCellIndex = 6; // Cell 0 through 5 are used by the halving algorithm
+  Cell const powCell = lhs.template cell<powCellIndex>();
+  setToValue(powCell, p); 
+  auto const halvingWorkspace = lhs.template transformed<
+    ws::Replace<powCellIndex, ws::Untouched>
+  >();
+
+  loop(powCell, [&]{
+    dec(powCell);
+    half16Destructive(halvingWorkspace);
+  });
+  
+  return lhs;
+}
+template <ws::ModByPowerOfTwoOperand W>
+Assembler::Data8Result<W> Assembler::modByPowerOfTwoDestructive(W const &lhs, size_t p) {
+  assert(p > 1);
+
+  auto const [x, _1, _2, _3, _4, pow, rem] = lhs.template cells<7>();
+
+  if (p >= 8) return lhs;
+
+  auto const halvingWorkspace = lhs.template transformed<
+    ws::Replace<5, ws::Untouched>,
+    ws::Replace<6, ws::Untouched>
+  >();
+
+  for (size_t i = 0; i < p; ++i) {
+    auto const result = halfWithParityDestructive(halvingWorkspace);
+    Cell const parity = result.template cell<ws::Role::ParityBit>();
+    loop(parity, [&] {
+      dec(parity);
+      addConst(rem, 1u << i);
+    });
+  }
+  moveField(rem, x);
+  return lhs;
+}
+
+
+template <ws::ModByPowerOfTwo16Operand W>
+Assembler::Data16Result<W> Assembler::modByPowerOfTwo16Destructive(W const &lhs, size_t p) {
+  assert(p > 1);
+  if (p >= 16) return lhs;
+
+  Slot const remainder = getTemp(ts::u16());
+  setSlotToValue(remainder, 0);
+
+  Cell const remLow  = {remainder, MacroCell::Value0};
+  Cell const remHigh = {remainder, MacroCell::Value1};
+
+  for (size_t i = 0; i < p; ++i) {
+    auto const result = half16WithParityDestructive(lhs);
+    Cell const parity = result.template cell<ws::Role::ParityBit>();
+
+    loop(parity, [&] {
+      dec(parity);
+      if (i < 8)
+        addConst(remLow, 1u << i);
+      else
+        addConst(remHigh, 1u << (i - 8));
+    });
+  }
+
+  moveField(remLow, lhs[0]);
+  moveField(remHigh, lhs[1]);
+  freeTempSlot(remainder);
+
+  return lhs;
+}
+

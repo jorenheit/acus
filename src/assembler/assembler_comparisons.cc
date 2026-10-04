@@ -613,10 +613,10 @@ void Assembler::greaterDestructive(Cell x, Cell y, Cell tmp) {
 
 void Assembler::lessOrEqualDestructive(Cell x, Cell y, Cell tmp) {
   greaterDestructive(x, y, tmp);
-  notDestructive(x, y); // TODO: use whichever is closest to x
+  notDestructive(x, closestTo(x, {y, tmp}));
 }
 
 void Assembler::greaterOrEqualDestructive(Cell x, Cell y, Cell tmp) {
   lessDestructive(x, y, tmp);
-  notDestructive(x, y); // TODO: use whichever is closest to x
+  notDestructive(x, closestTo(x, {y, tmp}));
 }
