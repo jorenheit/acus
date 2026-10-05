@@ -113,9 +113,10 @@ Expression Assembler::binOpImpl(Expression lhs, Expression rhs, API_CTX) {
     std::swap(lhs, rhs);
     swapped = true;
   }
-  
-  Slot result = getTemp(opResult.workType);
-  assignImpl(Expression{result}, lhs, API_FWD);
+
+  bool const reuseLhs = lhs.type() == opResult.workType && canDestroy(lhs);
+  Slot result = reuseLhs ? materialize(lhs.slot()) : getTemp(opResult.workType);
+  if (!reuseLhs) assignImpl(Expression{result}, lhs, API_FWD);
 
   if (swapped) binOpAssignImpl<SwapOperator>(Expression{result}, rhs, API_FWD);
   else         binOpAssignImpl<Operator>(Expression{result}, rhs, API_FWD);
@@ -124,7 +125,7 @@ Expression Assembler::binOpImpl(Expression lhs, Expression rhs, API_CTX) {
   return Expression{result};
 }
 
-#define INSTANTIATE_FOR(op)						\
+#define INSTANTIATE_FOR(op)                                             \
   template Expression Assembler::binOpImpl<op>(Expression, Expression, API_CTX); \
   template Expression Assembler::binOpAssignImpl<op>(Expression, Expression, API_CTX); \
   template void Assembler::binOpAssignSlot<op>(Slot lhs, Slot rhs, bool destroyRhs); \
