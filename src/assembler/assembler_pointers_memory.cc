@@ -33,9 +33,7 @@ Slot Assembler::addressOfSlot(Slot pointeeSlot, API_CTX) {
   }
 
   // Construct offset in second cell
-  int const offset = pointeeSlot.offset();  
-  moveTo(ptrSlot + RuntimePointer::Offset, MacroCell::Value0);
-  setToValue16(ws::promise(_dp.current(), ws::Layout<ws::DataCells<2>>{}), offset);
+  setToValue16(ws::promiseClean16(ptrSlot + RuntimePointer::Offset), pointeeSlot.offset());
 
   return ptrSlot;
 }

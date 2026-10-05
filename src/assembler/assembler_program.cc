@@ -236,9 +236,6 @@ void Assembler::endProgram(API_FUNC) {
   _state.begun = false;
   setTargetSequence(nullptr);
 
-  // Primitive merging
-  mergeSequence(result);
-  
   // Construct context for final generation passes
   primitive::Context ctx = constructContext(dispatchBlocks, innerSwitchCaseCount);  
 

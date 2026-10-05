@@ -294,7 +294,8 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     moveTo(0, MacroCell::Value0);
     primitive::DInt const diff = currentFrameSize + paramStart + offset;
     emit<primitive::MovePointerRelative>(diff);
-    setToValue16(ws::promise(_dp.current(), ws::Layout<ws::DataCells<2>>{}), value);
+    setToValue16(ws::promiseClean16(_dp.current()), value);
+//    setToValue16(ws::promise(_dp.current(), ws::Layout<ws::DataCells<2>>{}), value);
     emit<primitive::MovePointerRelative>(-diff);
     offset += MacroCell::FieldCount;
   };

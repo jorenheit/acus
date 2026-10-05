@@ -114,12 +114,10 @@ void Assembler::printDecimalSlot(Slot slot) {
 void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
   assert(types::isUnsignedInteger(slot.type()));
 
-  bool freeValSlot = false;
-  Slot valSlot = [&] {
+  Slot const valSlot = [&] {
     if (destroySlot) return slot;
     Slot const copy = getTemp(slot.type());
     assignSlot(copy, slot);
-    freeValSlot = true;
     return copy;
   }();
 
@@ -136,46 +134,54 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
 	
   // Already add '0' to the 1's digit (at the base) to make sure there is at least 1 nonzero.
   // Plant a marker at the base of the array.
+  addConst(ws::promiseClean8(digits.sub(ts::u8(), 0)), '0');
   moveTo(digits);
-  addConst('0');
   setSeekMarker();
 	
   // Start at right-most digit and move left until first nonzero is found.
   moveTo(digits + maxDigits - 1);
   seek(MacroCell::Value0, primitive::Left, {}, true);
 
+  // Construct the '0' character in Payload0
+  addConst(Cell{_dp.current(), MacroCell::Payload0},
+           Cell{_dp.current(), MacroCell::Payload1},
+           '0');
+  
   // Now just print every character until the start of the string has been reached (seekMarker).
   // Don't print the 1's digit in the loop.
-  auto const writeNotSeekMarkerToFlag = [&] {
+  auto const writeNotSeekMarkerToFlag = [&] -> Cell {
     Cell const marker{_dp.current().offset, MacroCell::SeekMarker};
     Cell const flag{_dp.current().offset, MacroCell::Flag};
     Cell const scratch{_dp.current().offset, MacroCell::Scratch0};
 
     copyField(marker, flag, scratch);
-    inc(scratch);
-    loop(flag, [&] {
-      dec(scratch);
-      zeroCell(flag);
-    });
-    loop(scratch, [&] {
-      dec(scratch);
-      inc(flag);
-    });
-    moveTo(flag);
+    notDestructive(flag, scratch);
+    return flag;
   };
 
-  writeNotSeekMarkerToFlag();
-  loopOpen(); {
-    zeroCell();
+  Cell const flag = writeNotSeekMarkerToFlag();
+  loop(flag, [&]{
+    dec(); 
 
-    switchField(MacroCell::Value0);
-    addConst('0');
+    // Add '0' to digit and set payload from next cell
+    Cell const digit = {_dp.current(), MacroCell::Value0};
+    Cell const zero = {_dp.current(), MacroCell::Payload0};
+    Cell const next = {_dp.current() - 1, MacroCell::Payload0};
+    loop(zero, [&]{
+      dec(zero);
+      inc(digit);
+      inc(next);
+    });
+
+    moveTo(digit);
     emit<primitive::Out>();
-	    
     emit<primitive::MovePointerRelative>(-1 * MacroCell::FieldCount);
     writeNotSeekMarkerToFlag();
-  } loopClose();
+  });
 
+  // Cleanup payload
+  zeroCell(Cell{_dp.current(), MacroCell::Payload0});
+  
   // At seekmarker -> print 1's digit and clear seekMarker
   switchField(MacroCell::Value0);
   emit<primitive::Out>();
@@ -186,7 +192,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
 
   popPtr();
   freeTempSlot(digits);
-  if (freeValSlot) freeTempSlot(valSlot);
+  if (!destroySlot) freeTempSlot(valSlot);
 }
 
 void Assembler::printDecimalSlotSigned(Slot slot) {
@@ -208,13 +214,6 @@ void Assembler::printDecimalSlotSigned(Slot slot) {
 
   
   // // Construct sign bit in the flag and use that to determine whether to print a - sign.
-  // moveTo(valSlot, valSlot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0);
-  // Cell const minusSign = Cell{valSlot, MacroCell::Flag};
-  // signBitConstructive(minusSign,
-  // 		      Temps<3>::select(valSlot, MacroCell::Scratch0,
-  // 				       valSlot, MacroCell::Scratch1,
-  // 				       valSlot, MacroCell::Payload0));
-
   Cell const minusSignFlag = {valSlot, MacroCell::Scratch0};
   loop(minusSignFlag, [&]{
     zeroCell(minusSignFlag);
@@ -223,7 +222,7 @@ void Assembler::printDecimalSlotSigned(Slot slot) {
     negateSlot(valSlot);
     //    setToValue('-', Temps<1>::select(valSlot, MacroCell::Scratch0));
     // Use  -cell to hold the minus sign
-    setToValue(ws::promise(minusSignFlag, ws::Layout<ws::Scratch, ws::Scratch>{}), '-');
+    setToValue(ws::promise(minusSignFlag, ws::Layout<ws::Data<>, ws::Scratch>{}), '-');
     emit<primitive::Out>();
     zeroCell(minusSignFlag);
   });

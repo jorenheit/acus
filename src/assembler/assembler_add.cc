@@ -31,12 +31,27 @@ void Assembler::addConstToSlot(Slot lhs, int delta) {
   }
 }
 
-Assembler::SingleCell Assembler::addConst(int delta) {
-  return addConst(_dp.current(), delta);
+Assembler::SingleCell Assembler::addConst(Cell lhs, Cell tmp, int delta) {
+  int const current = getFieldIndex(lhs);
+  int const scratch = getFieldIndex(tmp);
+  
+  pushPtr();
+  moveTo(lhs);
+  emit<primitive::ChangeBy>(delta, current, scratch);
+  popPtr();
+  return lhs;
 }
 
 Assembler::SingleCell Assembler::addConst(Cell lhs, int delta) {
-  return addConst(SingleCell{lhs}, delta);
+  pushPtr();
+  moveTo(lhs);
+  emit<primitive::ChangeBy>(delta);
+  popPtr();
+  return lhs;
+}
+
+Assembler::SingleCell Assembler::addConst(int delta) {
+  return addConst(_dp.current(), delta);
 }
 
 

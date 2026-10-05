@@ -577,6 +577,7 @@ private:
   // Add (assember_add.{cc,tpp}
   SingleCell addConst(int delta);
   SingleCell addConst(Cell lhs, int delta);
+  SingleCell addConst(Cell lhs, Cell tmp, int delta);
 
   template <ws::SingleCell W>       Data8Result<W>  addConst(W const &lhs, int delta);
   template <ws::SingleAndScratch W> Data8Result<W>  addConst(W const &lhs, int delta);

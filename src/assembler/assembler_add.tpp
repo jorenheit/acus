@@ -2,10 +2,7 @@
 // Simple version, no scratch required.
 template <ws::SingleCell W>
 Assembler::Data8Result<W> Assembler::addConst(W const &lhs, int delta) {
-  pushPtr();
-  moveTo(lhs[0]);
-  emit<primitive::ChangeBy>(delta);
-  popPtr();
+  addConst(lhs[0], delta);
   return lhs;
 }
 
@@ -13,10 +10,7 @@ Assembler::Data8Result<W> Assembler::addConst(W const &lhs, int delta) {
 template <ws::SingleAndScratch W>
 Assembler::Data8Result<W> Assembler::addConst(W const &lhs, int delta) {
   constexpr size_t scratch = W::template ScratchOffset<1>;
-  pushPtr();
-  moveTo(lhs[0]);
-  emit<primitive::ChangeBy>(delta, 0, scratch);
-  popPtr();
+  addConst(lhs[0], lhs[scratch], delta);
   return lhs;
 }
 

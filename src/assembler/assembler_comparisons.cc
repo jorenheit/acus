@@ -10,11 +10,33 @@ void Assembler::setSlotToBool(Slot slot, bool value) {
 }
 
 void Assembler::slotEqualConst(Slot lhs, int val) {
+  if (lhs.type()->usesValue1()) {
+    unsigned const encoded = static_cast<unsigned>(val) & 0xffff;
+    if ((encoded & 0xff) == 0) {
+      subConst(ws::promiseClean16(lhs).template subset<1>(), encoded >> 8);
+      return notSlot(lhs);
+    }
+    if ((encoded >> 8) == 0) {
+      subConst(ws::promiseClean16(lhs).template transformed<ws::Replace<1, ws::Untouched>>(), encoded);
+      return notSlot(lhs);
+    }
+  }
  if (val != 0) subConstFromSlot(lhs, val);
  return notSlot(lhs);
 }
 
 void Assembler::slotNotEqualConst(Slot lhs, int val) {
+  if (lhs.type()->usesValue1()) {
+    unsigned const encoded = static_cast<unsigned>(val) & 0xffff;
+    if ((encoded & 0xff) == 0) {
+      subConst(ws::promiseClean16(lhs).template subset<1>(), encoded >> 8);
+      return boolSlot(lhs);
+    }
+    if ((encoded >> 8) == 0) {
+      subConst(ws::promiseClean16(lhs).template transformed<ws::Replace<1, ws::Untouched>>(), encoded);
+      return boolSlot(lhs);
+    }
+  }
   if (val != 0) subConstFromSlot(lhs, val);
   return boolSlot(lhs);
 }
@@ -67,6 +89,26 @@ void Assembler::slotLessConstUnsigned(Slot lhs, int val) {
   else if (val == 1) return notSlot(lhs);
   else if (val == max) return slotNotEqualConst(lhs, val);
   
+  if (lhs.type()->usesValue1() && (val & 0xff) == 0) {
+    // This byte boundary makes the low byte irrelevant.
+    zeroCell(Cell{lhs, MacroCell::Value0});
+    moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
+    return slotLessConstUnsigned(lhs.sub(ts::u8(), 0), val >> 8);
+  }
+  if (lhs.type()->usesValue1() && val < 256) {
+    // Compare the low byte without clobbering the high byte.
+    auto const ws = ws::promiseClean16(lhs);
+    auto const [low, high, constant, tmp] = ws.template cells<4>();
+    setToValue(ws.template subset<2>(), val);
+    lessDestructive(low, constant, tmp);
+    // Any nonzero high byte makes lhs larger than this constant.
+    loop(high, [&] {
+      zeroCell(high);
+      setToValue(low, 0);
+    });
+    return;
+  }
+
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotLessSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
@@ -82,7 +124,16 @@ void Assembler::slotLessConstSigned(Slot lhs, int val) {
   else if (val > max)  return setSlotToValue(lhs, 1);
   else if (val == min + 1) return slotEqualConst(lhs, min);
   else if (val == max) return slotNotEqualConst(lhs, max);
-  else if (val > 0) {
+  if (lhs.type()->usesValue1() && (static_cast<unsigned>(val) & 0xff) == 0) {
+    unsigned const encoded = static_cast<unsigned>(val) & 0xffff;
+    int const high = static_cast<int>(encoded >> 8);
+    int const signedHigh = high < 128 ? high : high - 256;
+    zeroCell(Cell{lhs, MacroCell::Value0});
+    moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
+    return slotLessConstSigned(lhs.sub(ts::s8(), 0), signedHigh);
+  }
+
+  if (val > 0) {
     // If sign bit is set, return 1
     // If no sign bit, do normal unsigned comparison
     branchOnSignBit(lhs, // Cell{lhs, MacroCell::Flag},
@@ -202,6 +253,41 @@ void Assembler::slotLessEqualConstUnsigned(Slot lhs, int val) {
   if (val == 0)   return notSlot(lhs);
   if (val >= max) return setSlotToValue(lhs, 1);
   
+  if (lhs.type()->usesValue1() && (val & 0xff) == 0) {
+    // lhs <= (q << 8) iff high < q, or high == q and low == 0.
+    auto const ws = ws::promiseClean16(lhs);
+    auto const [low, high, constant, tmp, highCopy] = ws.template cells<5>();
+    copyField(high, highCopy, tmp);
+    notDestructive(low, tmp);
+    setToValue(ws.template subset<2>(), val >> 8);
+    lessDestructive(high, constant, tmp);
+    subConst(ws.template subset<4>(), val >> 8);
+    notDestructive(highCopy, tmp);
+    andDestructive(low, highCopy, tmp);
+    orDestructive(high, low);
+    moveField(high, low);
+    return;
+  }
+  if (lhs.type()->usesValue1() && (val & 0xff) == 255) {
+    // This byte boundary makes the low byte irrelevant.
+    zeroCell(Cell{lhs, MacroCell::Value0});
+    moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
+    return slotLessEqualConstUnsigned(lhs.sub(ts::u8(), 0), val >> 8);
+  }
+  if (lhs.type()->usesValue1() && val < 256) {
+    // Compare the low byte without clobbering the high byte.
+    auto const ws = ws::promiseClean16(lhs);
+    auto const [low, high, constant, tmp] = ws.template cells<4>();
+    setToValue(ws.template subset<2>(), val);
+    lessOrEqualDestructive(low, constant, tmp);
+    // Any nonzero high byte makes lhs larger than this constant.
+    loop(high, [&] {
+      zeroCell(high);
+      setToValue(low, 0);
+    });
+    return;
+  }
+
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotLessEqualSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
@@ -218,6 +304,15 @@ void Assembler::slotLessEqualConstSigned(Slot lhs, int val) {
   if (val == min) return slotEqualConst(lhs, min);
   if (val == -1) return signBitSlot(lhs);
   
+  if (lhs.type()->usesValue1() && (static_cast<unsigned>(val) & 0xff) == 255) {
+    unsigned const encoded = static_cast<unsigned>(val) & 0xffff;
+    int const high = static_cast<int>(encoded >> 8);
+    int const signedHigh = high < 128 ? high : high - 256;
+    zeroCell(Cell{lhs, MacroCell::Value0});
+    moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
+    return slotLessEqualConstSigned(lhs.sub(ts::s8(), 0), signedHigh);
+  }
+
   if (val >= 0) {
     // if sign bit is set -> return 1
     // if not, use unsigned version
@@ -333,6 +428,30 @@ void Assembler::slotGreaterConstUnsigned(Slot lhs, int val) {
   if (val >= max) return setSlotToValue(lhs, 0);
   if (val == max - 1) return slotEqualConst(lhs, max);
   
+  if (lhs.type()->usesValue1() && (val & 0xff) == 0) {
+    slotLessEqualConstUnsigned(lhs, val);
+    return notSlot(lhs);
+  }
+  if (lhs.type()->usesValue1() && (val & 0xff) == 255) {
+    // This byte boundary makes the low byte irrelevant.
+    zeroCell(Cell{lhs, MacroCell::Value0});
+    moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
+    return slotGreaterConstUnsigned(lhs.sub(ts::u8(), 0), val >> 8);
+  }
+  if (lhs.type()->usesValue1() && val < 256) {
+    // Compare the low byte without clobbering the high byte.
+    auto const ws = ws::promiseClean16(lhs);
+    auto const [low, high, constant, tmp] = ws.template cells<4>();
+    setToValue(ws.template subset<2>(), val);
+    greaterDestructive(low, constant, tmp);
+    // Any nonzero high byte makes lhs larger than this constant.
+    loop(high, [&] {
+      zeroCell(high);
+      setToValue(low, 1);
+    });
+    return;
+  }
+
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotGreaterSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
@@ -442,6 +561,26 @@ void Assembler::slotGreaterEqualConstUnsigned(Slot lhs, int val) {
   if (val == 1) return boolSlot(lhs);
   if (val == max) return slotEqualConst(lhs, max);
 
+  if (lhs.type()->usesValue1() && (val & 0xff) == 0) {
+    // This byte boundary makes the low byte irrelevant.
+    zeroCell(Cell{lhs, MacroCell::Value0});
+    moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
+    return slotGreaterEqualConstUnsigned(lhs.sub(ts::u8(), 0), val >> 8);
+  }
+  if (lhs.type()->usesValue1() && val < 256) {
+    // Compare the low byte without clobbering the high byte.
+    auto const ws = ws::promiseClean16(lhs);
+    auto const [low, high, constant, tmp] = ws.template cells<4>();
+    setToValue(ws.template subset<2>(), val);
+    greaterOrEqualDestructive(low, constant, tmp);
+    // Any nonzero high byte makes lhs larger than this constant.
+    loop(high, [&] {
+      zeroCell(high);
+      setToValue(low, 1);
+    });
+    return;
+  }
+
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotGreaterEqualSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
@@ -500,7 +639,7 @@ void Assembler::slotGreaterEqualSlotSigned(Slot lhs, Slot rhs, bool destroyRhs) 
   // if lhs >= 0 and rhs < 0, return true
   // if both are negative, negate and use unsigned less-equal
 
-  branchOnSignBit(lhs,// Cell{lhs, MacroCell::Flag},
+  branchOnSignBit(lhs,
 		  [&] /* lhs < 0 */ { 
 		    branchOnSignBit(rhs, //Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
