@@ -336,11 +336,6 @@ private:
   void printDecimalSlotUnsigned(Slot slot, bool const destroySlot = false);
   void printDecimalSlotSigned(Slot slot);
 
-  
-  // Slot operations
-  // template <typename TrueBranch, typename FalseBranch>
-  // void branchOnSignBit(Slot slot, Cell const &flagCell, TrueBranch&& trueBranch, FalseBranch&& falseBranch);
-
   template <typename TrueBranch, typename FalseBranch>
   void branchOnSignBit(Slot slot, TrueBranch&& trueBranch, FalseBranch&& falseBranch);
 

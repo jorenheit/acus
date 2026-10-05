@@ -242,7 +242,7 @@ template <>
 struct Satisfies<Clobber, Data<>> : std::true_type {};
 
 // Expect Clobber, anything works
-template <IsRegion R> requires (not std::is_same_v<R, Clobber>)
+template <IsRegion R> requires (not std::is_same_v<R, Clobber> && not std::is_same_v<R, Untouched>)
 struct Satisfies<R, Clobber>: std::true_type {};
 
 // Expect Untouched, anything works
@@ -250,8 +250,6 @@ template <IsRegion R> requires (not std::is_same_v<R, Untouched>)
 struct Satisfies<R, Untouched>: std::true_type {};
 
 
-
-      
 class WorkspaceBase {};
 
 template <typename T>

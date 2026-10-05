@@ -29,22 +29,9 @@ namespace acus {
     Kind kind;
     int offset;
     void const *scope = nullptr;
-    //    bool consumable = false;
-    //    bool consumed = false;
   
     int size() const;
     operator int() const { return offset; }
-
-    // void wasConsumed() {
-    //   assert(consumable);
-    //   consumable = false;
-    //   consumed = true;
-    // }
-
-    // void allowConsumption(bool value = true) {
-    //   assert(not consumed);
-    //   consumable = value;
-    // }
 
     SlotData sub(types::TypeHandle subType, int subOffset) const;
     SlotData unsignedView() const;
@@ -76,8 +63,6 @@ namespace acus {
     void const *scope() const { return _slot->scope; }
     int size() const { return _slot->size(); }
     int offset() const { return _slot->offset; }
-    // bool consumable() const { return _slot->consumable; }
-    // bool consumed() const { return _slot->consumed; }
     operator int() const { return offset(); }
     
     

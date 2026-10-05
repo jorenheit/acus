@@ -10,51 +10,44 @@ void Assembler::setSlotToBool(Slot slot, bool value) {
 }
 
 void Assembler::slotEqualConst(Slot lhs, int val) {
-
-  pushPtr();
-
-  moveTo(lhs);  
-  subConstFromSlot(lhs, val);
-  
-  if (lhs.type()->usesValue1()) {
-    not16Destructive(ws::promiseClean16(lhs));
-  } else {
-    notDestructive(ws::promiseClean8(lhs));
-  }
-
-  popPtr();
-}
-
-void Assembler::slotEqualSlot(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
-  pushPtr();
-  Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
-  if (!destroyRhs) assignSlot(rhsCopy, rhs);
-  moveTo(lhs);
-
-  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    eq16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
-  } else {
-    eqDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
-  }
-
-  popPtr();
-  if (!destroyRhs) freeTempSlot(rhsCopy);
+ if (val != 0) subConstFromSlot(lhs, val);
+ return notSlot(lhs);
 }
 
 void Assembler::slotNotEqualConst(Slot lhs, int val) {
-  pushPtr();
-  slotEqualConst(lhs, val);
-  notDestructive(ws::promiseClean8(lhs));
-  popPtr();
+  if (val != 0) subConstFromSlot(lhs, val);
+  return boolSlot(lhs);
 }
 
-void Assembler::slotNotEqualSlot(Slot lhs, Slot rhs, bool destroyRhs) {
+void Assembler::slotEqualSlot(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, true);
   destroyRhs = destroyRhs && lhs != rhs;
-  pushPtr();
+  bool const widenRhs = lhs.type()->usesValue1() && !rhs.type()->usesValue1();
+  Slot const rhsWork = [&] {
+    if (widenRhs) {
+      Slot copy = getTemp(types::isSignedInteger(rhs.type()) ? ts::s16() : ts::u16());
+      assignSlot(copy, rhs, destroyRhs ? TransferMode::Move : TransferMode::Copy);
+      return copy;
+    }
+    if (destroyRhs) return rhs;
+    Slot copy = getTemp(rhs.type());
+    assignSlot(copy, rhs);
+    return copy;
+  }();
+
+  if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
+    eq16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsWork));
+  } else {
+    eqDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsWork));
+  }
+
+  if (widenRhs || !destroyRhs) freeTempSlot(rhsWork);
+}
+
+
+void Assembler::slotNotEqualSlot(Slot lhs, Slot rhs, bool destroyRhs) {
   slotEqualSlot(lhs, rhs, destroyRhs);
-  notDestructive(ws::promiseClean8(lhs));
-  popPtr();
+  notDestructive(Cell{lhs, MacroCell::Value0}, Cell{lhs, MacroCell::Scratch0});
 }
 
 void Assembler::slotLessConst(Slot lhs, int val) {
@@ -67,27 +60,28 @@ void Assembler::slotLessConst(Slot lhs, int val) {
 void Assembler::slotLessConstUnsigned(Slot lhs, int val) {
   assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
+  int const max = lhs.type()->usesValue1() ? 65535 : 255;
+
+  if      (val == 0)  return setSlotToValue(lhs, 0);
+  else if (val > max) return setSlotToValue(lhs, 1);
+  else if (val == 1) return notSlot(lhs);
+  else if (val == max) return slotNotEqualConst(lhs, val);
   
-  if (val == 0) {
-    setSlotToValue(lhs, 0);
-    return;
-  }
-
-  pushPtr();
-
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotLessSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
-
-  popPtr();
 }
 
 void Assembler::slotLessConstSigned(Slot lhs, int val) {
   assert(types::isSignedInteger(lhs.type()));
-
-  if (val == 0) {
-    signBitSlot(lhs);
-  }
+  int const min = lhs.type()->usesValue1() ? -32768 : -128;
+  int const max = lhs.type()->usesValue1() ?  32767 :  127;
+  
+  if      (val == 0)   return signBitSlot(lhs);
+  else if (val <= min) return setSlotToValue(lhs, 0);
+  else if (val > max)  return setSlotToValue(lhs, 1);
+  else if (val == min + 1) return slotEqualConst(lhs, min);
+  else if (val == max) return slotNotEqualConst(lhs, max);
   else if (val > 0) {
     // If sign bit is set, return 1
     // If no sign bit, do normal unsigned comparison
@@ -114,6 +108,7 @@ void Assembler::slotLessConstSigned(Slot lhs, int val) {
 }
 
 void Assembler::slotLessSlot(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, false);
   destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
@@ -126,33 +121,29 @@ void Assembler::slotLessSlot(Slot lhs, Slot rhs, bool destroyRhs) {
 }
 
 void Assembler::slotLessSlotUnsigned(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, false);
   destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isUnsignedInteger(lhs.type()));
   assert(types::isUnsignedInteger(rhs.type()));
   
-  pushPtr();
-
-  bool freeRhsCopy = false;
-  Slot rhsCopy = [&] {
+  Slot const rhsWork = [&] {
     if (destroyRhs) return rhs;
-    Slot const tmp = getTemp(rhs.type());
-    assignSlot(tmp, rhs);
-    freeRhsCopy = true;
-    return tmp;
+    Slot const copy = getTemp(rhs.type());
+    assignSlot(copy, rhs);
+    return copy;
   }();
 
-  moveTo(lhs);  
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    less16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+    less16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsWork));
   } else {
-    lessDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+    lessDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsWork));
   }
 
-  popPtr();
-  if (freeRhsCopy) freeTempSlot(rhsCopy);
+  if (!destroyRhs) freeTempSlot(rhsWork);
 }
 
 void Assembler::slotLessSlotSigned(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, false);
   destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isSignedInteger(lhs.type()));
   assert(types::isSignedInteger(rhs.type()));
@@ -206,30 +197,32 @@ void Assembler::slotLessEqualConst(Slot lhs, int val) {
 void Assembler::slotLessEqualConstUnsigned(Slot lhs, int val) {
   assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
-  
-  // If val is maximal, the result must be true
-  if ((lhs.type()->usesValue1() && (val & 0xffff) == 0xffff) || (val & 0xff) == 0xff) {
-    setSlotToValue(lhs, 1);
-    return;
-  }
 
-  pushPtr();
+  int const max = lhs.type()->usesValue1() ? 65535 : 255;
+  if (val == 0)   return notSlot(lhs);
+  if (val >= max) return setSlotToValue(lhs, 1);
   
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotLessEqualSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
-
-  popPtr();
 }
 
 void Assembler::slotLessEqualConstSigned(Slot lhs, int val) {
   assert(types::isSignedInteger(lhs.type()));
 
+  int const min = lhs.type()->usesValue1() ? -32768 : -128;
+  int const max = lhs.type()->usesValue1() ?  32767 :  127;
+
+  if (val >= max) return setSlotToValue(lhs, 1);
+  if (val < min) return setSlotToValue(lhs, 0);
+  if (val == min) return slotEqualConst(lhs, min);
+  if (val == -1) return signBitSlot(lhs);
+  
   if (val >= 0) {
     // if sign bit is set -> return 1
     // if not, use unsigned version
     
-    branchOnSignBit(lhs, //Cell{lhs, MacroCell::Flag},
+    branchOnSignBit(lhs,
 		    [&] /* lhs  < 0 */ { setSlotToBool(lhs, true); },
 		    [&] /* lhs >= 0 */ { slotLessEqualConstUnsigned(lhs.unsignedView(), val); });
   }
@@ -249,6 +242,7 @@ void Assembler::slotLessEqualConstSigned(Slot lhs, int val) {
 }
 
 void Assembler::slotLessEqualSlot(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, true);
   destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
@@ -261,33 +255,29 @@ void Assembler::slotLessEqualSlot(Slot lhs, Slot rhs, bool destroyRhs) {
 }
 
 void Assembler::slotLessEqualSlotUnsigned(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, true);
   destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isUnsignedInteger(lhs.type()));
   assert(types::isUnsignedInteger(rhs.type()));
 
-  pushPtr();
-
-  bool freeRhsCopy = false;
-  Slot rhsCopy = [&] {
+  Slot const rhsWork = [&] {
     if (destroyRhs) return rhs;
-    Slot const tmp = getTemp(rhs.type());
-    assignSlot(tmp, rhs);
-    freeRhsCopy = true;
-    return tmp;
+    Slot const copy = getTemp(rhs.type());
+    assignSlot(copy, rhs);
+    return copy;
   }();
 
-  moveTo(lhs);  
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    lessOrEqual16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+    lessOrEqual16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsWork));
   } else {
-    lessOrEqualDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+    lessOrEqualDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsWork));
   }
 
-  popPtr();
-  if (freeRhsCopy) freeTempSlot(rhsCopy);
+  if (!destroyRhs) freeTempSlot(rhsWork);
 }
 
 void Assembler::slotLessEqualSlotSigned(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, true);
   destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isSignedInteger(lhs.type()));
   assert(types::isSignedInteger(rhs.type()));
@@ -338,30 +328,30 @@ void Assembler::slotGreaterConstUnsigned(Slot lhs, int val) {
   assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
   
-
-  // If val is maximal, the result must be false
-  if ((lhs.type()->usesValue1() && (val & 0xffff) == 0xffff) || (val & 0xff) == 0xff) {
-    setSlotToValue(lhs, 0);
-    return;
-  }
-
-  pushPtr();
+  int const max = lhs.type()->usesValue1() ? 65535 : 255;
+  if (val == 0)   return boolSlot(lhs);
+  if (val >= max) return setSlotToValue(lhs, 0);
+  if (val == max - 1) return slotEqualConst(lhs, max);
   
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotGreaterSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
-  
-  popPtr();
 }
 
 void Assembler::slotGreaterConstSigned(Slot lhs, int val) {
   assert(types::isSignedInteger(lhs.type()));
   
+  int const min = lhs.type()->usesValue1() ? -32768 : -128;
+  int const max = lhs.type()->usesValue1() ?  32767 :  127;
+  if (val == min) return slotNotEqualConst(lhs, min);
+  if (val == max - 1) return slotEqualConst(lhs, max);
+
   slotLessEqualConstSigned(lhs, val);
-  notSlot(lhs);
+  notDestructive(Cell{lhs, MacroCell::Value0}, Cell{lhs, MacroCell::Scratch0});
 }
 
 void Assembler::slotGreaterSlot(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, false);
   destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
@@ -374,37 +364,32 @@ void Assembler::slotGreaterSlot(Slot lhs, Slot rhs, bool destroyRhs) {
 }
 
 void Assembler::slotGreaterSlotUnsigned(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
+  if (lhs == rhs) return setSlotToBool(lhs, false);
   assert(types::isUnsignedInteger(lhs.type()));
   assert(types::isUnsignedInteger(rhs.type()));
+  destroyRhs = destroyRhs && lhs != rhs;
   
-  pushPtr();
-
-  bool freeRhsCopy = false;
-  Slot rhsCopy = [&] {
+  Slot const rhsWork = [&] {
     if (destroyRhs) return rhs;
-    Slot const tmp = getTemp(rhs.type());
-    assignSlot(tmp, rhs);
-    freeRhsCopy = true;
-    return tmp;
+    Slot const copy = getTemp(rhs.type());
+    assignSlot(copy, rhs);
+    return copy;
   }();
     
-  moveTo(lhs);  
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    greater16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+    greater16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsWork));
   } else {
-    greaterDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+    greaterDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsWork));
   }
 
-  popPtr();
-
-  if (freeRhsCopy) freeTempSlot(rhsCopy);
+  if (!destroyRhs) freeTempSlot(rhsWork);
 }
 
 void Assembler::slotGreaterSlotSigned(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
+  if (lhs == rhs) return setSlotToBool(lhs, false);
   assert(types::isSignedInteger(lhs.type()));
   assert(types::isSignedInteger(rhs.type()));
+  destroyRhs = destroyRhs && lhs != rhs;
 
   // if both are positive, use unsigned version
   // if lhs < 0 and rhs >= 0, return false
@@ -415,7 +400,7 @@ void Assembler::slotGreaterSlotSigned(Slot lhs, Slot rhs, bool destroyRhs) {
 		  [&] /* lhs < 0 */ { 
 		    branchOnSignBit(rhs, //Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
-				      // Both negative -> negate both and use unsigned greater-equal
+				      // Both negative -> negate both and use unsigned less-than
 				      negateSlot(lhs);
 				      Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
 				      if (!destroyRhs) assignSlot(rhsCopy, rhs);
@@ -451,30 +436,26 @@ void Assembler::slotGreaterEqualConstUnsigned(Slot lhs, int val) {
   assert(types::isUnsignedInteger(lhs.type()));
   assert(val >= 0);
   
-
-  // If val is 0, the result must be true
-  if (val == 0) {
-    setSlotToValue(lhs, 1);
-    return;
-  }
-
-  pushPtr();
+  int const max = lhs.type()->usesValue1() ?  65535 : 255;
+  if (val == 0)  return setSlotToValue(lhs, 1);
+  if (val > max) return setSlotToValue(lhs, 0);
+  if (val == 1) return boolSlot(lhs);
+  if (val == max) return slotEqualConst(lhs, max);
 
   Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
   slotGreaterEqualSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
-
-  popPtr();
 }
 
 void Assembler::slotGreaterEqualConstSigned(Slot lhs, int val) {
   assert(types::isSignedInteger(lhs.type()));
 
   slotLessConstSigned(lhs, val);
-  notSlot(lhs);
+  notDestructive(Cell{lhs, MacroCell::Value0}, Cell{lhs, MacroCell::Scratch0});
 }
 
 void Assembler::slotGreaterEqualSlot(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, true);
   destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
@@ -488,34 +469,28 @@ void Assembler::slotGreaterEqualSlot(Slot lhs, Slot rhs, bool destroyRhs) {
 
 
 void Assembler::slotGreaterEqualSlotUnsigned(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, true);
   destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isUnsignedInteger(lhs.type()));
   assert(types::isUnsignedInteger(rhs.type()));
   
-  pushPtr();
-
-  bool freeRhsCopy = false;
-  Slot rhsCopy = [&] {
+  Slot const rhsWork = [&] {
     if (destroyRhs) return rhs;
-    Slot const tmp = getTemp(rhs.type());
-    assignSlot(tmp, rhs);
-    freeRhsCopy = true;
-    return tmp;
+    Slot const copy = getTemp(rhs.type());
+    assignSlot(copy, rhs);
+    return copy;
   }();
 
-  moveTo(lhs);  
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
-    greaterOrEqual16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
+    greaterOrEqual16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsWork));
   } else {
-    greaterOrEqualDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
+    greaterOrEqualDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsWork));
   }
-
-  popPtr();
-
-  if (freeRhsCopy) freeTempSlot(rhsCopy);
+  if (!destroyRhs) freeTempSlot(rhsWork);
 }
 
 void Assembler::slotGreaterEqualSlotSigned(Slot lhs, Slot rhs, bool destroyRhs) {
+  if (lhs == rhs) return setSlotToBool(lhs, true);
   destroyRhs = destroyRhs && lhs != rhs;
   assert(types::isSignedInteger(lhs.type()));
   assert(types::isSignedInteger(rhs.type()));
@@ -529,7 +504,7 @@ void Assembler::slotGreaterEqualSlotSigned(Slot lhs, Slot rhs, bool destroyRhs) 
 		  [&] /* lhs < 0 */ { 
 		    branchOnSignBit(rhs, //Cell{rhs, MacroCell::Flag},
 				    [&] /* rhs < 0 */ {
-				      // Both negative -> negate both and use unsigned greater-equal
+				      // Both negative -> negate both and use unsigned less-equal
 				      negateSlot(lhs);
 				      Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
 				      if (!destroyRhs) assignSlot(rhsCopy, rhs);
@@ -587,8 +562,8 @@ void Assembler::lessDestructive(Cell x, Cell y, Cell tmp) {
 
 void Assembler::greaterDestructive(Cell x, Cell y, Cell tmp) {
   // Decrement y while parking the remainder of x in tmp. If x has anything
-  // left when y reaches zero, x > y. The result is zero or non-zero; callers
-  // do not require it to be normalized to exactly one.
+  // left when y reaches zero, x > y. Normalize the result even when y
+  // started at zero and the main loop did not execute.
   loop(y, [&] {
     dec(y);
 
@@ -609,6 +584,7 @@ void Assembler::greaterDestructive(Cell x, Cell y, Cell tmp) {
     zeroCell(tmp);
     inc(x);
   });
+  boolDestructive(x, closestTo(x, {y, tmp}));
 }
 
 void Assembler::lessOrEqualDestructive(Cell x, Cell y, Cell tmp) {
