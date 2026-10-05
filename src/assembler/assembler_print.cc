@@ -154,7 +154,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
     Cell const flag{_dp.current().offset, MacroCell::Flag};
     Cell const scratch{_dp.current().offset, MacroCell::Scratch0};
 
-    copyField(marker, flag, scratch);
+    copyField(marker, flag, scratch, true);
     notDestructive(flag, scratch);
     return flag;
   };
@@ -204,9 +204,9 @@ void Assembler::printDecimalSlotSigned(Slot slot) {
   pushPtr();
 
   // Construct sign bit in the flag field
-  copyField(Cell{valSlot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+  copyFieldToZero(Cell{valSlot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
 	    Cell{valSlot, MacroCell::Scratch0},
-	    Cell{valSlot, MacroCell::Scratch1});
+	    Cell{valSlot, MacroCell::Scratch1}, true);
 
   signBitDestructive(ws::promise(Cell{valSlot, MacroCell::Scratch0},
 				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));

@@ -55,7 +55,7 @@ template <ws::SingleCell W>
 Assembler::Data8Result<W> Assembler::setToValue(W const &target, int value) {
   pushPtr();
   moveTo(target[0]);
-  zeroCell();
+  if constexpr (!W::template knownZero<0>()) zeroCell();
   emit<primitive::ChangeBy>(value & 0xff);
   popPtr();
   return target;
@@ -63,8 +63,8 @@ Assembler::Data8Result<W> Assembler::setToValue(W const &target, int value) {
 
 template <ws::DoubleCell W>
 Assembler::Data16Result<W> Assembler::setToValue16(W const &target, int value) {
-  setToValue(SingleCell{target[0]}, value & 0xff);
-  setToValue(SingleCell{target[1]}, (value >> 8) & 0xff);
+  setToValue(target.template subset<0, 0>(), value & 0xff);
+  setToValue(target.template subset<1, 1>(), (value >> 8) & 0xff);
   return target;
 }
 
@@ -73,7 +73,10 @@ Assembler::Data8Result<W> Assembler::setToValue(W const &target, int value) {
   constexpr size_t scratch = W::template ScratchOffset<1>;
   pushPtr();
   moveTo(target[0]);
-  emit<primitive::ConstructConstant>(value & 0xff, 0, scratch);
+  if constexpr (W::template knownZero<0>())
+    emit<primitive::ChangeBy>(value & 0xff, 0, scratch);
+  else
+    emit<primitive::ConstructConstant>(value & 0xff, 0, scratch);
   popPtr();
   return target;
 }
@@ -84,9 +87,15 @@ Assembler::Data16Result<W> Assembler::setToValue16(W const &target, int value) {
 
   pushPtr();
   moveTo(target[0]);
-  emit<primitive::ConstructConstant>(value & 0xff, 0, scratch);
+  if constexpr (W::template knownZero<0>())
+    emit<primitive::ChangeBy>(value & 0xff, 0, scratch);
+  else
+    emit<primitive::ConstructConstant>(value & 0xff, 0, scratch);
   moveTo(target[1]);
-  emit<primitive::ConstructConstant>((value >> 8) & 0xff, 0, scratch - 1);
+  if constexpr (W::template knownZero<1>())
+    emit<primitive::ChangeBy>((value >> 8) & 0xff, 0, scratch - 1);
+  else
+    emit<primitive::ConstructConstant>((value >> 8) & 0xff, 0, scratch - 1);
   popPtr();
 
   return target;
@@ -97,8 +106,8 @@ template <ws::DoubleCell Offset, ws::DynamicMoveWorkspace Work>
 void Assembler::moveToDynamicOffset(Offset const &offset, Work const &work, TransferMode mode) {
 
   auto const [high, low, S1, S2, S3] = work.template cells<5>();
-  copyOrMoveField(mode, offset[0], low, high);
-  copyOrMoveField(mode, offset[1], high, S1);
+  copyOrMoveFieldToZero(mode, offset[0], low, high, true);
+  copyOrMoveFieldToZero(mode, offset[1], high, S1, true);
 
   std::string const STEP_L = std::string(MacroCell::FieldCount, '<');
   std::string const STEP_R = std::string(MacroCell::FieldCount, '>');
@@ -126,12 +135,12 @@ void Assembler::fetchFromDynamicOffset(Offset const &offset, Payload const &payl
     copyOrMoveField(dataTransferMode,
                     Cell{base + i, MacroCell::Value0},
                     Cell{base + i, MacroCell::Payload0},
-                    Cell{base + i, MacroCell::Scratch0});
+                    Cell{base + i, MacroCell::Scratch0}, true);
     if (payload.width(i) == Payload::Width::Double) {
       copyOrMoveField(dataTransferMode,
                       Cell{base + i, MacroCell::Value1},
                       Cell{base + i, MacroCell::Payload1},
-                      Cell{base + i, MacroCell::Scratch0});
+                      Cell{base + i, MacroCell::Scratch0}, true);
     }
   }
   
@@ -257,7 +266,10 @@ Assembler::SignExtendResult<W> Assembler::signExtend(W const &w, bool const copy
   auto const [lo, hi, tmp] = w.template cells<3>();
   
   // Copy low byte into high byte
-  if (copyLowByte) copyField(lo, hi, tmp);
+  if (copyLowByte) {
+    if constexpr (W::template knownZero<1>()) copyFieldToZero(lo, hi, tmp, true);
+    else copyField(lo, hi, tmp, true);
+  }
 
   // Construct the signbit in the Value1 field
   auto const [value1, zero, sync] = signBitDestructive(w.template subset<1>()).template cells<3>();

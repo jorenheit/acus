@@ -11,7 +11,7 @@ Assembler::SignBitResult<W> Assembler::signBitDestructive(W const &op) {
   });
 
   // Move result into the data-cell, clear what's left in the overflow-check cell
-  moveField(signBit, value);
+  moveFieldToZero(signBit, value);
   zeroCell(overflowCheck);
   
   return op.template transformed<

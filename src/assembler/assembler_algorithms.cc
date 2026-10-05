@@ -106,42 +106,70 @@ Assembler::SingleCell Assembler::dec(Cell target, size_t n) {
 
 void Assembler::moveField(Cell from, Cell to) {
   if (from.offset == to.offset && from.field == to.field) return;
-
   zeroCell(to);
+  moveFieldToZero(from, to);
+}
+
+void Assembler::moveField(Cell from, std::vector<Cell> const &to) {
+  for (Cell const &c: to) zeroCell(c);
+  moveFieldToZero(from, to);
+}
+
+void Assembler::moveFieldToZero(Cell from, Cell to) {
+  if (from.offset == to.offset && from.field == to.field) return;
   loop(from, [&]{
     dec(from);
     inc(to);
   });
 }
 
-void Assembler::moveField(Cell from, std::vector<Cell> const &to) {
-  for (Cell const &c: to) zeroCell(c);
+void Assembler::moveFieldToZero(Cell from, std::vector<Cell> const &to) {
   loop(from, [&]{
     dec(from);
-    for (Cell const &c: to) inc(c); // TODO: optimize the order
+    for (Cell const &c: to) inc(c);
   });
 }
 
-void Assembler::copyField(Cell from, Cell to, Cell tmp) {
+void Assembler::copyField(Cell from, Cell to, Cell tmp, bool tmpKnownZero) {
   if (from.offset == to.offset && from.field == to.field) return;
-  moveField(from, {to, tmp});
-  addDestructive(SingleCell{from}, tmp); // from is known 0 now.
+  zeroCell(to);
+  copyFieldToZero(from, to, tmp, tmpKnownZero);
 }
 
-
-void Assembler::copyField(Cell from, std::vector<Cell> const &to, Cell tmp) {
-  auto vec = to; vec.push_back(tmp);
-  moveField(from, vec);
-  addDestructive(SingleCell{from}, tmp); // from is known 0 now
+void Assembler::copyField(Cell from, std::vector<Cell> const &to, Cell tmp, bool tmpKnownZero) {
+  for (Cell const &c: to) zeroCell(c);
+  copyFieldToZero(from, to, tmp, tmpKnownZero);
 }
 
-void Assembler::copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp) {
+void Assembler::copyFieldToZero(Cell from, Cell to, Cell tmp, bool tmpKnownZero) {
+  if (from.offset == to.offset && from.field == to.field) return;
+  copyFieldToZero(from, std::vector<Cell>{to}, tmp, tmpKnownZero);
+}
+
+void Assembler::copyFieldToZero(Cell from, std::vector<Cell> const &to, Cell tmp, bool tmpKnownZero) {
+  if (!tmpKnownZero) zeroCell(tmp);
+  auto targets = to;
+  targets.push_back(tmp);
+  moveFieldToZero(from, targets);
+  moveFieldToZero(tmp, from);
+}
+
+void Assembler::copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp, bool tmpKnownZero) {
   if (mode == TransferMode::Move) moveField(from, to);
-  else copyField(from, to, tmp);  
+  else copyField(from, to, tmp, tmpKnownZero);
 }
 
-void Assembler::copyOrMoveField(TransferMode mode, Cell from, std::vector<Cell> const &to, Cell tmp) {
+void Assembler::copyOrMoveField(TransferMode mode, Cell from, std::vector<Cell> const &to, Cell tmp, bool tmpKnownZero) {
   if (mode == TransferMode::Move) moveField(from, to);
-  else copyField(from, to, tmp);  
+  else copyField(from, to, tmp, tmpKnownZero);
 }
 
+void Assembler::copyOrMoveFieldToZero(TransferMode mode, Cell from, Cell to, Cell tmp, bool tmpKnownZero) {
+  if (mode == TransferMode::Move) moveFieldToZero(from, to);
+  else copyFieldToZero(from, to, tmp, tmpKnownZero);
+}
+
+void Assembler::copyOrMoveFieldToZero(TransferMode mode, Cell from, std::vector<Cell> const &to, Cell tmp, bool tmpKnownZero) {
+  if (mode == TransferMode::Move) moveFieldToZero(from, to);
+  else copyFieldToZero(from, to, tmp, tmpKnownZero);
+}

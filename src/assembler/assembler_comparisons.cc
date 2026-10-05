@@ -91,7 +91,6 @@ void Assembler::slotLessConstUnsigned(Slot lhs, int val) {
   
   if (lhs.type()->usesValue1() && (val & 0xff) == 0) {
     // This byte boundary makes the low byte irrelevant.
-    zeroCell(Cell{lhs, MacroCell::Value0});
     moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
     return slotLessConstUnsigned(lhs.sub(ts::u8(), 0), val >> 8);
   }
@@ -128,7 +127,6 @@ void Assembler::slotLessConstSigned(Slot lhs, int val) {
     unsigned const encoded = static_cast<unsigned>(val) & 0xffff;
     int const high = static_cast<int>(encoded >> 8);
     int const signedHigh = high < 128 ? high : high - 256;
-    zeroCell(Cell{lhs, MacroCell::Value0});
     moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
     return slotLessConstSigned(lhs.sub(ts::s8(), 0), signedHigh);
   }
@@ -257,7 +255,7 @@ void Assembler::slotLessEqualConstUnsigned(Slot lhs, int val) {
     // lhs <= (q << 8) iff high < q, or high == q and low == 0.
     auto const ws = ws::promiseClean16(lhs);
     auto const [low, high, constant, tmp, highCopy] = ws.template cells<5>();
-    copyField(high, highCopy, tmp);
+    copyFieldToZero(high, highCopy, tmp, true);
     notDestructive(low, tmp);
     setToValue(ws.template subset<2>(), val >> 8);
     lessDestructive(high, constant, tmp);
@@ -265,12 +263,11 @@ void Assembler::slotLessEqualConstUnsigned(Slot lhs, int val) {
     notDestructive(highCopy, tmp);
     andDestructive(low, highCopy, tmp);
     orDestructive(high, low);
-    moveField(high, low);
+    moveFieldToZero(high, low);
     return;
   }
   if (lhs.type()->usesValue1() && (val & 0xff) == 255) {
     // This byte boundary makes the low byte irrelevant.
-    zeroCell(Cell{lhs, MacroCell::Value0});
     moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
     return slotLessEqualConstUnsigned(lhs.sub(ts::u8(), 0), val >> 8);
   }
@@ -308,7 +305,6 @@ void Assembler::slotLessEqualConstSigned(Slot lhs, int val) {
     unsigned const encoded = static_cast<unsigned>(val) & 0xffff;
     int const high = static_cast<int>(encoded >> 8);
     int const signedHigh = high < 128 ? high : high - 256;
-    zeroCell(Cell{lhs, MacroCell::Value0});
     moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
     return slotLessEqualConstSigned(lhs.sub(ts::s8(), 0), signedHigh);
   }
@@ -434,7 +430,6 @@ void Assembler::slotGreaterConstUnsigned(Slot lhs, int val) {
   }
   if (lhs.type()->usesValue1() && (val & 0xff) == 255) {
     // This byte boundary makes the low byte irrelevant.
-    zeroCell(Cell{lhs, MacroCell::Value0});
     moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
     return slotGreaterConstUnsigned(lhs.sub(ts::u8(), 0), val >> 8);
   }
@@ -563,7 +558,6 @@ void Assembler::slotGreaterEqualConstUnsigned(Slot lhs, int val) {
 
   if (lhs.type()->usesValue1() && (val & 0xff) == 0) {
     // This byte boundary makes the low byte irrelevant.
-    zeroCell(Cell{lhs, MacroCell::Value0});
     moveField(Cell{lhs, MacroCell::Value1}, Cell{lhs, MacroCell::Value0});
     return slotGreaterEqualConstUnsigned(lhs.sub(ts::u8(), 0), val >> 8);
   }
@@ -688,9 +682,9 @@ void Assembler::lessDestructive(Cell x, Cell y, Cell tmp) {
     dec(x);
     loop(y, [&] {
       dec(y);
-      moveField(y, tmp);
+      moveFieldToZero(y, tmp);
     });
-    moveField(tmp, y);
+    moveFieldToZero(tmp, y);
   });
 
   loop(y, [&] {
@@ -715,7 +709,7 @@ void Assembler::greaterDestructive(Cell x, Cell y, Cell tmp) {
 
     loop(x, [&] {
       dec(x);
-      moveField(x, tmp);
+      moveFieldToZero(x, tmp);
     });
   });
 

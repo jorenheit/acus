@@ -116,7 +116,7 @@ void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Pay
       Cell const flag{_dp.current().offset, MacroCell::Flag};
       Cell const scratch{_dp.current().offset, MacroCell::Scratch0};
 
-      copyField(marker, flag, scratch);
+      copyField(marker, flag, scratch, true);
 
       // NOT(flag), using the clean scratch cell from the copy operation.
       inc(scratch);

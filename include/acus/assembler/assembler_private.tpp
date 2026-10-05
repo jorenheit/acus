@@ -27,7 +27,7 @@ void Assembler::branchOnSignBit(Slot slot, TrueBranch&& trueBranch, FalseBranch&
 
   copyField(Cell{slot, slot.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
             signBit,
-            Cell{slot, MacroCell::Scratch0});
+            Cell{slot, MacroCell::Scratch0}, true);
   
   signBitSlot(tmp);
   setToValue(elseBit, 1);

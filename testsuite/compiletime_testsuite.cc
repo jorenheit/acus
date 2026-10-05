@@ -47,6 +47,25 @@ static_assert(acus::ws::SingleAndScratch<
   acus::ws::Workspace<acus::ws::Data<0>, acus::ws::Scratch>
 >);
 
+using KnownCells = acus::ws::Workspace<
+  acus::ws::Scratch, acus::ws::Data<0>, acus::ws::Data<42>,
+  acus::ws::Data<>, acus::ws::Clobber, acus::ws::Untouched,
+  acus::ws::Prepared<acus::ws::Role::ParityBit>
+>;
+static_assert(KnownCells::knownZero<0>());
+static_assert(KnownCells::knownZero<1>());
+static_assert(KnownCells::knownValue<42, 2>());
+static_assert(!KnownCells::knownZero<2>());
+static_assert(!KnownCells::knownValue<1, 0>());
+static_assert(!KnownCells::knownZero<3>());
+static_assert(!KnownCells::knownZero<4>());
+static_assert(!KnownCells::knownZero<5>());
+static_assert(!KnownCells::knownZero<6>());
+using UnknownAfterWrite = KnownCells::Transform<acus::ws::Replace<0, acus::ws::Data<>>>;
+static_assert(!UnknownAfterWrite::knownZero<0>());
+using RoleAfterWrite = KnownCells::Transform<acus::ws::Replace<0, acus::ws::Prepared<acus::ws::Role::ParityBit>>>;
+static_assert(!RoleAfterWrite::knownZero<0>());
+
 } // namespace
 
 namespace ct {

@@ -489,10 +489,18 @@ private:
   
   void moveField(Cell from, Cell to);
   void moveField(Cell from, std::vector<Cell> const &to);
-  void copyField(Cell from, Cell to, Cell tmp);
-  void copyField(Cell from, std::vector<Cell> const &to, Cell tmp);
-  void copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp);
-  void copyOrMoveField(TransferMode mode, Cell from, std::vector<Cell> const &to, Cell tmp);
+  // ToZero variants require every destination to be zero at runtime.
+  void moveFieldToZero(Cell from, Cell to);
+  void moveFieldToZero(Cell from, std::vector<Cell> const &to);
+  // tmpKnownZero is an independent promise; copies always leave tmp zero.
+  void copyField(Cell from, Cell to, Cell tmp, bool tmpKnownZero = false);
+  void copyField(Cell from, std::vector<Cell> const &to, Cell tmp, bool tmpKnownZero = false);
+  void copyFieldToZero(Cell from, Cell to, Cell tmp, bool tmpKnownZero = false);
+  void copyFieldToZero(Cell from, std::vector<Cell> const &to, Cell tmp, bool tmpKnownZero = false);
+  void copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp, bool tmpKnownZero = false);
+  void copyOrMoveField(TransferMode mode, Cell from, std::vector<Cell> const &to, Cell tmp, bool tmpKnownZero = false);
+  void copyOrMoveFieldToZero(TransferMode mode, Cell from, Cell to, Cell tmp, bool tmpKnownZero = false);
+  void copyOrMoveFieldToZero(TransferMode mode, Cell from, std::vector<Cell> const &to, Cell tmp, bool tmpKnownZero = false);
 
   // Workspaces for the implementations
   using SingleCell = ws::Workspace<ws::Data<>>;
@@ -547,11 +555,16 @@ private:
     >;
 
   template <ws::IsWorkspace W, size_t ParityBitIndex>
-  using HalfWithParityResult = typename W::template Transform<
+  using HalfWithParityResult = typename Data8Result<W>::template Transform<
     ws::Replace<ParityBitIndex, ws::Prepared<ws::Role::ParityBit>>
     >;
 
   
+  template <ws::IsWorkspace W>
+  using Half16WithParityResult = typename Data16Result<W>::template Transform<
+    ws::Replace<5, ws::Prepared<ws::Role::ParityBit>>
+  >;
+
   // inc/dec (assembler_algorithms.cc)
   SingleCell inc(size_t n = 1);
   SingleCell inc(Cell target, size_t n = 1);
@@ -597,15 +610,15 @@ private:
 
   // Mul (assembler_mul.{cc,tpp}).
   template <ws::MulValue Result, ws::MulValue Consumed, ws::MulValue Preserved, ws::MulWork Work>
-  Result multiplyInto(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
+  auto multiplyInto(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
 
   template <ws::MulValue Result, ws::MulValue Consumed, ws::MulValue Preserved, ws::MulWork Work>
   requires (Result::N == 1)
-  Result multiplyInto8(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
+  Data8Result<Result> multiplyInto8(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
 
   template <ws::MulValue Result, ws::MulValue Consumed, ws::MulValue Preserved, ws::MulWork Work>
   requires (Result::N == 2)
-  Result multiplyInto16(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
+  Data16Result<Result> multiplyInto16(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work);
 
 
   void twiceDestructive(Cell x, Cell tmp);
@@ -614,12 +627,12 @@ private:
   template <ws::SquareOperand W>            Data8Result<W>             squareDestructive(W const &lhs);
   template <ws::Square16Operand W>          Data16Result<W>            square16Destructive(W const &lhs);
 
-  template <ws::HalfOperand1 W>             Data8Result<W>             halfDestructive(W const &lhs);
+  template <ws::HalfOperand1 W>             auto                       halfDestructive(W const &lhs);
   template <ws::HalfOperand2 W>             Data8Result<W>             halfDestructive(W const &lhs);
-  template <ws::HalfWithParityOperand1 W>   HalfWithParityResult<W, 4> halfWithParityDestructive(W const &lhs);
+  template <ws::HalfWithParityOperand1 W>   auto                       halfWithParityDestructive(W const &lhs);
   template <ws::HalfWithParityOperand2 W>   HalfWithParityResult<W, 5> halfWithParityDestructive(W const &lhs);
   template <ws::Half16Operand W>            Data16Result<W>            half16Destructive(W const &lhs);
-  template <ws::Half16WithParityOperand W>  HalfWithParityResult<W, 5> half16WithParityDestructive(W const &lhs);
+  template <ws::Half16WithParityOperand W>  Half16WithParityResult<W> half16WithParityDestructive(W const &lhs);
   
   template <ws::SingleAndScratch W>         Data8Result<W>           twiceDestructive(W const &lhs);
   template <ws::Twice16Operand W>           Data16Result<W>          twice16Destructive(W const &lhs);

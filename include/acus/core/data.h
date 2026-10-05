@@ -662,6 +662,18 @@ public:
 
   template <size_t Index, int Value>
   static constexpr bool KnownData = Has<ws::Data<Value>, Index, 1>;
+
+  // Queries describe the state promised by this view, not later writes through aliases.
+  template <int Value, size_t Index> requires (Value >= 0 && Value <= 255 && Index < N)
+  static consteval bool knownValue() {
+    return Is<Index, ws::Data<Value>> || (Value == 0 && Is<Index, ws::Scratch>);
+  }
+
+  template <size_t Index> requires (Index < N)
+  static consteval bool knownZero() {
+    return knownValue<0, Index>();
+  }
+
       
   template <size_t Index, size_t N = 1>
   static constexpr bool Scratch = Has<ws::Scratch, Index, N>;

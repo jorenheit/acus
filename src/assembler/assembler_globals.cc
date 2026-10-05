@@ -23,11 +23,11 @@ void Assembler::fetchGlobal(Slot globalSlot, Slot localSlot) {
   for (int i = 0; i != size; ++i) {
     copyField(Cell{globalSlot + i, MacroCell::Value0},
               Cell{globalSlot + i, MacroCell::Payload0},
-              Cell{globalSlot + i, MacroCell::Scratch0});
+              Cell{globalSlot + i, MacroCell::Scratch0}, true);
     if (useValue1) {
       copyField(Cell{globalSlot + i, MacroCell::Value1},
                 Cell{globalSlot + i, MacroCell::Payload1},
-                Cell{globalSlot + i, MacroCell::Scratch0});
+                Cell{globalSlot + i, MacroCell::Scratch0}, true);
     }
   }
 
@@ -66,12 +66,12 @@ void Assembler::putGlobal(Slot globalSlot, Slot localSlot, TransferMode mode) {
     copyOrMoveField(mode,
                     Cell{localSlot + i, MacroCell::Value0},
                     Cell{i, MacroCell::Payload0},
-                    Cell{localSlot + i, MacroCell::Scratch0});
+                    Cell{localSlot + i, MacroCell::Scratch0}, true);
     if (useValue1) {
       copyOrMoveField(mode,
                       Cell{localSlot + i, MacroCell::Value1},
                       Cell{i, MacroCell::Payload1},
-                      Cell{localSlot + i, MacroCell::Scratch0});
+                      Cell{localSlot + i, MacroCell::Scratch0}, true);
     }
   }
 

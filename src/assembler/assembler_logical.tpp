@@ -40,7 +40,8 @@ Assembler::Bool16Result<L> Assembler::logic16Destructive(L const &lhs, R const &
   template <ws::BinaryLogic8Operand W>                                  \
   Assembler::Data8Result<W> Assembler::op##Destructive(W const &lhs, SingleCell const &rhs) { \
     auto const [x, y, tmp] = lhs.template cells<3>();                   \
-    moveField(rhs[0], y);                                               \
+    if constexpr (W::template knownZero<1>()) moveFieldToZero(rhs[0], y); \
+    else moveField(rhs[0], y);                                         \
     op##Destructive(x, y, tmp);                                         \
     return lhs.template transformed<ws::Replace<1, ws::Data<0>>>();     \
   }

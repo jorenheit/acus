@@ -169,7 +169,7 @@ void Assembler::boolDestructive(Cell target, Cell tmp) {
     zeroCell(target);
     inc(tmp);
   });
-  moveField(tmp, target);
+  moveFieldToZero(tmp, target);
 }
   
 void Assembler::notDestructive(Cell x, Cell tmp) {
@@ -179,7 +179,7 @@ void Assembler::notDestructive(Cell x, Cell tmp) {
     zeroCell(x);
   });
   // x = 0, tmp = not(x)
-  moveField(tmp, x);
+  moveFieldToZero(tmp, x);
 }
 
 void Assembler::orDestructive(Cell lhs, Cell rhs) {

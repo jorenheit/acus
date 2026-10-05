@@ -6,12 +6,15 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
   pushPtr();
 
   // Bring the denominator into this workspace.
-  copyOrMoveField(rhsMode, denom, v["D"], v["CopyTemp"]);
+  if constexpr (N::template knownZero<1>())
+    copyOrMoveFieldToZero(rhsMode, denom, v["D"], v["CopyTemp"], true);
+  else
+    copyOrMoveField(rhsMode, denom, v["D"], v["CopyTemp"], true);
 
   // Reuse the CopyTemp field for DTest and pick a new CopyTemp field
   v.rename("CopyTemp", "DTest");
   v.template rename<3>("CopyTemp");
-  copyField(v["D"], v["DTest"], v["CopyTemp"]);
+  copyFieldToZero(v["D"], v["DTest"], v["CopyTemp"], true);
 
   // Assume denominator == 0.
   inc(v["ZeroFlag"]);
@@ -59,7 +62,7 @@ Assembler::DivModResult<W> Assembler::divModPreparedDestructive(W const &prep) {
   // n | d | 0 |    0     |   0   |     0
 
   // Preserve D and initialize the restore flag.
-  copyField(D, DCopy, Q);
+  copyFieldToZero(D, DCopy, Q, true);
   inc(RestoreFlag);
 
   // N | D | Q | CopyTemp | DCopy | RestoreFlag
@@ -84,7 +87,7 @@ Assembler::DivModResult<W> Assembler::divModPreparedDestructive(W const &prep) {
     // Restore D from its persistent copy.
     loop(RestoreFlag, [&] {
       dec(RestoreFlag);
-      copyField(DCopy, D, CopyTemp);
+      copyFieldToZero(DCopy, D, CopyTemp, true);
     });
 
     // Prepare the flag for the next iteration.
@@ -103,8 +106,8 @@ Assembler::DivModResult<W> Assembler::divModPreparedDestructive(W const &prep) {
   subDestructive(SingleCell{DCopy}, SingleCell{D});
 
   // D and N are now both zero, so place the final results there.
-  moveField(DCopy, D); // TODO: known zero move optimization
-  moveField(Q, N);
+  moveFieldToZero(DCopy, D);
+  moveFieldToZero(Q, N);
 
   // Final layout:
   //
@@ -162,8 +165,8 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
 
   // Preserve the denominator. The subtraction loop consumes Dlo/Dhi
   // on every iteration, so these copies are restored afterwards.
-  copyField(Dlo, DloCopy, DhiCopy);
-  copyField(Dhi, DhiCopy, CopyTemp);
+  copyFieldToZero(Dlo, DloCopy, DhiCopy, true);
+  copyFieldToZero(Dhi, DhiCopy, CopyTemp, true);
 
   // Q starts at -1 because the loop performs one subtraction too many.
   dec(Qinitial);
@@ -186,8 +189,8 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
     });
 
     // Restore denominator for the next subtraction.
-    copyField(DloCopy, Dlo, CopyTemp);
-    copyField(DhiCopy, Dhi, CopyTemp);
+    copyFieldToZero(DloCopy, Dlo, CopyTemp, true);
+    copyFieldToZero(DhiCopy, Dhi, CopyTemp, true);
 
     inc(Qinitial);
   });
@@ -198,7 +201,7 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
   zeroCell(DhiCopy);
 
   // Move Q from cell 4 to its final position at cell 5.
-  moveField(Qinitial, Qfinal);
+  moveFieldToZero(Qinitial, Qfinal);
   
   auto currentRemainder =
     ws::promise(Rlo, ws::Layout<
@@ -233,8 +236,8 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
   auto dv = den.view("Dlo", "Dhi", "CopyTemp");
   auto tv = tmp.view("DloCopy", "DhiCopy", "ElseFlag");
 
-  copyField(dv["Dlo"], tv["DloCopy"], dv["CopyTemp"]);
-  copyField(dv["Dhi"], tv["DhiCopy"], dv["CopyTemp"]);
+  copyField(dv["Dlo"], tv["DloCopy"], dv["CopyTemp"], true);
+  copyField(dv["Dhi"], tv["DhiCopy"], dv["CopyTemp"], true);
 
   inc(tv["ElseFlag"]);
   loop(tv["DhiCopy"], [&]{
@@ -245,9 +248,9 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
          .view("Rlo", "Rhi", ws::At<5>{"Qlo"});
 
     // Move remainder to cells 2 and 3 and quotient to cell 0
-    moveField(nv["Rlo"], nv[2]);
-    moveField(nv["Rhi"], nv[3]);
-    moveField(nv["Qlo"], nv[0]);
+    moveFieldToZero(nv["Rlo"], nv[2]);
+    moveFieldToZero(nv["Rhi"], nv[3]);
+    moveFieldToZero(nv["Qlo"], nv[0]);
 
     nv.reset(); // Reset to initial name-state for the else-branch
   });
@@ -263,26 +266,26 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
       // Prepare tmp for 8-bit division Nhi / Dlo
       // All tmp cells have already been cleared at this point
       tv.renameAll("Nhi", "", "");
-      moveField(nv["Nhi"], tv["Nhi"]);
+      moveFieldToZero(nv["Nhi"], tv["Nhi"]);
 
       // Calulate Nhi / Dlo
       tv = divModDestructive(ws::promiseClean8(tv["Nhi"]), dv["Dlo"], TransferMode::Copy)
            .view("Qhi", "Carry");
 
       // The Qhi that was returned by the 8-bit algorithm is already final -> move into final position
-      moveField(tv["Qhi"], nv[1]);
+      moveFieldToZero(tv["Qhi"], nv[1]);
 
       // Move Nlo into the tmp workspace to prepare for the calculation of
       // (Nlo:Carry) / Dlo
       tv.renameAll("Nlo", "Carry");
-      moveField(nv["Nlo"], tv["Nlo"]);
+      moveFieldToZero(nv["Nlo"], tv["Nlo"]);
       tv = divMod16Digit(ws::promiseClean16(tv["Nlo"]), ws::promiseClean16(dv["Dlo"]))
            .view("Rlo", "Rhi", ws::At<5>{"Qlo"});
 
       nv.renameAll("Qlo", "Qhi", "Rlo", "Rhi");
-      moveField(tv["Rlo"], nv["Rlo"]);
-      moveField(tv["Rhi"], nv["Rhi"]);
-      moveField(tv["Qlo"], nv["Qlo"]);
+      moveFieldToZero(tv["Rlo"], nv["Rlo"]);
+      moveFieldToZero(tv["Rhi"], nv["Rhi"]);
+      moveFieldToZero(tv["Qlo"], nv["Qlo"]);
 
       // tv[2] is left empty and becomes the ElseFlag again
       tv.renameAll("", "", "ElseFlag");
@@ -312,23 +315,24 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
 // TODO: factor this stuff (maybe)
 
 template <ws::HalfOperand1 W> // consecutive
-Assembler::Data8Result<W>  Assembler::halfDestructive(W const &lhs) {
+auto Assembler::halfDestructive(W const &lhs) {
   auto const [x, remaining, zero, sync] = lhs.template cells<4>();
-  moveField(x, remaining);
+  if constexpr (W::template knownZero<1>()) moveFieldToZero(x, remaining);
+  else moveField(x, remaining);
   inc(sync);
   loop(remaining, [&]{
     literalBf(remaining, "-[<+>->]>[<]<");
   });
   dec(sync);
 
-  return lhs;
+  return lhs.template transformed<ws::Replace<0, ws::Data<>>, ws::Replace<1, ws::Data<0>>>();
 }
 
 template <ws::HalfOperand2 W> // gapped
 Assembler::Data8Result<W>  Assembler::halfDestructive(W const &lhs) {
   auto const [x, _, remaining, zero, sync] = lhs.template cells<5>();
   
-  moveField(x, remaining);
+  moveFieldToZero(x, remaining);
   inc(sync);
   loop(remaining, [&]{
     literalBf(remaining, "-[<<+>>->]>[<]<");
@@ -340,9 +344,10 @@ Assembler::Data8Result<W>  Assembler::halfDestructive(W const &lhs) {
 
 
 template <ws::HalfWithParityOperand1 W> // consecutive
-Assembler::HalfWithParityResult<W, 4>  Assembler::halfWithParityDestructive(W const &lhs) {
+auto Assembler::halfWithParityDestructive(W const &lhs) {
   auto const [x, remaining, zero, sync, parity] = lhs.template cells<5>();
-  moveField(x, remaining); // remaining might not be zero in this version
+  if constexpr (W::template knownZero<1>()) moveFieldToZero(x, remaining);
+  else moveField(x, remaining);
   inc(sync);
   loop(remaining, [&]{
     inc(parity);
@@ -351,6 +356,8 @@ Assembler::HalfWithParityResult<W, 4>  Assembler::halfWithParityDestructive(W co
   dec(sync);
 
   return lhs.template transformed<
+    ws::Replace<0, ws::Data<>>,
+    ws::Replace<1, ws::Data<0>>,
     ws::Replace<4, ws::Prepared<ws::Role::ParityBit>>
     >();
 }
@@ -394,12 +401,12 @@ Assembler::Data16Result<W> Assembler::half16Destructive(W const &lhs) {
 }
 
 template <ws::Half16WithParityOperand W>
-Assembler::HalfWithParityResult<W, 5> Assembler::half16WithParityDestructive(W const &lhs) {
+Assembler::Half16WithParityResult<W> Assembler::half16WithParityDestructive(W const &lhs) {
   auto const [low, high, _1, _2, _3, parity, parityHigh] = lhs.template cells<7>();
 
   // Calculate high/2, store parity bit
   halfWithParityDestructive(lhs.template subset<1>());
-  moveField(parity, parityHigh);
+  moveFieldToZero(parity, parityHigh);
   // Calculate low/2, this parity bit will be returned at index 5
   halfWithParityDestructive(lhs.template transformed<ws::Replace<1, ws::Untouched>,
                             ws::Replace<6, ws::Untouched>
@@ -514,7 +521,8 @@ Assembler::Data16Result<W> Assembler::modByPowerOfTwo16Destructive(W const &lhs,
   }
 
   moveField(remLow, lhs[0]);
-  moveField(remHigh, lhs[1]);
+  if (p >= 8) moveFieldToZero(remHigh, lhs[1]);
+  else moveField(remHigh, lhs[1]);
   freeTempSlot(remainder);
 
   return lhs;

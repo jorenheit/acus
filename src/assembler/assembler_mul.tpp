@@ -1,6 +1,6 @@
 template <ws::MulValue Result, ws::MulValue Consumed, ws::MulValue Preserved, ws::MulWork Work>
 requires (Result::N == 1)
-Result Assembler::multiplyInto8(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work) {
+Assembler::Data8Result<Result> Assembler::multiplyInto8(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work) {
   
   Cell const consumedLow = consumed[0];
   Cell const preservedLow = preserved[0];
@@ -22,13 +22,16 @@ Result Assembler::multiplyInto8(Result const &result, Consumed const &consumed, 
     });
   });
 
-  moveField(product, result[0]);
+  if (result[0].offset == consumedLow.offset && result[0].field == consumedLow.field)
+    moveFieldToZero(product, result[0]);
+  else
+    moveField(product, result[0]);
   return result;
 }
 
 template <ws::MulValue Result, ws::MulValue Consumed, ws::MulValue Preserved, ws::MulWork Work>
 requires (Result::N == 2)
-Result Assembler::multiplyInto16(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work) {
+Assembler::Data16Result<Result> Assembler::multiplyInto16(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work) {
   // 16-bit product modulo 2^16. Five clean work cells are enough:
   // productLow | productHigh | incScratch | preserveTmp | incScratch
   // preserveTmp is intentionally the Untouched cell of inc16's workspace, so
@@ -43,7 +46,7 @@ Result Assembler::multiplyInto16(Result const &result, Consumed const &consumed,
       inc(preserveTmp);
       inc(productHigh);
     });
-    moveField(preserveTmp, value);
+    moveFieldToZero(preserveTmp, value);
   };
 
   auto const addLowToProduct = [&] {
@@ -56,7 +59,7 @@ Result Assembler::multiplyInto16(Result const &result, Consumed const &consumed,
       inc(preserveTmp);
       inc16(product);
     });
-    moveField(preserveTmp, preservedLow);
+    moveFieldToZero(preserveTmp, preservedLow);
   };
 
   loop(consumedLow, [&] {
@@ -77,13 +80,23 @@ Result Assembler::multiplyInto16(Result const &result, Consumed const &consumed,
     });
   }
 
-  moveField(productLow, result[0]);
-  moveField(productHigh, result[1]);
+  if (result[0].offset == consumedLow.offset && result[0].field == consumedLow.field)
+    moveFieldToZero(productLow, result[0]);
+  else
+    moveField(productLow, result[0]);
+  if constexpr (Consumed::N == 2) {
+    if (result[1].offset == consumed[1].offset && result[1].field == consumed[1].field)
+      moveFieldToZero(productHigh, result[1]);
+    else
+      moveField(productHigh, result[1]);
+  } else {
+    moveField(productHigh, result[1]);
+  }
   return result;
 }
 
 template <ws::MulValue Result, ws::MulValue Consumed, ws::MulValue Preserved, ws::MulWork Work>
-Result Assembler::multiplyInto(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work) {
+auto Assembler::multiplyInto(Result const &result, Consumed const &consumed, Preserved const &preserved, Work const &work) {
   if constexpr (Result::N == 1) {
     return multiplyInto8(result, consumed, preserved, work);
   } else if constexpr (Result::N == 2) {
@@ -109,7 +122,7 @@ Assembler::Data8Result<W>  Assembler::squareDestructive(W const &lhs) {
   // Raw: [>>+<<-]>>[>+[<<<+>>>>+<-]+>[<+>-]<<-]>[-]<<<
 
   pushPtr();
-  moveField(value, copy);
+  moveFieldToZero(value, copy);
   loop(copy, [&]{
     dec(copy);
 
@@ -154,7 +167,7 @@ Assembler::Data16Result<W> Assembler::square16Destructive(W const &lhs) {
   //
   // At the same time, make two copies of original_low for
   // calculating low^2 afterwards.
-  moveField(high, high_copy);
+  moveFieldToZero(high, high_copy);
 
   loop(low, [&] {
     dec(low);
@@ -165,7 +178,7 @@ Assembler::Data16Result<W> Assembler::square16Destructive(W const &lhs) {
       inc(high, 2);
       inc(restore);
     });
-    moveField(restore, high_copy);
+    moveFieldToZero(restore, high_copy);
 
     inc(addend);
     inc(count);
@@ -228,7 +241,7 @@ Assembler::Data16Result<W> Assembler::square16Destructive(W const &lhs) {
     });
 
     // Restore addend for the next outer iteration.
-    moveField(restore, addend);
+    moveFieldToZero(restore, addend);
   });
 
   // addend was restored after the final iteration as well.
@@ -262,7 +275,7 @@ Assembler::Data16Result<W>  Assembler::twice16Destructive(W const &lhs) {
                          "+[<->>]>[<]<");
   });
   dec(sync);
-  moveField(lowResult, low);
+  moveFieldToZero(lowResult, low);
 
   return lhs;
 }

@@ -194,16 +194,16 @@ void Assembler::endProgram(API_FUNC) {
       .view("low", "high", "lowCopy", "highCopy", "highCopy2");
 
     // 1: Move TargetBlock high byte value into copy cells
-    moveField(tb["high"], {tb["highCopy"], tb["highCopy2"]});
+    moveFieldToZero(tb["high"], {tb["highCopy"], tb["highCopy2"]});
     tb.rename("high", "lowCopy2");
     
     // 2: Move TargetBlock low byte value into copy cells
-    moveField(tb["low"], {tb["lowCopy2"], tb["lowCopy"]});
+    moveFieldToZero(tb["low"], {tb["lowCopy2"], tb["lowCopy"]});
     
     // 3: Restore low byte in Value0
-    moveField(tb["lowCopy2"], tb["low"]);
+    moveFieldToZero(tb["lowCopy2"], tb["low"]);
     tb.rename("lowCopy2", "high");
-    moveField(tb["highCopy2"], tb["high"]);
+    moveFieldToZero(tb["highCopy2"], tb["high"]);
 
     // Final state:
     // L | H | L | H | 0 |

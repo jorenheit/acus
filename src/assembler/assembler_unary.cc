@@ -106,17 +106,17 @@ Expression Assembler::castImpl(Expression obj, types::TypeHandle toType, API_CTX
   
   if (slot.type()->usesValue1() && toType->usesValue1()) {
     // If both types (from and to) are 16-bits, we need to copy the high byte as well:
-    copyField(srcLow, resultLow, tmp);
-    copyField(srcHigh, resultHigh, tmp);
+    copyField(srcLow, resultLow, tmp, true);
+    copyField(srcHigh, resultHigh, tmp, true);
   }
   else if (slot.type()->tag() == types::S8 && toType->usesValue1()) {
     // If we're widening S8, we need to sign-extend
-    copyField(srcLow, {resultLow, resultHigh}, tmp);
+    copyField(srcLow, {resultLow, resultHigh}, tmp, true);
     signExtend(ws::promiseClean16(result), false);
   }
   else {
     // All other cases, just zero the high byte
-    copyField(srcLow, resultLow, tmp);
+    copyField(srcLow, resultLow, tmp, true);
     zeroCell(resultHigh);
   }
 
@@ -170,9 +170,9 @@ void Assembler::absSlot(Slot rhs) {
   assert(types::isInteger(rhs.type()));
   if (types::isUnsignedInteger(rhs.type())) return;
 
-  copyField(Cell{rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+  copyFieldToZero(Cell{rhs, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
             Cell{rhs, MacroCell::Scratch0},
-            Cell{rhs, MacroCell::Scratch1});
+            Cell{rhs, MacroCell::Scratch1}, true);
 
   signBitDestructive(ws::promise(Cell{rhs, MacroCell::Scratch0},
                                  ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));

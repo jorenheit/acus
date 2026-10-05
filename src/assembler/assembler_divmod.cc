@@ -82,9 +82,9 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   assert(types::isSignedInteger(rhs.type()));
 
   // Construct sign-bit in lhs::Scratch0
-  copyField(Cell{lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+  copyFieldToZero(Cell{lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
 	    Cell{lhs, MacroCell::Scratch0},
-	    Cell{lhs, MacroCell::Scratch1});
+	    Cell{lhs, MacroCell::Scratch1}, true);
   
   signBitDestructive(ws::promise(Cell{lhs, MacroCell::Scratch0},
 				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
@@ -109,9 +109,9 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
 
   // Construct sign-bit of rhs in rhsCopy::Scratch0
   if (!destroyRhs) assignSlot(rhsCopy, rhs);
-  copyField(Cell{rhsCopy, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+  copyFieldToZero(Cell{rhsCopy, rhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
 	    Cell{rhsCopy, MacroCell::Scratch0},
-	    Cell{rhsCopy, MacroCell::Scratch1});
+	    Cell{rhsCopy, MacroCell::Scratch1}, true);
   
   signBitDestructive(ws::promise(Cell{rhsCopy, MacroCell::Scratch0},
 				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
@@ -173,14 +173,14 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
     lhs,
     lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0
   };
-  copyField(lhsSignByte, S, SCopy1);
+  copyField(lhsSignByte, S, SCopy1, true);
   signBitDestructive(ws::promise(S, ws::Layout<ws::Data<>, ws::ScratchCells<5>>{}));
 
   // Copy sign bit to adjacent cells so we have enough independent copies.
   if (modSlot) {
-    copyField(S, {SCopy1, SCopy2}, copyTmp);
+    copyFieldToZero(S, {SCopy1, SCopy2}, copyTmp, true);
   } else {
-    copyField(S, SCopy1, SCopy2);
+    copyFieldToZero(S, SCopy1, SCopy2, true);
   }
   // If lhs was negative, negate it before passing it to the unsigned algorithm.
   loop(S, [&] {
@@ -244,8 +244,13 @@ void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
       moveField(qhi, Cell{*divSlot, MacroCell::Value1});
     }
 
-    moveField(rlo, qlo);
-    moveField(rhi, qhi);
+    if (divSlot.has_value()) {
+      moveFieldToZero(rlo, qlo);
+      moveFieldToZero(rhi, qhi);
+    } else {
+      moveField(rlo, qlo);
+      moveField(rhi, qhi);
+    }
 
     if (freeRhsWork)
       freeTempSlot(rhsWork);
@@ -259,7 +264,8 @@ void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
     if (divSlot.has_value()) {
       moveField(quotient, Cell{*divSlot, MacroCell::Value0});
     }
-    moveField(remainder, quotient);
+    if (divSlot.has_value()) moveFieldToZero(remainder, quotient);
+    else moveField(remainder, quotient);
   }
 
 }
@@ -271,9 +277,9 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
 
 
   // Construct sign-bit in lhs::Scratch0
-  copyField(Cell{lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
+  copyFieldToZero(Cell{lhs, lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0},
 	    Cell{lhs, MacroCell::Scratch0},
-	    Cell{lhs, MacroCell::Scratch1});
+	    Cell{lhs, MacroCell::Scratch1}, true);
   
   signBitDestructive(ws::promise(Cell{lhs, MacroCell::Scratch0},
 				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
@@ -374,14 +380,14 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
     lhs.type()->usesValue1() ? MacroCell::Value1 : MacroCell::Value0
   };
 
-  copyField(lhsSignByte, S, SCopy1);
+  copyField(lhsSignByte, S, SCopy1, true);
   signBitDestructive(ws::promiseClean8(signBit).template subset<1>());
 
   // Copy sign bit to adjacent cells so we have enough independent copies.
   if (divSlot) {
-    copyField(S, {SCopy1, SCopy2}, copyTmp);
+    copyFieldToZero(S, {SCopy1, SCopy2}, copyTmp, true);
   } else {
-    copyField(S, SCopy1, SCopy2);
+    copyFieldToZero(S, SCopy1, SCopy2, true);
   }
 
   // If lhs was negative, negate it before passing it to the unsigned algorithm.

@@ -27,7 +27,7 @@ Slot Assembler::addressOfSlot(Slot pointeeSlot, API_CTX) {
   if (pointeeSlot.kind() == SlotData::Kind::Global) {
     copyField(Cell{0, MacroCell::FrameMarker},
               Cell{ptrSlot + RuntimePointer::FrameDepth, MacroCell::Value0},
-              Cell{0, MacroCell::Scratch0});
+              Cell{0, MacroCell::Scratch0}, true);
   } else {
     zeroCell(Cell{ptrSlot + RuntimePointer::FrameDepth, MacroCell::Value0});
   }
@@ -141,12 +141,12 @@ void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot, 
     copyOrMoveField(mode,
                     Cell{srcSlot + i, MacroCell::Value0},
                     Cell{arrSlot + i, MacroCell::Payload0},
-                    Cell{srcSlot + i, MacroCell::Scratch0});
+                    Cell{srcSlot + i, MacroCell::Scratch0}, true);
     if (elementType->usesValue1()) {
       copyOrMoveField(mode,
                       Cell{srcSlot + i, MacroCell::Value1},
                       Cell{arrSlot + i, MacroCell::Payload1},
-                      Cell{srcSlot + i, MacroCell::Scratch0});
+                      Cell{srcSlot + i, MacroCell::Scratch0}, true);
     }
   }
   
@@ -257,7 +257,7 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src, TransferMode mode) {
   Cell const dstHigh = {dest, MacroCell::Value1};
   Cell const tmp = {dest, MacroCell::Scratch0};
 
-  copyOrMoveField(mode, srcLow, {dstLow, dstHigh}, tmp);
+  copyOrMoveField(mode, srcLow, {dstLow, dstHigh}, tmp, true);
   signExtend(ws::promiseClean16(dest), false);
 }
 
@@ -280,12 +280,12 @@ void Assembler::assignSlotBytewise(Slot dest, Slot src, TransferMode mode) {
     copyOrMoveField(mode,
                     Cell{src + i, MacroCell::Value0},
                     Cell{dest + i, MacroCell::Value0},
-                    Cell{src + i, MacroCell::Scratch0});
+                    Cell{src + i, MacroCell::Scratch0}, true);
     if (src.type()->usesValue1()) {
       copyOrMoveField(mode,
                       Cell{src + i, MacroCell::Value1},
                       Cell{dest + i, MacroCell::Value1},
-                      Cell{src + i, MacroCell::Scratch0});
+                      Cell{src + i, MacroCell::Scratch0}, true);
     }
     else {
       zeroCell(Cell{dest + i, MacroCell::Value1});
@@ -376,9 +376,9 @@ void Assembler::moveToPointee(Slot ptrSlot) {
   Cell const offsetHighPayload { 0 + RuntimePointer::Offset, MacroCell::Payload1 };
 
   // Copy pointer (frameDepth and offset) to the payload-cells of cell 0 and 1
-  copyField(frameDepth, frameDepthPayload, Cell{frameDepth, MacroCell::Scratch0});
-  copyField(offsetLow,  offsetLowPayload, Cell{offsetLow, MacroCell::Scratch0});
-  copyField(offsetHigh, offsetHighPayload, Cell{offsetHigh, MacroCell::Scratch0});
+  copyField(frameDepth, frameDepthPayload, Cell{frameDepth, MacroCell::Scratch0}, true);
+  copyField(offsetLow,  offsetLowPayload, Cell{offsetLow, MacroCell::Scratch0}, true);
+  copyField(offsetHigh, offsetHighPayload, Cell{offsetHigh, MacroCell::Scratch0}, true);
   
   Payload const payload{
     1, Payload::Width::Single, // depth
@@ -420,7 +420,7 @@ void Assembler::writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot, 
   // when ptrSlot aliases storage contained in srcSlot.
   copyField(Cell{ptrSlot + RuntimePointer::FrameDepth, MacroCell::Value0},
             Cell{frameDepth, MacroCell::Value0},
-            Cell{ptrSlot + RuntimePointer::FrameDepth, MacroCell::Scratch0});
+            Cell{ptrSlot + RuntimePointer::FrameDepth, MacroCell::Scratch0}, true);
 
   // Leave a marker at the end of the current frame to guarantee that the
   // pointee is to our left.
@@ -524,8 +524,8 @@ void Assembler::rebasePointers(Slot slot, Cell depthDiff, auto &&rebase) {
       Cell const depthDiffCopy { slot + RuntimePointer::FrameDepth, MacroCell::Scratch0 };
 
       // Make a disposable copy of the depth difference before rebasing, which consumes its operand.    
-      copyField(depthDiff, depthDiffCopy,
-                Cell{slot + RuntimePointer::FrameDepth, MacroCell::Scratch1});
+      copyFieldToZero(depthDiff, depthDiffCopy,
+                Cell{slot + RuntimePointer::FrameDepth, MacroCell::Scratch1}, true);
       rebase(currentDepth, depthDiffCopy);
       break;
     }
@@ -587,11 +587,11 @@ void Assembler::dereferencePointerIntoSlot(Slot ptrSlot, Slot derefSlot) {
   for (int i = 0; i != derefSlot.size(); ++i) {
     copyField(Cell{i, MacroCell::Value0},
               Cell{i, MacroCell::Payload0},
-              Cell{i, MacroCell::Scratch0});
+              Cell{i, MacroCell::Scratch0}, true);
     if (derefSlot.type()->usesValue1()) {
       copyField(Cell{i, MacroCell::Value1},
                 Cell{i, MacroCell::Payload1},
-                Cell{i, MacroCell::Scratch0});
+                Cell{i, MacroCell::Scratch0}, true);
     }
   }
   
