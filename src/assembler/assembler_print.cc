@@ -229,7 +229,9 @@ void Assembler::printDecimalSlotSigned(Slot slot) {
 
   popPtr();
   printDecimalSlotUnsigned(valSlot.unsignedView(), true);
-  // valSlot will already be freed
+  // The unsigned printer consumes the value, but its view does not own
+  // the allocator record. Release the original temporary explicitly.
+  freeTempSlot(valSlot);
 }
 
 void Assembler::printString(Expression expr) {

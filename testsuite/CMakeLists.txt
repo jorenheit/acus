@@ -22,3 +22,10 @@ endif()
 
 add_test(NAME acus-runtime COMMAND acus-runtime-tests)
 add_test(NAME acus-compiletime COMMAND acus-compiletime-tests)
+
+add_executable(acus-memory-tests memory_testsuite.cc)
+target_compile_features(acus-memory-tests PRIVATE cxx_std_23)
+set_target_properties(acus-memory-tests PROPERTIES CXX_EXTENSIONS OFF)
+acus_enable_warnings(acus-memory-tests)
+target_link_libraries(acus-memory-tests PRIVATE Acus::acus)
+add_test(NAME acus-memory COMMAND acus-memory-tests)

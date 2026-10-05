@@ -147,6 +147,7 @@ public:
   void unreachable(API_FUNC);
   
 private:
+  friend struct MemoryRegressionAccess;
   friend class proxy::impl::Direct;
   friend class proxy::impl::ArrayElement;
   friend class proxy::impl::StructField;

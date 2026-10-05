@@ -269,6 +269,7 @@ void Assembler::Cache::freeSlotBoundary(Slot slot) {
 
   for (Entry *entry: roots) {
     flushSubtree(*entry, true, TransferMode::Move);
+    markSubtreeForDelete(*entry, true);
   }
 
   deleteMarkedEntries();

@@ -11,7 +11,7 @@ std::optional<Slot> Assembler::localSlot(std::string const &varName) const {
   while (true) {
     for (Slot const &slot: _currentFunction->frame.locals) {
       if (slot.name() == varName && slot.scope() == targetScope) {
-	return slot;
+        return slot;
       }
     }
     if (targetScope == nullptr) break;
@@ -22,13 +22,13 @@ std::optional<Slot> Assembler::localSlot(std::string const &varName) const {
 }
 
 std::optional<Slot> Assembler::globalSlot(std::string const &varName) const {
- for (Slot const &slot: _program.globals) {
-   if (slot.name() == varName) {
-     return slot;
-   }
- }
+  for (Slot const &slot: _program.globals) {
+    if (slot.name() == varName) {
+      return slot;
+    }
+  }
  
- return {};
+  return {};
 }
 
 SlotProxy Assembler::proxyFromVariableName(std::string const& varName, API_CTX) const {
@@ -67,31 +67,15 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
   assert(_currentFunction != nullptr);
   
   auto const tryFindAvailableSlot = [&](std::string const &name,
-				        types::TypeHandle type,
-				        SlotData::Kind kind) -> std::optional<Slot> {
+                                        types::TypeHandle type,
+                                        SlotData::Kind kind) -> std::optional<Slot> {
     
-    // Prefer the smallest fitting hole; preserve larger holes for larger values.
-    auto &frame = _currentFunction->frame;
-    Slot *selected = nullptr;
-    Slot *tail = nullptr;
-    int const end = frame.localBase() + frame.localAreaSize();
+    // Now check if there is an existing slot that fits this type
+    auto &frame = _currentFunction->frame;  
     for (Slot &slot: frame.locals) {
-      if (slot.kind() != Slot::Available) continue;
-      if (slot.offset() + slot.size() == end) tail = &slot;
-      if (slot.size() < type->size()) continue;
-      if (selected == nullptr || slot.size() < selected->size() ||
-          (slot.size() == selected->size() && slot.offset() < selected->offset())) {
-        selected = &slot;
-      }
-    }
-    // Grow a free tail rather than appending beyond it. Keep the reserved
-    // extent: previously emitted code can still address cells in that extent.
-    if (selected == nullptr && tail != nullptr) {
-      tail->get().type = ts::raw(type->size());
-      selected = tail;
-    }
-    if (selected != nullptr) {
-      Slot slot = *selected;
+      if (slot.kind() != Slot::Available || slot.type()->size() < type->size())
+        continue;
+
       int const diff = slot.type()->size() - type->size();      
       
       // Reuse this slot
@@ -104,27 +88,27 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
       
       // Split the slot if there is still room
       if (diff > 0) {
-	std::string const dummyName = [] {
-	  static int counter = 0; return "__dummy_" + std::to_string(counter++);
-	}();
+        std::string const dummyName = [] {
+          static int counter = 0; return "__dummy_" + std::to_string(counter++);
+        }();
 	
-	frame.locals.push_back(SlotData {
-	    .name = dummyName,
-	    .uniqueName = makeFullName(dummyName),
-	    .type = ts::raw(diff),
-	    .kind = Slot::Available,
-	    .offset = slot.offset() + slot.type()->size(),
-	    .scope = nullptr
-	  });
+        frame.locals.push_back(SlotData {
+                                 .name = dummyName,
+                                 .uniqueName = makeFullName(dummyName),
+                                 .type = ts::raw(diff),
+                                 .kind = Slot::Available,
+                                 .offset = slot.offset() + slot.type()->size(),
+                                 .scope = nullptr
+                               });
       }
-      return slot;
+      return Slot{data};
     }
     return {};
   };
 
   auto const newSlot = [&](std::string const &name,
-			   types::TypeHandle type,
-			   SlotData::Kind kind) -> Slot {
+                           types::TypeHandle type,
+                           SlotData::Kind kind) -> Slot {
 
     auto &frame = _currentFunction->frame;
     SlotData newSlot {
@@ -158,10 +142,10 @@ void Assembler::mergeAvailableSlots() {
 
       for (size_t j = 0; j < locals.size(); ++j) {
         if (i == j) continue;
-	Slot &b = locals[j];
+        Slot &b = locals[j];
         if (b.kind() != Slot::Available) continue;
 
-	// a just before b
+        // a just before b
         if (a.offset() + a.size() == b.offset()) {
           a.get().type = ts::raw(a.size() + b.size());
           locals.erase(locals.begin() + static_cast<std::ptrdiff_t>(j));
@@ -169,7 +153,7 @@ void Assembler::mergeAvailableSlots() {
           break;
         }
 
-	// b just before a
+        // b just before a
         if (b.offset() + b.size() == a.offset()) {
           b.get().type = ts::raw(b.size() + a.size());
           locals.erase(locals.begin() + static_cast<std::ptrdiff_t>(i));
@@ -298,13 +282,13 @@ void Assembler::declareGlobal(std::string const &name, types::TypeHandle type, A
   API_REQUIRE_GLOBAL_NAME_AVAILABLE(name);
 
   _program.globals.emplace_back(SlotData {
-    .name = name,
-    .uniqueName = makeFullGlobalName(name),
-    .type = type,
-    .kind = Slot::Global,
-    .offset = _program.globalVariableFrameSize(),
-    .scope = nullptr
-  });
+                                  .name = name,
+                                  .uniqueName = makeFullGlobalName(name),
+                                  .type = type,
+                                  .kind = Slot::Global,
+                                  .offset = _program.globalVariableFrameSize(),
+                                  .scope = nullptr
+                                });
 }
 
 Expression Assembler::declareLocal(std::string const& name, types::TypeHandle type, API_FUNC) {
