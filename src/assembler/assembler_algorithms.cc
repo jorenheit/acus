@@ -125,14 +125,14 @@ void Assembler::moveField(Cell from, std::vector<Cell> const &to) {
 void Assembler::copyField(Cell from, Cell to, Cell tmp) {
   if (from.offset == to.offset && from.field == to.field) return;
   moveField(from, {to, tmp});
-  moveField(tmp, from);
+  addDestructive(SingleCell{from}, tmp); // from is known 0 now.
 }
 
 
 void Assembler::copyField(Cell from, std::vector<Cell> const &to, Cell tmp) {
   auto vec = to; vec.push_back(tmp);
   moveField(from, vec);
-  moveField(tmp, from);
+  addDestructive(SingleCell{from}, tmp); // from is known 0 now
 }
 
 void Assembler::copyOrMoveField(TransferMode mode, Cell from, Cell to, Cell tmp) {
