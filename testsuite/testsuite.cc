@@ -459,6 +459,9 @@ using namespace acus::api;
 
 static std::vector<bftest::TestCase> buildTests() {
   std::vector<bftest::TestCase> tests;
+  tests.push_back(expectOutput("Consumed temporary lifetimes and aliases", "BCBBB" + std::string(3, '\1') + "TB", [] {
+#include "tests/consume_lifetimes.cc"
+  }));
   bftest::addConstantByteComparisonTests(tests);
   bftest::addConstantSpecialCaseTests(tests);
   tests.push_back(expectOutput("Consumable pointer offset", "ACBCBA2", [] {

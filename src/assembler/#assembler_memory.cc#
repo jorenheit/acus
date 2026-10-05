@@ -70,12 +70,28 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
                                         types::TypeHandle type,
                                         SlotData::Kind kind) -> std::optional<Slot> {
     
-    // Now check if there is an existing slot that fits this type
-    auto &frame = _currentFunction->frame;  
+    // Prefer the smallest fitting hole; preserve larger holes for larger values.
+    auto &frame = _currentFunction->frame;
+    Slot *selected = nullptr;
+    Slot *tail = nullptr;
+    int const end = frame.localBase() + frame.localAreaSize();
     for (Slot &slot: frame.locals) {
-      if (slot.kind() != Slot::Available || slot.type()->size() < type->size())
-        continue;
-
+      if (slot.kind() != Slot::Available) continue;
+      if (slot.offset() + slot.size() == end) tail = &slot;
+      if (slot.size() < type->size()) continue;
+      if (selected == nullptr || slot.size() < selected->size() ||
+          (slot.size() == selected->size() && slot.offset() < selected->offset())) {
+        selected = &slot;
+      }
+    }
+    // Grow a free tail rather than appending beyond it. Keep the reserved
+    // extent: previously emitted code can still address cells in that extent.
+    if (selected == nullptr && tail != nullptr) {
+      tail->get().type = ts::raw(type->size());
+      selected = tail;
+    }
+    if (selected != nullptr) {
+      Slot slot = *selected;
       int const diff = slot.type()->size() - type->size();      
       
       // Reuse this slot
@@ -101,7 +117,7 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
                                  .scope = nullptr
                                });
       }
-      return Slot{data};
+      return slot;
     }
     return {};
   };

@@ -69,6 +69,58 @@ struct MemoryRegressionAccess {
         require(slot.kind() == Slot::Available,
                 "scope cleanup left an allocation live");
     }
+    {
+      Assembler c; start(c);
+      c.declareLocal("x", ts::u8());
+      c.assign("x", literal::u8(1));
+      for (int i = 0; i != 20; ++i)
+        c.assign("x", c.add(c.add("x", literal::u8(1)),
+                            c.add("x", literal::u8(2))));
+      require(area(c) <= 3, "consumed arithmetic expressions grew the frame");
+      for (auto const &slot: c._currentFunction->frame.locals)
+        require(slot.kind() != Slot::Temp, "assignment or binary operation leaked an operand");
+      auto same = c.add("x", literal::u8(0));
+      c.assign(same, same);
+      c.addAssign(same, same);
+      require(c.materialize(same.slot()).kind() == Slot::Temp,
+              "self-aliasing operation released its result");
+      c.assign("x", same);
+    }
+    {
+      Assembler c; start(c);
+      c.declareLocal("x", ts::u8());
+      c.assign("x", literal::u8(1));
+      c.jumpIf(c.add("x", literal::u8(0)), "yes", "no");
+      c.label("yes"); c.jump("no"); c.label("no");
+      for (auto const &slot: c._currentFunction->frame.locals)
+        require(slot.kind() != Slot::Temp, "branch condition leaked a temporary");
+    }
+    {
+      Assembler c; start(c);
+      c.declareLocal("x", ts::u8());
+      c.assign("x", literal::u8(7));
+      auto arg = c.add("x", literal::u8(0));
+      c.callFunction("callee").arg(arg).arg(arg).done();
+      for (auto const &slot: c._currentFunction->frame.locals)
+        require(slot.kind() != Slot::Temp, "duplicate call argument leaked its allocation");
+    }
+    {
+      Assembler c; start(c);
+      auto arg = c.getTemp(ts::array(ts::u8(), 2));
+      for (int i = 0; i != 2; ++i) c.setSlotToValue(arg.sub(ts::u8(), i), 0);
+      c.callFunction("arrayCallee").arg(Expression{arg}).done();
+      for (auto const &slot: c._currentFunction->frame.locals)
+        require(slot.kind() != Slot::Temp, "aggregate argument leaked its whole allocation");
+    }
+    {
+      Assembler c; start(c);
+      c.declareLocal("x", ts::u8()); c.assign("x", literal::u8(1));
+      auto target = c.add("x", literal::u8(0));
+      c.callFunction("identity").into(target).arg(target).done();
+      require(!c.canConsume(target), "deferred return storage was allowed to be reused");
+      require(c.materialize(target.slot()).kind() == Slot::Temp,
+              "call released its deferred return destination");
+    }
     for (auto type: {ts::s8(), ts::s16()}) {
       Assembler c; start(c);
       c.declareLocal("x", type);

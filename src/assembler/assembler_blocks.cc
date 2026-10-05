@@ -148,7 +148,13 @@ void Assembler::jumpIfImpl(Expression obj, std::string const &trueLabel,
   API_REQUIRE_IS_INTEGER(obj.type());
 
   if (obj.hasSlot()) {
-    branchIfSlot(materialize(obj.slot()), trueLabel, falseLabel);
+    Slot const condition = materialize(obj.slot());
+    bool const consumeCondition = canConsume(obj);
+    branchIfSlot(condition, trueLabel, falseLabel);
+    if (consumeCondition) {
+      _cache.freeSlotBoundary(condition);
+      freeTempSlot(condition);
+    }
   } else {  
     bool const value = literal::cast<types::IntegerType>(obj.literal())->encodedValue();
     setNextBlock(_currentFunction->name, value ? trueLabel : falseLabel);

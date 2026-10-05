@@ -61,29 +61,29 @@ void Assembler::mulSlotByConst(Slot lhs, int factor) {
 }
 
 
-void Assembler::mulSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
+void Assembler::mulSlotBySlot(Slot lhs, Slot rhs, bool consumeRhs) {
+  consumeRhs = consumeRhs && lhs != rhs;
   assert(types::isInteger(lhs.type()));
   assert(types::isInteger(rhs.type()));
 
   if (types::isSignedInteger(lhs.type()) && lhs.type()->usesValue1() && !rhs.type()->usesValue1()) {
     Slot rhsWide = getTemp(ts::s16());
-    assignSlot(rhsWide, rhs, destroyRhs ? TransferMode::Move : TransferMode::Copy);  // existing signed widening -> sign extension
+    assignSlot(rhsWide, rhs, consumeRhs ? TransferMode::Move : TransferMode::Copy);  // existing signed widening -> sign extension
 
     // rhsWide may be destroyed
     mulSlotBySlotUnsigned(lhs.unsignedView(), rhsWide.unsignedView(), true);
     freeTempSlot(rhsWide);
   }
   else {
-    mulSlotBySlotUnsigned(lhs.unsignedView(), rhs.unsignedView(), destroyRhs);
+    mulSlotBySlotUnsigned(lhs.unsignedView(), rhs.unsignedView(), consumeRhs);
   }
 }
 
-void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
+void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool consumeRhs) {
+  consumeRhs = consumeRhs && lhs != rhs;
 
   if (lhs == rhs) {
-    assert(destroyRhs == false);
+    assert(consumeRhs == false);
     return squareSlot(lhs);
   }
 
@@ -101,7 +101,7 @@ void Assembler::mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool destroyRhs) {
   // choice preserves the old implementation's useful property that an
   // ordinary x *= y does not require a temporary copy of y.
   withValueWorkspace(lhs, [&](auto const &lhsValue, auto const &lhsWork) {
-    if (destroyRhs) {
+    if (consumeRhs) {
       withValueWorkspace(rhs, [&](auto const &rhsValue, auto const &) {
         multiplyInto(lhsValue, rhsValue, lhsValue, lhsWork);
       });

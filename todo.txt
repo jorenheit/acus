@@ -1,4 +1,4 @@
 [ ] 16 bit frame-markers to allow for much deeper call stacks?
 [ ] use dynamic moves instead of long >>...>> sequences.
 [ ] copy and move take a vector of cells as destination
-[ ] rename destroyRhs to consumeRhs
+[x] rename destroyRhs to consumeRhs

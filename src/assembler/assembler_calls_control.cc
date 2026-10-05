@@ -38,6 +38,13 @@ void Assembler::callFunctionImpl(std::string const &functionName, std::optional<
   // Prepare frame (set target, copy args) and push next frame onto the stack
   _cache.controlBoundary();  
   prepareNextFrame(functionName, args, API_FWD);
+  for (Expression const &arg: args) {
+    if (!canConsume(arg)) continue;
+    Slot const source = materialize(arg.slot());
+    if (returnSlot && returnSlot->slot().dependsOnStorage(source)) continue;
+    _cache.freeSlotBoundary(source);
+    freeTempSlot(source);
+  }
   pushFrame();
   _cache.reset();
   
@@ -78,6 +85,20 @@ void Assembler::callFunctionImpl(Expression fPtr, std::optional<Expression> cons
   // Prepare frame (set target, copy args) and push next frame onto the stack
   _cache.controlBoundary();
   prepareNextFrame(fPtr, args, API_FWD);
+  for (Expression const &arg: args) {
+    if (!canConsume(arg)) continue;
+    Slot const source = materialize(arg.slot());
+    if (returnSlot && returnSlot->slot().dependsOnStorage(source)) continue;
+    _cache.freeSlotBoundary(source);
+    freeTempSlot(source);
+  }
+  if (canConsume(fPtr)) {
+    Slot const source = materialize(fPtr.slot());
+    if (!returnSlot || !returnSlot->slot().dependsOnStorage(source)) {
+      _cache.freeSlotBoundary(source);
+      freeTempSlot(source);
+    }
+  }
   pushFrame();
   _cache.reset();
 
@@ -234,8 +255,9 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
     }
   };
 
+  bool consumeArgument = false;
   auto const copyOrMoveSlotToNextFrame = [&](Slot slot, int &offset) {
-    if (slot.kind() == Slot::Temp) moveSlotToNextFrame(slot, offset);
+    if (consumeArgument && slot.kind() == Slot::Temp) moveSlotToNextFrame(slot, offset);
     else copySlotToNextFrame(slot, offset);
   };
 
@@ -367,7 +389,19 @@ void Assembler::initializeArguments(primitive::DInt const currentFrameSize, prim
   
   // Copy arguments
   int offset = 0;
-  for (Expression const &arg: args) {
+  for (size_t i = 0; i != args.size(); ++i) {
+    Expression const &arg = args[i];
+    consumeArgument = canConsume(arg);
+    if (consumeArgument) {
+      Slot const source = materialize(arg.slot());
+      for (size_t j = i + 1; j != args.size(); ++j) {
+        if (args[j].hasSlot() && args[j].slot().dependsOnStorage(source)) {
+          consumeArgument = false;
+          break;
+        }
+      }
+      _cache.freeSlotBoundary(source);
+    }
     init(init, offset, arg);
   }
   
@@ -405,9 +439,7 @@ void Assembler::prepareNextFrame(Expression fptr, std::vector<Expression> const 
     return ctx.getStackFrameSize(caller) * MacroCell::FieldCount;
   };
 
-  initializeArguments(currentFrameSize, paramStart, args, API_FWD);
-  
-  
+  // Copy the call target before an argument can consume the same storage.
   // Set target block
   Slot fptrSlot = [&] {
     if (fptr.hasSlot()) return materialize(fptr.slot());
@@ -427,7 +459,9 @@ void Assembler::prepareNextFrame(Expression fptr, std::vector<Expression> const 
   emit<primitive::CopyData>(sourceCell1, targetCell1, scratchCell);
   popPtr();
 
-  if (fptrSlot.kind() == Slot::Temp) freeTempSlot(fptrSlot);
+  initializeArguments(currentFrameSize, paramStart, args, API_FWD);
+  // The call-site releases expression-owned storage after all reads finish.
+  if (fptr.isLiteral()) freeTempSlot(fptrSlot);
 }
 
 

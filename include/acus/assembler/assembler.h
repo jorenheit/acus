@@ -360,20 +360,20 @@ private:
   void signBitSlot(Slot rhs);
   void printIntegerSlotDestructive(Slot valSlot);
     
-  // destroyRhs permits consuming RHS values; it never transfers slot ownership.
+  // consumeRhs permits consuming RHS values; it never transfers slot ownership.
   // The caller remains responsible for freeing its temporaries.
-  void addSlotToSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void addSlotToSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
   void addConstToSlot(Slot lhs, int delta);
-  void subSlotFromSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void subSlotFromSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
   void subConstFromSlot(Slot lhs, int delta);
 
   void mulSlotByConst(Slot lhs, int factor);
   void mulSlotByConstUnsigned(Slot lhs, int factor);
   void mulSlotByConstSigned(Slot lhs, int factor);
 
-  void mulSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs = false);
-  void mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
-  void mulSlotBySlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void mulSlotBySlot(Slot lhs, Slot rhs, bool consumeRhs = false);
+  void mulSlotBySlotUnsigned(Slot lhs, Slot rhs, bool const consumeRhs = false);
+  void mulSlotBySlotSigned(Slot lhs, Slot rhs, bool consumeRhs = false);
 
   void squareSlot(Slot slot);
   void twiceSlot(Slot slot);
@@ -406,33 +406,33 @@ private:
   void modSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> const &divSlot = {});
   void modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> const &divSlot = {});
 
-  void divSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs = false);
-  void divSlotBySlot(Slot lhs, Slot rhs, Slot modSlot, bool destroyRhs = false);
-  void divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot = {}, bool const destroyRhs = false);
-  void divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot = {}, bool destroyRhs = false);
+  void divSlotBySlot(Slot lhs, Slot rhs, bool consumeRhs = false);
+  void divSlotBySlot(Slot lhs, Slot rhs, Slot modSlot, bool consumeRhs = false);
+  void divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot = {}, bool const consumeRhs = false);
+  void divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &modSlot = {}, bool consumeRhs = false);
 
-  void modSlotBySlot(Slot lhs, Slot rhs, bool destroyRhs = false);
-  void modSlotBySlot(Slot lhs, Slot rhs, Slot divSlot, bool destroyRhs = false);
-  void modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot = {}, bool const destroyRhs = false);
-  void modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot = {}, bool destroyRhs = false);
+  void modSlotBySlot(Slot lhs, Slot rhs, bool consumeRhs = false);
+  void modSlotBySlot(Slot lhs, Slot rhs, Slot divSlot, bool consumeRhs = false);
+  void modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot = {}, bool const consumeRhs = false);
+  void modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> const &divSlot = {}, bool consumeRhs = false);
 
   void andSlotWithConst(Slot lhs, int val);
-  void andSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void andSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
   void nandSlotWithConst(Slot lhs, int val);
-  void nandSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void nandSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
   void orSlotWithConst(Slot lhs, int val);
-  void orSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void orSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
   void norSlotWithConst(Slot lhs, int val);
-  void norSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void norSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
   void xorSlotWithConst(Slot lhs, int val);
-  void xorSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void xorSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
   void xnorSlotWithConst(Slot lhs, int val);
-  void xnorSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void xnorSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
 
   void slotEqualConst(Slot lhs, int val);
-  void slotEqualSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void slotEqualSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
   void slotNotEqualConst(Slot lhs, int val);
-  void slotNotEqualSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void slotNotEqualSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
 
   void slotLessConst(Slot lhs, int val);
   void slotLessConstSigned(Slot lhs, int val);
@@ -450,21 +450,21 @@ private:
   void slotGreaterEqualConstSigned(Slot lhs, int val);
   void slotGreaterEqualConstUnsigned(Slot lhs, int val);
 
-  void slotLessSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
-  void slotLessSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
-  void slotLessSlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void slotLessSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
+  void slotLessSlotUnsigned(Slot lhs, Slot rhs, bool const consumeRhs = false);
+  void slotLessSlotSigned(Slot lhs, Slot rhs, bool consumeRhs = false);
 
-  void slotLessEqualSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
-  void slotLessEqualSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
-  void slotLessEqualSlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void slotLessEqualSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
+  void slotLessEqualSlotUnsigned(Slot lhs, Slot rhs, bool const consumeRhs = false);
+  void slotLessEqualSlotSigned(Slot lhs, Slot rhs, bool consumeRhs = false);
 
-  void slotGreaterSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
-  void slotGreaterSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
-  void slotGreaterSlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void slotGreaterSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
+  void slotGreaterSlotUnsigned(Slot lhs, Slot rhs, bool const consumeRhs = false);
+  void slotGreaterSlotSigned(Slot lhs, Slot rhs, bool consumeRhs = false);
 
-  void slotGreaterEqualSlot(Slot lhs, Slot rhs, bool destroyRhs = false);
-  void slotGreaterEqualSlotUnsigned(Slot lhs, Slot rhs, bool const destroyRhs = false);
-  void slotGreaterEqualSlotSigned(Slot lhs, Slot rhs, bool destroyRhs = false);
+  void slotGreaterEqualSlot(Slot lhs, Slot rhs, bool consumeRhs = false);
+  void slotGreaterEqualSlotUnsigned(Slot lhs, Slot rhs, bool const consumeRhs = false);
+  void slotGreaterEqualSlotSigned(Slot lhs, Slot rhs, bool consumeRhs = false);
     
   // Algorithms: all applied to the current DP (assembler_algorithms.cc)
   void literalBf(std::string const &bf);
@@ -773,8 +773,10 @@ private:
   template <typename Operator> Expression unOpImpl(Expression obj, API_CTX);
   template <typename Operator> Expression binOpAssignImpl(Expression lhs, Expression rhs, API_CTX);
   template <typename Operator> Expression binOpImpl(Expression lhs, Expression rhs, API_CTX);
-  bool canDestroy(Expression const &expr);
-  template <typename Operator> void binOpAssignSlot(Slot const lhs, Slot const rhs, bool destroyRhs = false);
+  // Consumable values need not be preserved. Slot kernels do not release
+  // externally supplied operands; expression-level callers release owned Temps.
+  bool canConsume(Expression const &expr);
+  template <typename Operator> void binOpAssignSlot(Slot const lhs, Slot const rhs, bool consumeRhs = false);
   template <typename Operator> void binOpAssignConst(Slot const lhs, literal::Literal const rhs);
 
   template <typename Ret> struct UnaryOperator  { using ReturnType = Ret; };
@@ -800,8 +802,8 @@ private:
 #define DEFINE_BINARY_OPERATOR(name, type, ret, foldExpr, slotOp, constOp) \
   struct name: BinaryOperator<ret> {                                    \
     static ret fold(int x, int y) { return foldExpr; }                  \
-    static void applyWithSlot(Assembler &self, Slot lhs, Slot rhs, bool destroyRhs) {    \
-      return self.slotOp(lhs, rhs, destroyRhs);                                     \
+    static void applyWithSlot(Assembler &self, Slot lhs, Slot rhs, bool consumeRhs) {    \
+      return self.slotOp(lhs, rhs, consumeRhs);                                     \
     }                                                                   \
     static void applyWithConst(Assembler &self, Slot lhs, int rhs) {    \
       return self.constOp(lhs, rhs);                                    \

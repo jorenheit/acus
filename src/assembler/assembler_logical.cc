@@ -20,10 +20,10 @@ void Assembler::andSlotWithConst(Slot lhs, int val) {
   }
 }
 
-void Assembler::andSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
-  Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
-  if (!destroyRhs) assignSlot(rhsCopy, rhs);
+void Assembler::andSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
+  consumeRhs = consumeRhs && lhs != rhs;
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  if (!consumeRhs) assignSlot(rhsCopy, rhs);
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     and16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
@@ -31,7 +31,7 @@ void Assembler::andSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs) {
   } else {
     andDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
-  if (!destroyRhs) freeTempSlot(rhsCopy);
+  if (!consumeRhs) freeTempSlot(rhsCopy);
 }
 
 
@@ -44,17 +44,17 @@ void Assembler::nandSlotWithConst(Slot lhs, int val) {
   }
 }
 
-void Assembler::nandSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
-  Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
-  if (!destroyRhs) assignSlot(rhsCopy, rhs);
+void Assembler::nandSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
+  consumeRhs = consumeRhs && lhs != rhs;
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  if (!consumeRhs) assignSlot(rhsCopy, rhs);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     nand16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
 		     
   } else {
     nandDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
-  if (!destroyRhs) freeTempSlot(rhsCopy);
+  if (!consumeRhs) freeTempSlot(rhsCopy);
 }
 
 
@@ -69,17 +69,17 @@ void Assembler::orSlotWithConst(Slot lhs, int val) {
   }
 }
 
-void Assembler::orSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
-  Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
-  if (!destroyRhs) assignSlot(rhsCopy, rhs);
+void Assembler::orSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
+  consumeRhs = consumeRhs && lhs != rhs;
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  if (!consumeRhs) assignSlot(rhsCopy, rhs);
   
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     or16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
   } else {
     orDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
-  if (!destroyRhs) freeTempSlot(rhsCopy);
+  if (!consumeRhs) freeTempSlot(rhsCopy);
 }
 
 void Assembler::norSlotWithConst(Slot lhs, int val) {
@@ -91,16 +91,16 @@ void Assembler::norSlotWithConst(Slot lhs, int val) {
   }
 }
 
-void Assembler::norSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
-  Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
-  if (!destroyRhs) assignSlot(rhsCopy, rhs);
+void Assembler::norSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
+  consumeRhs = consumeRhs && lhs != rhs;
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  if (!consumeRhs) assignSlot(rhsCopy, rhs);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     nor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));		     
   } else {
     norDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
-  if (!destroyRhs) freeTempSlot(rhsCopy);
+  if (!consumeRhs) freeTempSlot(rhsCopy);
 }
 
 void Assembler::xorSlotWithConst(Slot lhs, int val) {
@@ -120,16 +120,16 @@ void Assembler::xorSlotWithConst(Slot lhs, int val) {
   }
 }
 
-void Assembler::xorSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
-  Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
-  if (!destroyRhs) assignSlot(rhsCopy, rhs);
+void Assembler::xorSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
+  consumeRhs = consumeRhs && lhs != rhs;
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  if (!consumeRhs) assignSlot(rhsCopy, rhs);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     xor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));		     
   } else {
     xorDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
-  if (!destroyRhs) freeTempSlot(rhsCopy);
+  if (!consumeRhs) freeTempSlot(rhsCopy);
 }
 
 
@@ -150,16 +150,16 @@ void Assembler::xnorSlotWithConst(Slot lhs, int val) {
   }
 }
 
-void Assembler::xnorSlotWithSlot(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
-  Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
-  if (!destroyRhs) assignSlot(rhsCopy, rhs);
+void Assembler::xnorSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
+  consumeRhs = consumeRhs && lhs != rhs;
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  if (!consumeRhs) assignSlot(rhsCopy, rhs);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     xnor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
   } else {
     xnorDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
-  if (!destroyRhs) freeTempSlot(rhsCopy);
+  if (!consumeRhs) freeTempSlot(rhsCopy);
 }
 
 // Cell level stuff

@@ -353,8 +353,19 @@ Expression Assembler::assignImpl(Expression lhs, Expression rhs, API_CTX) {
 
   SlotProxy const dest = lhs.slot();
   if (rhs.hasSlot()) {
-    TransferMode const mode = canDestroy(rhs) ? TransferMode::Move : TransferMode::Copy;
-    _cache.write(dest, rhs.slot(), mode);
+    bool const consumeRhs = canConsume(rhs);
+    Slot const source = materialize(rhs.slot());
+    bool const overlaps = dest.direct() && dest.dependsOnStorage(source);
+    bool const releaseRhs = consumeRhs && !overlaps;
+    // A destination may use the RHS as an index or pointer. Keep that value
+    // intact until the pending write has reached its backing storage.
+    bool const moveRhs = releaseRhs && !dest.dependsOnStorage(source);
+    if (releaseRhs) _cache.freeSlotBoundary(source);
+    _cache.write(dest, rhs.slot(), moveRhs ? TransferMode::Move : TransferMode::Copy);
+    if (releaseRhs) {
+      _cache.freeSlotBoundary(source);
+      freeTempSlot(source);
+    }
   }
   else _cache.write(dest, rhs.literal());
   return lhs;

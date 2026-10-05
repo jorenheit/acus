@@ -14,11 +14,11 @@ void Assembler::subConstFromSlot(Slot lhs, int delta) {
   }
 }
 
-void Assembler::subSlotFromSlot(Slot lhs, Slot rhs, bool destroyRhs) {
-  destroyRhs = destroyRhs && lhs != rhs;
+void Assembler::subSlotFromSlot(Slot lhs, Slot rhs, bool consumeRhs) {
+  consumeRhs = consumeRhs && lhs != rhs;
   pushPtr();
-  Slot rhsCopy = destroyRhs ? rhs : getTemp(rhs.type());
-  if (!destroyRhs) assignSlot(rhsCopy, rhs);
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  if (!consumeRhs) assignSlot(rhsCopy, rhs);
   moveTo(lhs, MacroCell::Value0);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     sub16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
@@ -26,7 +26,7 @@ void Assembler::subSlotFromSlot(Slot lhs, Slot rhs, bool destroyRhs) {
     subDestructive(ws::promiseClean8(lhs), ws::promiseClean8(rhsCopy));
   }
   popPtr();
-  if (!destroyRhs) freeTempSlot(rhsCopy);
+  if (!consumeRhs) freeTempSlot(rhsCopy);
 }
 
 Assembler::SingleCell Assembler::subConst(int delta) {
