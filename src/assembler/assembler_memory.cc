@@ -109,13 +109,11 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
       size_t winnerIndex = -1;
       for (size_t idx = 0; idx != candidates.size(); ++idx) {
         size_t const distance = std::abs(*near - candidates[idx]->offset());
-        std::cerr << distance << '\n';
         if (distance < smallestDistance) {
           smallestDistance = distance;
           winnerIndex = idx;
         }
       }
-      assert(false);
       selected = candidates[winnerIndex];
     }
     
