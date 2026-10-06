@@ -59,7 +59,13 @@ Assembler::Cache::Entry& Assembler::Cache::findOrCreateEntry(SlotProxy proxy, bo
   // is set to true), m[row] must still exist as the parent entry so the cell can later flush into it.
 
   Entry *parentEntry = ensureParentEntry(proxy);
-  Slot const cacheSlot = _self.getCache(proxy.type());
+  std::optional<int> near;
+  if (parentEntry) near = _self.allocHint(parentEntry->slot);
+  else if (proxy.kind() == proxy::Kind::GlobalReference) {
+    // Global transfers stage their local payload at the frame origin.
+    near = _self.allocHint(Cell{0, MacroCell::Payload0});
+  }
+  Slot const cacheSlot = _self.getCache(proxy.type(), near);
   if (not skipMaterialization) {
     proxy.materialize(_self, cacheSlot);
   }

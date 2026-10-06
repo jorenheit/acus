@@ -68,7 +68,8 @@ namespace acus::proxy {
   }
 
   void impl::GlobalReference::write(Assembler &a, SlotWriteCallback const &writeInto) const {
-    Slot tmp = a.getTemp(this->type());
+    // putGlobal stages the value in payload fields at the caller's origin.
+    Slot tmp = a.getTemp(this->type(), a.allocHint(Cell{0, MacroCell::Payload0}));
     writeInto(tmp);
     write(a, tmp, TransferMode::Move);
     a.freeTempSlot(tmp);

@@ -116,7 +116,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
 
   Slot const valSlot = [&] {
     if (destroySlot) return slot;
-    Slot const copy = getTemp(slot.type());
+    Slot const copy = getTemp(slot.type(), allocHint(slot));
     assignSlot(copy, slot);
     return copy;
   }();
@@ -126,7 +126,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
   // We can destroy the contents of valSlot while working on it.
   int const maxDigits = valSlot.type()->usesValue1() ? 5 : 3;
 	  
-  Slot digits = getTemp(ts::raw(maxDigits));
+  Slot digits = getTemp(ts::raw(maxDigits), allocHint(valSlot));
   for (int i = 0; i != maxDigits; ++i) {
     Slot const currentDigitSlot = digits.sub(ts::u8(), i);
     divSlotByConst(valSlot, 10, currentDigitSlot);
@@ -197,7 +197,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
 void Assembler::printDecimalSlotSigned(Slot slot) {
   assert(types::isSignedInteger(slot.type()));
 
-  Slot const valSlot = getTemp(slot.type());
+  Slot const valSlot = getTemp(slot.type(), allocHint(slot));
   assignSlot(valSlot, slot);
   
   pushPtr();

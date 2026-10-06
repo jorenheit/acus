@@ -33,7 +33,7 @@ void Assembler::binOpAssignSlot(Slot const lhs, Slot const rhs, bool consumeRhs)
 
    auto const [operandSlot, freeOperandSlot] = [&] -> std::pair<Slot, bool> {
      if (consumeRhs) return {rhs, false};
-     Slot const copy = getTemp(rhs.type());
+     Slot const copy = getTemp(rhs.type(), allocHint(targetSlot, rhs));
      assignSlot(copy, rhs);
      return {copy, true};
    }();
@@ -135,7 +135,14 @@ Expression Assembler::binOpImpl(Expression lhs, Expression rhs, API_CTX) {
   }
 
   bool const reuseLhs = lhs.type() == opResult.workType && canConsume(lhs);
-  Slot result = reuseLhs ? materialize(lhs.slot()) : getTemp(opResult.workType);
+  Slot result = [&] {
+    if (reuseLhs) return materialize(lhs.slot());
+    // Use the source that will be copied into the result. Do not materialize
+    // both operands merely for placement: reading RHS can flush a cached LHS.
+    if (lhs.hasSlot())
+      return getTemp(opResult.workType, allocHint(materialize(lhs.slot())));
+    return getTemp(opResult.workType);
+  }();
   // The other operand may still refer to the LHS, including through an
   // indirect proxy. In that case copy first and release only after its read.
   bool const deferLhsRelease = !reuseLhs && canConsume(lhs) && rhs.hasSlot() &&

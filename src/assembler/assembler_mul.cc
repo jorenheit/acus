@@ -33,7 +33,7 @@ void Assembler::mulSlotByConst(Slot lhs, int factor) {
     return;
   }
   if (factor > 3 && util::math::isPowerOfTwo(factor - 1)) {
-    Slot const copy = getTemp(lhs.type());
+    Slot const copy = getTemp(lhs.type(), allocHint(lhs));
     assignSlot(copy, lhs);
     mulSlotByPowerOfTwo(lhs, util::math::getPowerOfTwo(factor - 1));
     addSlotToSlot(lhs, copy, true);
@@ -42,7 +42,7 @@ void Assembler::mulSlotByConst(Slot lhs, int factor) {
     return;
   }
   if (util::math::isPowerOfTwo(factor + 1)) {
-    Slot const copy = getTemp(lhs.type());
+    Slot const copy = getTemp(lhs.type(), allocHint(lhs));
     assignSlot(copy, lhs);
     mulSlotByPowerOfTwo(lhs, util::math::getPowerOfTwo(factor + 1));
     subSlotFromSlot(lhs, copy, true);
@@ -52,7 +52,7 @@ void Assembler::mulSlotByConst(Slot lhs, int factor) {
   }
 
   // General multiplication
-  Slot factorSlot = getTemp(lhs.type());
+  Slot factorSlot = getTemp(lhs.type(), allocHint(lhs));
   setSlotToValue(factorSlot, factor);
   mulSlotBySlotUnsigned(lhs, factorSlot, true);
   if (negate) negateSlot(lhs);
@@ -67,7 +67,7 @@ void Assembler::mulSlotBySlot(Slot lhs, Slot rhs, bool consumeRhs) {
   assert(types::isInteger(rhs.type()));
 
   if (types::isSignedInteger(lhs.type()) && lhs.type()->usesValue1() && !rhs.type()->usesValue1()) {
-    Slot rhsWide = getTemp(ts::s16());
+    Slot rhsWide = getTemp(ts::s16(), allocHint(lhs, rhs));
     assignSlot(rhsWide, rhs, consumeRhs ? TransferMode::Move : TransferMode::Copy);  // existing signed widening -> sign extension
 
     // rhsWide may be destroyed

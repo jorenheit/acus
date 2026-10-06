@@ -57,7 +57,7 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
       return {indexSlot, false};
     }
     
-    Slot scaled = getTemp(ts::u16());
+    Slot scaled = getTemp(ts::u16(), allocHint(arrSlot, indexSlot));
     assignSlot(scaled, indexSlot);
     mulSlotByConst(scaled, elementType->size());
     return {scaled, true};
@@ -107,7 +107,7 @@ void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot, 
       return {indexSlot, false};
     }
     
-    Slot scaled = getTemp(ts::u16());
+    Slot scaled = getTemp(ts::u16(), allocHint(arrSlot, indexSlot));
     assignSlot(scaled, indexSlot);
     mulSlotByConst(scaled, elementType->size());
     return {scaled, true};
@@ -193,7 +193,7 @@ void Assembler::copyConstIntoElement(literal::Literal const value, Slot arrSlot,
       return {indexSlot, false};
     }
     
-    Slot scaled = getTemp(ts::u16());
+    Slot scaled = getTemp(ts::u16(), allocHint(arrSlot, indexSlot));
     assignSlot(scaled, indexSlot);
     mulSlotByConst(scaled, elementType->size());
     return {scaled, true};
@@ -419,8 +419,8 @@ void Assembler::writeSlotThroughDereferencedPointer(Slot ptrSlot, Slot srcSlot, 
   // fields in that temporary can then be rebased destructively without ever
   // modifying a copied source value. The temporary is always consumed by the
   // actual write below.
-  Slot const tmp = getTemp(srcSlot.type());
-  Slot const frameDepth = getTemp(ts::u8());
+  Slot const tmp = getTemp(srcSlot.type(), allocHint(srcSlot));
+  Slot const frameDepth = getTemp(ts::u8(), allocHint(tmp, ptrSlot));
 
   pushPtr();
 

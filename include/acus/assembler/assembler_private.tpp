@@ -21,7 +21,7 @@ auto Assembler::getFieldIndices(Args... args) {
 template <typename TrueBranch, typename FalseBranch>
 void Assembler::branchOnSignBit(Slot slot, TrueBranch&& trueBranch, FalseBranch&& falseBranch) {
 
-  Slot const tmp = getTemp(ts::s8());
+  Slot const tmp = getTemp(ts::s8(), allocHint(slot));
   Cell const signBit = {tmp, MacroCell::Value0};
   Cell const elseBit = {tmp, MacroCell::Value1};
 
@@ -61,4 +61,5 @@ void Assembler::loop(auto&& body) {
   Cell const flag = _dp.current();
   loop(flag, body);
 }
+
 } // namespace acus

@@ -8,7 +8,7 @@
 void Assembler::addSlotToSlot(Slot lhs, Slot rhs, bool consumeRhs) {
   consumeRhs = consumeRhs && lhs != rhs;
   pushPtr();
-  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
   if (!consumeRhs) assignSlot(rhsCopy, rhs);
 
 

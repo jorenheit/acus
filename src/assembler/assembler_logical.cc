@@ -22,7 +22,7 @@ void Assembler::andSlotWithConst(Slot lhs, int val) {
 
 void Assembler::andSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
   consumeRhs = consumeRhs && lhs != rhs;
-  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
   if (!consumeRhs) assignSlot(rhsCopy, rhs);
 
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
@@ -46,7 +46,7 @@ void Assembler::nandSlotWithConst(Slot lhs, int val) {
 
 void Assembler::nandSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
   consumeRhs = consumeRhs && lhs != rhs;
-  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
   if (!consumeRhs) assignSlot(rhsCopy, rhs);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     nand16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));
@@ -71,7 +71,7 @@ void Assembler::orSlotWithConst(Slot lhs, int val) {
 
 void Assembler::orSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
   consumeRhs = consumeRhs && lhs != rhs;
-  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
   if (!consumeRhs) assignSlot(rhsCopy, rhs);
   
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
@@ -93,7 +93,7 @@ void Assembler::norSlotWithConst(Slot lhs, int val) {
 
 void Assembler::norSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
   consumeRhs = consumeRhs && lhs != rhs;
-  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
   if (!consumeRhs) assignSlot(rhsCopy, rhs);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     nor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));		     
@@ -122,7 +122,7 @@ void Assembler::xorSlotWithConst(Slot lhs, int val) {
 
 void Assembler::xorSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
   consumeRhs = consumeRhs && lhs != rhs;
-  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
   if (!consumeRhs) assignSlot(rhsCopy, rhs);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     xor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));		     
@@ -152,7 +152,7 @@ void Assembler::xnorSlotWithConst(Slot lhs, int val) {
 
 void Assembler::xnorSlotWithSlot(Slot lhs, Slot rhs, bool consumeRhs) {
   consumeRhs = consumeRhs && lhs != rhs;
-  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
   if (!consumeRhs) assignSlot(rhsCopy, rhs);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {
     xnor16Destructive(ws::promiseClean16(lhs), ws::promiseClean16(rhsCopy));

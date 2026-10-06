@@ -11,7 +11,7 @@ std::optional<Slot> Assembler::localSlot(std::string const &varName) const {
   while (true) {
     for (Slot const &slot: _currentFunction->frame.locals) {
       if (slot.name() == varName && slot.scope() == targetScope) {
-	return slot;
+        return slot;
       }
     }
     if (targetScope == nullptr) break;
@@ -22,13 +22,13 @@ std::optional<Slot> Assembler::localSlot(std::string const &varName) const {
 }
 
 std::optional<Slot> Assembler::globalSlot(std::string const &varName) const {
- for (Slot const &slot: _program.globals) {
-   if (slot.name() == varName) {
-     return slot;
-   }
- }
+  for (Slot const &slot: _program.globals) {
+    if (slot.name() == varName) {
+      return slot;
+    }
+  }
  
- return {};
+  return {};
 }
 
 SlotProxy Assembler::proxyFromVariableName(std::string const& varName, API_CTX) const {
@@ -62,34 +62,63 @@ std::string Assembler::makeFullGlobalName(std::string const &name) {
 }
 
 
-Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotData::Kind kind) {
+Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotData::Kind kind, std::optional<int> near) {
 
   assert(_currentFunction != nullptr);
   
-  auto const tryFindAvailableSlot = [&](std::string const &name,
-				        types::TypeHandle type,
-				        SlotData::Kind kind) -> std::optional<Slot> {
+  auto const tryFindAvailableSlot = [&] -> std::optional<Slot> {
     
     // Prefer the smallest fitting hole; preserve larger holes for larger values.
     auto &frame = _currentFunction->frame;
-    Slot *selected = nullptr;
+    std::vector<Slot*> candidates;
+    int smallestSlotSize = -1;
     Slot *tail = nullptr;
     int const end = frame.localBase() + frame.localAreaSize();
     for (Slot &slot: frame.locals) {
       if (slot.kind() != Slot::Available) continue;
       if (slot.offset() + slot.size() == end) tail = &slot;
       if (slot.size() < type->size()) continue;
-      if (selected == nullptr || slot.size() < selected->size() ||
-          (slot.size() == selected->size() && slot.offset() < selected->offset())) {
-        selected = &slot;
+
+      if (candidates.size() == 0 || slot.size() < smallestSlotSize) {
+        // found a better fit, reset candidates
+        candidates.clear();
+        candidates.push_back(&slot);
+        smallestSlotSize = slot.size();
+        continue;
+      }
+      if (slot.size() == smallestSlotSize) {
+        // equal fit, add to candidates
+        candidates.push_back(&slot);
+        continue;
       }
     }
+    
     // Grow a free tail rather than appending beyond it. Keep the reserved
     // extent: previously emitted code can still address cells in that extent.
-    if (selected == nullptr && tail != nullptr) {
+    Slot *selected = nullptr;
+    if (candidates.size() == 0 && tail != nullptr) {
+      // No candidates found, but tail can be used
       tail->get().type = ts::raw(type->size());
       selected = tail;
+    } else if (candidates.size() == 1 ||  (candidates.size() > 1 && not near.has_value())) {
+      // Single candidate or no hint to go by -> pick the first one
+      selected = candidates[0];
+    } else if (candidates.size() > 1) {
+      // Multiple candidates -> pick the one closest to the hint-offset
+      size_t smallestDistance = -1;
+      size_t winnerIndex = -1;
+      for (size_t idx = 0; idx != candidates.size(); ++idx) {
+        size_t const distance = std::abs(*near - candidates[idx]->offset());
+        std::cerr << distance << '\n';
+        if (distance < smallestDistance) {
+          smallestDistance = distance;
+          winnerIndex = idx;
+        }
+      }
+      assert(false);
+      selected = candidates[winnerIndex];
     }
+    
     if (selected != nullptr) {
       Slot slot = *selected;
       int const diff = slot.type()->size() - type->size();      
@@ -104,27 +133,25 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
       
       // Split the slot if there is still room
       if (diff > 0) {
-	std::string const dummyName = [] {
-	  static int counter = 0; return "__dummy_" + std::to_string(counter++);
-	}();
+        std::string const dummyName = [] {
+          static int counter = 0; return "__dummy_" + std::to_string(counter++);
+        }();
 	
-	frame.locals.push_back(SlotData {
-	    .name = dummyName,
-	    .uniqueName = makeFullName(dummyName),
-	    .type = ts::raw(diff),
-	    .kind = Slot::Available,
-	    .offset = slot.offset() + slot.type()->size(),
-	    .scope = nullptr
-	  });
+        frame.locals.push_back(SlotData {
+                                 .name = dummyName,
+                                 .uniqueName = makeFullName(dummyName),
+                                 .type = ts::raw(diff),
+                                 .kind = Slot::Available,
+                                 .offset = slot.offset() + slot.type()->size(),
+                                 .scope = nullptr
+                               });
       }
       return slot;
     }
     return {};
   };
 
-  auto const newSlot = [&](std::string const &name,
-			   types::TypeHandle type,
-			   SlotData::Kind kind) -> Slot {
+  auto const newSlot = [&] -> Slot {
 
     auto &frame = _currentFunction->frame;
     SlotData newSlot {
@@ -140,9 +167,9 @@ Slot Assembler::allocSlot(std::string const &name, types::TypeHandle type, SlotD
     return frame.locals.back();
   };
 
-  auto opt = tryFindAvailableSlot(name, type, kind);
+  auto opt = tryFindAvailableSlot();
   if (opt) return *opt;
-  return newSlot(name, type, kind);
+  return newSlot();
 }
 
 void Assembler::mergeAvailableSlots() {
@@ -158,10 +185,10 @@ void Assembler::mergeAvailableSlots() {
 
       for (size_t j = 0; j < locals.size(); ++j) {
         if (i == j) continue;
-	Slot &b = locals[j];
+        Slot &b = locals[j];
         if (b.kind() != Slot::Available) continue;
 
-	// a just before b
+        // a just before b
         if (a.offset() + a.size() == b.offset()) {
           a.get().type = ts::raw(a.size() + b.size());
           locals.erase(locals.begin() + static_cast<std::ptrdiff_t>(j));
@@ -169,7 +196,7 @@ void Assembler::mergeAvailableSlots() {
           break;
         }
 
-	// b just before a
+        // b just before a
         if (b.offset() + b.size() == a.offset()) {
           b.get().type = ts::raw(b.size() + a.size());
           locals.erase(locals.begin() + static_cast<std::ptrdiff_t>(i));
@@ -267,24 +294,24 @@ void Assembler::freeScope(Function::Scope const *scope) {
   mergeAvailableSlots();
 }
 
-Slot Assembler::getTemp(types::TypeHandle type) {
+Slot Assembler::getTemp(types::TypeHandle type, std::optional<int> near) {
   assert(_currentBlock != nullptr);
-  return allocSlot("__tmp_" + std::to_string(_counters.tmpID++), type, Slot::Temp);
+  return allocSlot("__tmp_" + std::to_string(_counters.tmpID++), type, Slot::Temp, near);
 }
 
-Slot Assembler::getTemp(literal::Literal value) {
-  Slot tmp = getTemp(value.type());
+Slot Assembler::getTemp(literal::Literal value, std::optional<int> near) {
+  Slot tmp = getTemp(value.type(), near);
   assignSlot(tmp, value);
   return tmp;
 }
 
-Slot Assembler::getCache(types::TypeHandle type) {
+Slot Assembler::getCache(types::TypeHandle type, std::optional<int> near) {
   assert(_currentBlock != nullptr);
-  return allocSlot("__cache_" + std::to_string(_counters.cacheID++), type, Slot::Cache);
+  return allocSlot("__cache_" + std::to_string(_counters.cacheID++), type, Slot::Cache, near);
 }
 
-Slot Assembler::getCache(literal::Literal value) {
-  Slot const slot = getCache(value.type());
+Slot Assembler::getCache(literal::Literal value, std::optional<int> near) {
+  Slot const slot = getCache(value.type(), near);
   assignSlot(slot, value);
   return slot;
 }
@@ -298,13 +325,13 @@ void Assembler::declareGlobal(std::string const &name, types::TypeHandle type, A
   API_REQUIRE_GLOBAL_NAME_AVAILABLE(name);
 
   _program.globals.emplace_back(SlotData {
-    .name = name,
-    .uniqueName = makeFullGlobalName(name),
-    .type = type,
-    .kind = Slot::Global,
-    .offset = _program.globalVariableFrameSize(),
-    .scope = nullptr
-  });
+                                  .name = name,
+                                  .uniqueName = makeFullGlobalName(name),
+                                  .type = type,
+                                  .kind = Slot::Global,
+                                  .offset = _program.globalVariableFrameSize(),
+                                  .scope = nullptr
+                                });
 }
 
 Expression Assembler::declareLocal(std::string const& name, types::TypeHandle type, API_FUNC) {

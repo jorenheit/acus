@@ -47,12 +47,12 @@ void Assembler::slotEqualSlot(Slot lhs, Slot rhs, bool consumeRhs) {
   bool const widenRhs = lhs.type()->usesValue1() && !rhs.type()->usesValue1();
   Slot const rhsWork = [&] {
     if (widenRhs) {
-      Slot copy = getTemp(types::isSignedInteger(rhs.type()) ? ts::s16() : ts::u16());
+      Slot copy = getTemp(types::isSignedInteger(rhs.type()) ? ts::s16() : ts::u16(), allocHint(lhs, rhs));
       assignSlot(copy, rhs, consumeRhs ? TransferMode::Move : TransferMode::Copy);
       return copy;
     }
     if (consumeRhs) return rhs;
-    Slot copy = getTemp(rhs.type());
+    Slot copy = getTemp(rhs.type(), allocHint(lhs, rhs));
     assignSlot(copy, rhs);
     return copy;
   }();
@@ -108,7 +108,7 @@ void Assembler::slotLessConstUnsigned(Slot lhs, int val) {
     return;
   }
 
-  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
+  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val), allocHint(lhs));
   slotLessSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
 }
@@ -177,7 +177,7 @@ void Assembler::slotLessSlotUnsigned(Slot lhs, Slot rhs, bool consumeRhs) {
   
   Slot const rhsWork = [&] {
     if (consumeRhs) return rhs;
-    Slot const copy = getTemp(rhs.type());
+    Slot const copy = getTemp(rhs.type(), allocHint(lhs, rhs));
     assignSlot(copy, rhs);
     return copy;
   }();
@@ -208,7 +208,7 @@ void Assembler::slotLessSlotSigned(Slot lhs, Slot rhs, bool consumeRhs) {
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned greater-than
 				      negateSlot(lhs);
-				      Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+				      Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
 				      if (!consumeRhs) assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotGreaterSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
@@ -285,7 +285,7 @@ void Assembler::slotLessEqualConstUnsigned(Slot lhs, int val) {
     return;
   }
 
-  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
+  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val), allocHint(lhs));
   slotLessEqualSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
 }
@@ -353,7 +353,7 @@ void Assembler::slotLessEqualSlotUnsigned(Slot lhs, Slot rhs, bool consumeRhs) {
 
   Slot const rhsWork = [&] {
     if (consumeRhs) return rhs;
-    Slot const copy = getTemp(rhs.type());
+    Slot const copy = getTemp(rhs.type(), allocHint(lhs, rhs));
     assignSlot(copy, rhs);
     return copy;
   }();
@@ -384,7 +384,7 @@ void Assembler::slotLessEqualSlotSigned(Slot lhs, Slot rhs, bool consumeRhs) {
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned greater-equal
 				      negateSlot(lhs);
-				      Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+				      Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
 				      if (!consumeRhs) assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotGreaterEqualSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
@@ -447,7 +447,7 @@ void Assembler::slotGreaterConstUnsigned(Slot lhs, int val) {
     return;
   }
 
-  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
+  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val), allocHint(lhs));
   slotGreaterSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
 }
@@ -485,7 +485,7 @@ void Assembler::slotGreaterSlotUnsigned(Slot lhs, Slot rhs, bool consumeRhs) {
   
   Slot const rhsWork = [&] {
     if (consumeRhs) return rhs;
-    Slot const copy = getTemp(rhs.type());
+    Slot const copy = getTemp(rhs.type(), allocHint(lhs, rhs));
     assignSlot(copy, rhs);
     return copy;
   }();
@@ -516,7 +516,7 @@ void Assembler::slotGreaterSlotSigned(Slot lhs, Slot rhs, bool consumeRhs) {
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned less-than
 				      negateSlot(lhs);
-				      Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+				      Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
 				      if (!consumeRhs) assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotLessSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);
@@ -575,7 +575,7 @@ void Assembler::slotGreaterEqualConstUnsigned(Slot lhs, int val) {
     return;
   }
 
-  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val));
+  Slot valSlot = getTemp(((val >> 8) & 0xff) ? literal::u16(val) : literal::u8(val), allocHint(lhs));
   slotGreaterEqualSlotUnsigned(lhs, valSlot, true);
   freeTempSlot(valSlot);
 }
@@ -609,7 +609,7 @@ void Assembler::slotGreaterEqualSlotUnsigned(Slot lhs, Slot rhs, bool consumeRhs
   
   Slot const rhsWork = [&] {
     if (consumeRhs) return rhs;
-    Slot const copy = getTemp(rhs.type());
+    Slot const copy = getTemp(rhs.type(), allocHint(lhs, rhs));
     assignSlot(copy, rhs);
     return copy;
   }();
@@ -639,7 +639,7 @@ void Assembler::slotGreaterEqualSlotSigned(Slot lhs, Slot rhs, bool consumeRhs) 
 				    [&] /* rhs < 0 */ {
 				      // Both negative -> negate both and use unsigned less-equal
 				      negateSlot(lhs);
-				      Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+				      Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
 				      if (!consumeRhs) assignSlot(rhsCopy, rhs);
 				      negateSlot(rhsCopy);
 				      slotLessEqualSlotUnsigned(lhs.unsignedView(), rhsCopy.unsignedView(), true);

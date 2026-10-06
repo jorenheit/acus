@@ -524,7 +524,7 @@ void Assembler::fetchReturnData(Slot returnSlot) {
 
 void Assembler::branchIfSlot(Slot slot, std::string const &trueLabel, std::string const &falseLabel) {
 
-  Slot const tmp = getTemp(slot.type());
+  Slot const tmp = getTemp(slot.type(), allocHint(slot));
   assignSlot(tmp, slot);
 
   if (slot.type()->usesValue1()) {

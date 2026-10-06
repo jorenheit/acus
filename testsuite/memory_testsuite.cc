@@ -22,6 +22,23 @@ struct MemoryRegressionAccess {
   static void run() {
     {
       Assembler c; start(c);
+      int const base = c._currentFunction->frame.localBase();
+      auto left = c.getTemp(ts::u8());
+      auto guard = c.getTemp(ts::raw(5));
+      auto right = c.getTemp(ts::u8());
+      require(!c.allocHint(), "empty allocation hint should be absent");
+      require(c.allocHint(left, right) == base + 3,
+              "slot allocation hint did not average its anchors");
+      require(c.allocHint(guard, Cell{base + 6, MacroCell::Value0}) == base + 3,
+              "mixed slot/cell allocation hint did not average its anchors");
+      c.freeTempSlot(left); c.freeTempSlot(right);
+      auto chosen = c.getTemp(ts::u8(), c.allocHint(Cell{base + 6, MacroCell::Value0}));
+      require(chosen.offset() == base + 6 && area(c) == 7,
+              "hint did not select the nearest equally fitting hole");
+      require(guard.kind() == Slot::Temp, "hint damaged a live allocation");
+    }
+    {
+      Assembler c; start(c);
       auto first = c.getTemp(ts::raw(4));
       c.freeTempSlot(first);
       auto reused = c.getTemp(ts::u8()); // also split the block

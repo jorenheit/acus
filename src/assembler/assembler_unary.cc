@@ -52,7 +52,7 @@ Expression Assembler::unOpImpl(Expression obj, API_CTX) {
     if (src.kind() == Slot::Temp) {
       return src;
     } else {
-      Slot copy = getTemp(obj.type());
+      Slot copy = getTemp(obj.type(), allocHint(src));
       assignSlot(copy, src);
       return copy;
     }
@@ -89,7 +89,7 @@ Expression Assembler::castImpl(Expression obj, types::TypeHandle toType, API_CTX
   assert(toType == opResult.type);
 
   Slot const slot = materialize(obj.slot());
-  Slot const result = getTemp(toType);
+  Slot const result = getTemp(toType, allocHint(slot));
   if (slot.type() == toType) {
     // same type but direct slot, so we copy it directly into our temp
     assignSlot(result, slot);
@@ -151,7 +151,7 @@ void Assembler::negateSlot(Slot rhs) {
   assert(types::isInteger(rhs.type()));
 
   // Move the original value out, leaving rhs zero.
-  Slot const copy = getTemp(rhs.type());
+  Slot const copy = getTemp(rhs.type(), allocHint(rhs));
   assignSlot(copy, rhs, TransferMode::Move);
 
   // rhs = 0 - original

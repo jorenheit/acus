@@ -739,13 +739,25 @@ private:
   void freeCacheSlots();
   void freeCacheSlot(Slot slot);
     
+  std::optional<int> allocHint(auto const & ... slots) {
+    // just take the mean for now. There might be a better heuristic
+    if constexpr (sizeof ... (slots) == 0) return {};
+    else {
+      auto const offset = [](auto const &slot) {
+        if constexpr (requires { slot.offset(); }) return slot.offset();
+        else return slot.offset; // Cell, including a workspace's data cell
+      };
+      return (offset(slots) + ...) / static_cast<int>(sizeof ... (slots));
+    }
+  }
+
+  Slot allocSlot(std::string const &name, types::TypeHandle type, SlotData::Kind kind, std::optional<int> near = {});
   void freeScope(Function::Scope const *scope);
-  Slot allocSlot(std::string const &name, types::TypeHandle type, SlotData::Kind kind);
   void mergeAvailableSlots();
-  Slot getTemp(types::TypeHandle type);
-  Slot getTemp(literal::Literal val);
-  Slot getCache(types::TypeHandle type);
-  Slot getCache(literal::Literal val);
+  Slot getTemp(types::TypeHandle type, std::optional<int> near = {});
+  Slot getTemp(literal::Literal val, std::optional<int> near = {});
+  Slot getCache(types::TypeHandle type, std::optional<int> near = {});
+  Slot getCache(literal::Literal val, std::optional<int> near = {});
     
   // Global Data Synchronization (assembler_globals.cc)
   void fetchGlobal(Slot globalSlot, Slot localSlot);

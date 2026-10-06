@@ -19,7 +19,7 @@ Assembler::Data16Result<W> Assembler::add16Const(W const &lhs, int delta) {
   if (delta == 0) return lhs;
   if (delta < 0) return sub16Const(lhs, -delta);
 
-  Slot const tmpSlot = getTemp(ts::raw(1));
+  Slot const tmpSlot = getTemp(ts::raw(1), allocHint(lhs[0]));
   auto const tmp = ws::promiseClean16(tmpSlot);
   setToValue16(tmp, delta);
   add16Destructive(lhs, DoubleCell{tmp});

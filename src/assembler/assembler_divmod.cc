@@ -18,7 +18,7 @@ void Assembler::divSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
     // Need a copy if rhs must survive, or if an 8-bit rhs must
     // be widened to the 16-bit representation expected by divMod16.
     if (!rhs.type()->usesValue1() || !consumeRhs) {
-      rhsWork = getTemp(ts::u16());
+      rhsWork = getTemp(ts::u16(), allocHint(lhs, rhs));
       assignSlot(rhsWork, rhs,
                  consumeRhs ? TransferMode::Move : TransferMode::Copy);
       freeRhsWork = true;
@@ -70,7 +70,7 @@ void Assembler::divSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> 
     return divSlotByPowerOfTwo(lhs, util::math::getPowerOfTwo(denom));
   }
   
-  Slot tmp = getTemp(denom > 0xff ? ts::u16() : ts::u8());
+  Slot tmp = getTemp(denom > 0xff ? ts::u16() : ts::u8(), allocHint(lhs));
   setSlotToValue(tmp, denom);
   divSlotBySlotUnsigned(lhs, tmp, modSlot, true);
   freeTempSlot(tmp);
@@ -89,7 +89,7 @@ void Assembler::divSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   signBitDestructive(ws::promise(Cell{lhs, MacroCell::Scratch0},
 				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
 
-  Slot tmp = getTemp(ts::raw(consumeRhs ? 1 : 2));
+  Slot tmp = getTemp(ts::raw(consumeRhs ? 1 : 2), allocHint(lhs, rhs));
   Slot const resultNegative = tmp.sub(ts::u8(), 0);
   Slot const rhsCopy = consumeRhs ? rhs : tmp.sub(rhs.type(), 1);
   Cell const resultNegativeFlag = {tmp, MacroCell::Value0};
@@ -166,7 +166,7 @@ void Assembler::divSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   // absolute value but remember the sign.
 
   // Create a new slot and move the sign-byte to its Value1 field
-  Slot signBit = getTemp(ts::raw(1));
+  Slot signBit = getTemp(ts::raw(1), allocHint(lhs));
   auto const [_, S, SCopy1, SCopy2, copyTmp] = ws::promiseClean16(signBit).cells<5>();
   
   Cell const lhsSignByte {
@@ -229,7 +229,7 @@ void Assembler::modSlotBySlotUnsigned(Slot lhs, Slot rhs, std::optional<Slot> co
     // Need a copy if rhs must survive, or if an 8-bit rhs must
     // be widened to the 16-bit representation expected by divMod16.
     if (!rhs.type()->usesValue1() || !consumeRhs) {
-      rhsWork = getTemp(ts::u16());
+      rhsWork = getTemp(ts::u16(), allocHint(lhs, rhs));
       assignSlot(rhsWork, rhs,
                  consumeRhs ? TransferMode::Move
                             : TransferMode::Copy);
@@ -284,7 +284,7 @@ void Assembler::modSlotBySlotSigned(Slot lhs, Slot rhs, std::optional<Slot> cons
   signBitDestructive(ws::promise(Cell{lhs, MacroCell::Scratch0},
 				 ws::Layout<ws::Data<>, ws::ScratchCells<4>>{}));
 
-  Slot tmp = getTemp(ts::raw(consumeRhs ? 1 : 2));
+  Slot tmp = getTemp(ts::raw(consumeRhs ? 1 : 2), allocHint(lhs, rhs));
   Slot const resultNegative = tmp.sub(rhs.type(), 0);
   Slot const rhsCopy = consumeRhs ? rhs : tmp.sub(rhs.type(), 1);
 
@@ -340,7 +340,7 @@ void Assembler::modSlotByConstUnsigned(Slot lhs, int denom, std::optional<Slot> 
     return modSlotByPowerOfTwo(lhs, util::math::getPowerOfTwo(denom));
   }
   
-  Slot tmp = getTemp(denom > 0xff ? ts::u16() : ts::u8());
+  Slot tmp = getTemp(denom > 0xff ? ts::u16() : ts::u8(), allocHint(lhs));
   setSlotToValue(tmp, denom);
   modSlotBySlotUnsigned(lhs, tmp, divSlot, true);
   freeTempSlot(tmp);
@@ -372,7 +372,7 @@ void Assembler::modSlotByConstSigned(Slot lhs, int denom, std::optional<Slot> co
   // absolute value but remember the sign.
 
   // Copy lhs into a temp and reduce it to its sign bit.
-  Slot signBit = getTemp(ts::u8());
+  Slot signBit = getTemp(ts::u8(), allocHint(lhs));
   auto const [_, S, SCopy1, SCopy2, copyTmp] = ws::promiseClean8(signBit).cells<5>();
 
   Cell const lhsSignByte {

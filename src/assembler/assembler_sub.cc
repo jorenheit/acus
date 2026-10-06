@@ -17,7 +17,7 @@ void Assembler::subConstFromSlot(Slot lhs, int delta) {
 void Assembler::subSlotFromSlot(Slot lhs, Slot rhs, bool consumeRhs) {
   consumeRhs = consumeRhs && lhs != rhs;
   pushPtr();
-  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type());
+  Slot rhsCopy = consumeRhs ? rhs : getTemp(rhs.type(), allocHint(lhs, rhs));
   if (!consumeRhs) assignSlot(rhsCopy, rhs);
   moveTo(lhs, MacroCell::Value0);
   if (lhs.type()->usesValue1() || rhs.type()->usesValue1()) {

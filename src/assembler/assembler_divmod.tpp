@@ -227,7 +227,7 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
 
 template <ws::DivMod16Num N, ws::DivMod16Den D>
 Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D const &den) {
-  Slot const tmpSlot = getTemp(ts::raw(1));
+  Slot const tmpSlot = getTemp(ts::raw(1), allocHint(num[0], den[0]));
   auto const tmp = ws::promiseClean16(tmpSlot);
 
   pushPtr();
@@ -501,7 +501,7 @@ Assembler::Data16Result<W> Assembler::modByPowerOfTwo16Destructive(W const &lhs,
   assert(p > 1);
   if (p >= 16) return lhs;
 
-  Slot const remainder = getTemp(ts::u16());
+  Slot const remainder = getTemp(ts::u16(), allocHint(lhs[0]));
   setSlotToValue(remainder, 0);
 
   Cell const remLow  = {remainder, MacroCell::Value0};
