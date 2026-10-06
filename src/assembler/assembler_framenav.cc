@@ -58,7 +58,7 @@ void Assembler::popFrame() {
   popPtr();
 }
 
-
+// TODO: don't seek from current offset, but accept Cell instead of Field and move from there
 void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Payload const &payload, bool checkCurrent) {  
 
   auto step = [&]{
@@ -73,8 +73,8 @@ void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Pay
       switchField(MacroCell::Payload0);
       emit<primitive::MoveData>(stride);
       if (payload.width(i) == Payload::Width::Double) {
-	switchField(MacroCell::Payload1);
-	emit<primitive::MoveData>(stride);
+        switchField(MacroCell::Payload1);
+        emit<primitive::MoveData>(stride);
       }
       moveRel(diff);
     }
@@ -83,88 +83,79 @@ void Assembler::seek(MacroCell::Field markerField, primitive::Direction dir, Pay
   };
 
   bool const usingBinaryMarker = (markerField == MacroCell::SeekMarker ||
-				  markerField == MacroCell::FrameMarker);
+                                  markerField == MacroCell::FrameMarker);
 
   pushPtr();
   if (usingBinaryMarker) {
     // For binary markers, we can use an optimized version of the seek-algorithm.
     // Credits to Daniel. Basically (ignoring payload): -[+>>>>>>>>>-]+
     
-    // Set pointer at current marker-field
-    switchField(markerField);
-
-    // If the seek starts at the next cell, skip the current one
     if (not checkCurrent) {
+      // If the seek starts at the next cell, skip the current one
       step();
     }
 
     // Keep stepping until we hit the marker
-    dec();
-    loopOpen(); {
-      inc();
+    Cell const marker = {_dp.current(), markerField};
+    dec(marker);
+    loop(marker, [&]{
+      inc(marker);
       step();
-      dec();
-    } loopClose();
-    inc();
+      dec(marker);
+    });
+    inc(marker);
   
   } else {
     // For other markers that can have values > 1, we need the more general algorithm
     // That does a NOT operation on the marker-fields
 
-    auto const writeNotMarkerToFlag = [&] {
+    Cell const flag{_dp.current().offset, MacroCell::Flag};
+    auto const writeNotMarkerToFlag = [&]{
       Cell const marker{_dp.current().offset, markerField};
-      Cell const flag{_dp.current().offset, MacroCell::Flag};
       Cell const scratch{_dp.current().offset, MacroCell::Scratch0};
 
       copyField(marker, flag, scratch, true);
-
-      // NOT(flag), using the clean scratch cell from the copy operation.
-      inc(scratch);
-      loop(flag, [&] {
-        dec(scratch);
-        zeroCell(flag);
-      });
-      loop(scratch, [&] {
-        dec(scratch);
-        inc(flag);
-      });
-
-      moveTo(flag);
+      notDestructive(flag, scratch);
     };
+    
+    if (not checkCurrent)  setToValue(flag, 1);
+    else                   writeNotMarkerToFlag();
 
-    if (not checkCurrent) {
-      switchField(MacroCell::Flag);
-      zeroCell(); inc();
-    }
-    else {
-      writeNotMarkerToFlag();
-    }
-
-    loopOpen(); {
-      zeroCell();
+    loop(flag, [&]{
+      dec(flag);
       step();
 
       // Store NOT(marker) in Flag. A nonzero marker clears Flag and exits the loop.
       writeNotMarkerToFlag();
-    } loopClose();
+    });
   }
 
   popPtr();
 }
 
 
+void Assembler::setSeekMarker(Cell cell) {
+  setToValue(cell, 1);
+}
+
+void Assembler::setSeekMarker(int offset) {
+  setSeekMarker(Cell{offset, MacroCell::SeekMarker});
+}
+
 void Assembler::setSeekMarker() {
-  pushPtr();
-  switchField(MacroCell::SeekMarker);
-  zeroCell(); inc();
-  popPtr();
+  setSeekMarker(Cell{_dp.current(), MacroCell::SeekMarker});
+}
+
+void Assembler::resetSeekMarker(Cell cell) {
+  zeroCell(cell);  
+}
+
+void Assembler::resetSeekMarker(int offset) {
+  resetSeekMarker(Cell{offset, MacroCell::SeekMarker});  
 }
 
 void Assembler::resetSeekMarker() {
-  pushPtr();
-  switchField(MacroCell::SeekMarker);
-  zeroCell();
-  popPtr();
+  resetSeekMarker(Cell{_dp.current(), MacroCell::SeekMarker});
 }
 
 void Assembler::moveToPreviousFrame(Payload const &payload) {

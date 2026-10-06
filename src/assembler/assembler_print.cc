@@ -135,8 +135,7 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
   // Already add '0' to the 1's digit (at the base) to make sure there is at least 1 nonzero.
   // Plant a marker at the base of the array.
   addConst(ws::promiseClean8(digits.sub(ts::u8(), 0)), '0');
-  moveTo(digits);
-  setSeekMarker();
+  setSeekMarker(digits);
 	
   // Start at right-most digit and move left until first nonzero is found.
   moveTo(digits + maxDigits - 1);
@@ -149,9 +148,9 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
   
   // Now just print every character until the start of the string has been reached (seekMarker).
   // Don't print the 1's digit in the loop.
+  Cell const flag{_dp.current().offset, MacroCell::Flag};
   auto const writeNotSeekMarkerToFlag = [&] -> Cell {
     Cell const marker{_dp.current().offset, MacroCell::SeekMarker};
-    Cell const flag{_dp.current().offset, MacroCell::Flag};
     Cell const scratch{_dp.current().offset, MacroCell::Scratch0};
 
     copyField(marker, flag, scratch, true);
@@ -159,9 +158,9 @@ void Assembler::printDecimalSlotUnsigned(Slot slot, bool const destroySlot) {
     return flag;
   };
 
-  Cell const flag = writeNotSeekMarkerToFlag();
+  writeNotSeekMarkerToFlag();
   loop(flag, [&]{
-    dec(); 
+    dec(flag); 
 
     // Add '0' to digit and set payload from next cell
     Cell const digit = {_dp.current(), MacroCell::Value0};
@@ -254,8 +253,6 @@ void Assembler::printStringConst(std::string const &str) {
   Slot ch = getTemp(ts::u8());
   
   pushPtr();
-  // moveTo(ch);
-  // setToValue(str[0], Temps<1>::select(ch, MacroCell::Scratch0));
   setSlotToValue(ch, str[0]);
   moveTo(ch);
   emit<primitive::Out>();
@@ -273,26 +270,36 @@ void Assembler::printStringConst(std::string const &str) {
 void Assembler::printStringSlot(Slot slot) {
   assert(types::isString(slot.type()));
 
+  // If Value0 is nonzero, set the Flag field
+  auto const setFlagIfX = [&] -> Cell {
+    auto const [x, _1, flag, zero, _2, _3, sync] = ws::promiseClean8(_dp.current()).template cells<7>();
+    inc(sync);
+    literalBf(x, "[>>+>]>>>[<<<]<<<");
+    dec(sync);
+    return flag;
+  };
+
   pushPtr();
   moveTo(slot, MacroCell::Value0);
-  setSeekMarker();
+  
+  // Leave marker behind at the start of the string
+  setSeekMarker(slot);
 
-  emit<primitive::CopyData>(MacroCell::Value0, MacroCell::Flag, MacroCell::Scratch0);
-  switchField(MacroCell::Flag);
-  loopOpen(); {
-    zeroCell();
+  // Iterate over characters until null char is hit
+  Cell const flag = setFlagIfX();
+  loop(flag, [&]{
+    dec(flag);
     switchField(MacroCell::Value0);
     emit<primitive::Out>();
     emit<primitive::MovePointerRelative>(MacroCell::FieldCount);
 
     // Check if end of string was reached by using the current value as a flag.
     // If NULL terminator hit, we exit the loop and go back to start.
-    emit<primitive::CopyData>(MacroCell::Value0, MacroCell::Flag, MacroCell::Scratch0);
-    switchField(MacroCell::Flag);
-  } loopClose();
+    setFlagIfX();
+  });
 
   // We hit the end of the string -> return to seek marker (no payload, check current as well)
   seek(MacroCell::SeekMarker, primitive::Left, {}, true);
-  resetSeekMarker();
+  resetSeekMarker(slot);
   popPtr();
 }

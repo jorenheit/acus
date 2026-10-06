@@ -22,7 +22,7 @@ constexpr size_t InitialPaddleY = ScreenHeight / 2 - PaddleHeight / 2;
 constexpr size_t InitialBallX   = ScreenWidth / 2;
 constexpr size_t InitialBallY   = ScreenHeight / 2;
 
-constexpr size_t BallDelay = 16;
+constexpr size_t BallDelay = 2000;
 
 using Screen = ansi::Screen<ScreenWidth, ScreenHeight>;
 
@@ -41,7 +41,7 @@ int main() try {
     global_<u8>("ballDown");
 
     global_<u8>("running");
-    global_<u8>("tick");
+    global_<u16>("tick");
 
 
     auto drawPaddle =

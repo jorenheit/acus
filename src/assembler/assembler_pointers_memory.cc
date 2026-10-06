@@ -49,7 +49,6 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
   types::TypeHandle elementType = elementSlot.type();
 
   
-  pushPtr();
 
   // Prepare offset-payload (index * sizeof(T))
   auto [scaledIndexSlot, tempScaledIndexSlot] = [&] -> std::pair<Slot, bool> {
@@ -68,13 +67,15 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
                   elementType->usesValue1() ? Payload::Width::Double : Payload::Width::Single);
 
   // Mark Start of array
-  moveTo(arrSlot, MacroCell::Value0);
-  setSeekMarker();
+  setSeekMarker(arrSlot);
 
   // Fetch data
+  pushPtr();
   auto const offset = ws::promiseClean16(scaledIndexSlot);
+  moveTo(arrSlot, MacroCell::Value0);
   fetchFromDynamicOffset(offset, payload, primitive::Left, dataTransferMode,
                          tempScaledIndexSlot ? TransferMode::Move : TransferMode::Copy);
+  popPtr();
 
   // Move payload into element
   for (int i = 0; i != elementType->size(); ++i) {
@@ -86,12 +87,8 @@ void Assembler::copyElementIntoSlot(Slot elementSlot, Slot arrSlot, Slot indexSl
     }
   }
 
-  // Return to start of array
-  moveTo(arrSlot);
-  resetSeekMarker();
+  resetSeekMarker(arrSlot);
   if (tempScaledIndexSlot) freeTempSlot(scaledIndexSlot);
-  popPtr();
-
 }
 
 void Assembler::copySlotIntoElement(Slot srcSlot, Slot arrSlot, Slot indexSlot, TransferMode mode) {
@@ -255,7 +252,7 @@ void Assembler::assignIntegerSlot(Slot dest, Slot src, TransferMode mode) {
   Cell const srcLow  = {src, MacroCell::Value0};
   Cell const dstLow  = {dest, MacroCell::Value0};
   Cell const dstHigh = {dest, MacroCell::Value1};
-  Cell const tmp = {dest, MacroCell::Scratch0};
+  Cell const tmp = {src, MacroCell::Scratch0};
 
   copyOrMoveField(mode, srcLow, {dstLow, dstHigh}, tmp, true);
   signExtend(ws::promiseClean16(dest), false);

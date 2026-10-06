@@ -711,7 +711,11 @@ private:
   void popFrame();
   void seek(MacroCell::Field markerField, primitive::Direction dir, Payload const &payload, bool checkCurrent);
   void setSeekMarker();
+  void setSeekMarker(int offset);
+  void setSeekMarker(Cell cell);
   void resetSeekMarker();
+  void resetSeekMarker(int offset);
+  void resetSeekMarker(Cell cell);
   void moveToPreviousFrame(Payload const &payload = {});  
   void initializeArguments(primitive::DInt const currentFrameSize, primitive::DInt const paramOffset, std::vector<Expression> const &args, API_CTX);
   void prepareNextFrame(std::string const &functionName, std::vector<Expression> const &args, API_CTX);
