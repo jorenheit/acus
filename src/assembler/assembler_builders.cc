@@ -11,14 +11,15 @@ namespace acus {
   void Assembler::ProgramBuilder::begin() {
     BuilderBase::check();
     _finalized.done();
-    _assembler.beginProgramImpl(_name, _entry, API_FWD);
+    _assembler.beginProgramImpl(_name, _entry, _mode, API_FWD);
   }
 
-  Assembler::ProgramBuilder::ProgramBuilder(Assembler &a, std::string const &name, std::string const &entry, api::impl::Context const &ctx):
+Assembler::ProgramBuilder::ProgramBuilder(Assembler &a, std::string const &name, std::string const &entry, Program::Mode mode, api::impl::Context const &ctx):
     BuilderBase("ProgramBuilder", "begin", ctx),
     _assembler(a),
     _name(name),
-    _entry(entry)
+    _entry(entry),
+    _mode(mode)
   {}
 
 } // namespace acus
@@ -63,6 +64,7 @@ namespace acus {
     }
     auto functionType = functionTypeBuilder.done();
 
+    API_REQUIRE_BLOCK_DISPATCH_MODE();
     _assembler.beginFunctionImpl(_functionName, functionType, varNames, API_FWD);
   }
 

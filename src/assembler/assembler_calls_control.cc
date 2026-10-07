@@ -8,12 +8,14 @@
 
 Assembler::FunctionCallBuilder Assembler::callFunction(std::string const &functionName, API_FUNC) {
   API_FUNC_BEGIN();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   return FunctionCallBuilder { *this, functionName, API_FWD };
 }
 
 void Assembler::callFunctionImpl(std::string const &functionName, std::optional<Expression> const &returnSlot,
                                  std::vector<Expression> const &args, API_CTX) {
   API_CHECK_EXPECTED();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
   deferFunctionCallTypeCheck(functionName, args, API_FWD);
@@ -60,6 +62,7 @@ void Assembler::callFunctionImpl(std::string const &functionName, std::optional<
 void Assembler::callFunctionImpl(Expression fPtr, std::optional<Expression> const &returnSlot,
                                  std::vector<Expression> const &args, API_CTX) {
   API_CHECK_EXPECTED();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_FUNCTION_POINTER(fPtr.type());
 
@@ -164,6 +167,7 @@ void Assembler::deferredLabelChecks() {
 
 void Assembler::abortProgram(API_FUNC) {
   API_FUNC_BEGIN();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
@@ -184,6 +188,7 @@ void Assembler::returnFromFunction(API_FUNC) {
 
 void Assembler::returnFromFunctionImpl(std::optional<Expression> const &ret, API_CTX) {
   API_CHECK_EXPECTED();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
   _currentBlock->returns = true;

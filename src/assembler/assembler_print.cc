@@ -60,7 +60,8 @@ void Assembler::printImpl(Expression val, API_CTX) {
   
   if (types::isInteger(val.type())) {
     // For literals, inline the printing code
-    if (val.isLiteral()) return printDecimal(val);
+    if (val.isLiteral() || _program.mode == Program::Mode::StraightLine)
+      return printDecimal(val);
 
     // For slots, call the builtin functions
     BuiltinFunction const func = [&]{

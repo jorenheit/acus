@@ -6,22 +6,22 @@ using namespace acus::api;
 int main() try {
   Assembler a;
 
-  a.program("hello", "main").begin(); {
+  a.program("hello1", "main").begin(); {
 
     a.function("main").begin(); {
-      a.declareLocal("x", ts::u8());
-      a.assign("x", literal::u8(78));
-      a.modAssign("x", literal::u8(8));
-      a.print("x");
-      a.write(literal::u8('\n'));
-      
       a.print(literal::string("Hello, World!\n"));
       a.returnFromFunction();
     } a.endFunction();
 
   } a.endProgram();
 
-  std::cout << a.brainfuck("hello");
+  a.program("hello2", acus::Program::Mode::StraightLine).begin(); {
+
+//    a.print(literal::string("Hello, World!\n"));
+
+  } a.endProgram();
+  
+  std::cout << a.brainfuck("hello2");
 }
 catch (std::exception const &e) {
   std::cerr << e.what() << '\n';

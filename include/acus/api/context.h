@@ -24,6 +24,7 @@ namespace acus::api::impl {
     Context(Assembler const &a, std::string const &name, std::source_location loc);
 
     bool programStarted() const;
+    bool blockDispatchMode() const;
     std::string currentFunction() const;
     int currentScopeDepth() const;
     bool declaredAsGlobal(std::string const &name) const;

@@ -46,32 +46,8 @@ void Assembler::endStraightLineProgram() {
   assert(_deferredFunctionCallTypeChecks.size() == 0);
   assert(_metaBlocks.size() == 0);
 
-  assert(_ptrStack.empty());
-  assert(_deferredLabelChecks.empty());
-
-  // Final memory is unobservable. Discard dirty entries without writeback.
-  _cache.reset();
-  freeCacheSlots();
-  freeTempSlots();
-
   auto ctx = constructStraightLineContext();
-  primitive::Sequence result;
-  setTargetSequence(&result);
-  // The single local frame starts at tape origin. Pointer kernels still use
-  // its markers; no target block, dispatcher or return frame is needed.
-  _dp.set(0, MacroCell::FrameMarker);
-  inc(Cell{0, MacroCell::FrameMarker});
-  inc(Cell{0, MacroCell::SeekMarker});
-  moveToOrigin();
-  result.append(_program.functions[0].blocks[0]->code);
-
-  _currentBlock = nullptr;
-  _currentFunction = nullptr;
-  _currentScope = nullptr;
-  _blockPriority = 0;
-  _state.begun = false;
-  _state.allowGlobalDeclarations = false;
-  setTargetSequence(nullptr);
+  primitive::Sequence &result = _program.functions[0].blocks[0]->code;
   // Save results
   _txt[_program.name] = result.dumpText(ctx);
   _bf[_program.name] = simplifyBrainfuck(result.dumpCode(ctx));  
@@ -98,8 +74,6 @@ void Assembler::endProgram(API_FUNC) {
               "entry function must be of type 'void()', but is of type '", entryFunctionType->str(), "'."); 
 	      
   if (_program.mode == Program::Mode::StraightLine) {
-    API_REQUIRE_INSIDE_FUNCTION_BLOCK();
-    API_REQUIRE_NO_SCOPE();
     return endStraightLineProgram();
   }
   
@@ -239,7 +213,7 @@ void Assembler::endProgram(API_FUNC) {
 
 
   auto copyTargetBlockToScratch = [&]{
-
+    
     Cell const targetBlock = {FrameLayout::TargetBlock, MacroCell::Value0};
     auto tb = ws::promise(targetBlock, ws::Layout<ws::DataCells<2>, ws::ScratchCells<5>>{})
       .view("low", "high", "lowCopy", "highCopy", "highCopy2");
@@ -297,7 +271,6 @@ void Assembler::endProgram(API_FUNC) {
 
 Assembler::FunctionBuilder Assembler::function(std::string const &name, API_FUNC) {
   API_FUNC_BEGIN();
-  API_REQUIRE_INSIDE_PROGRAM_BLOCK();
   API_REQUIRE_BLOCK_DISPATCH_MODE();
   return FunctionBuilder { *this, name, API_FWD };
 }
@@ -331,7 +304,6 @@ void Assembler::beginFunctionImpl(std::string const &name, types::TypeHandle typ
 
 void Assembler::endFunction(API_FUNC) {
   API_FUNC_BEGIN();
-  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_CHECK_EXPECTED();  
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_NO_SCOPE();

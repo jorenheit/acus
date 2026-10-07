@@ -55,6 +55,12 @@ acus::api::impl::Context::Context(std::string const &name, std::source_location 
   _loc(std::move(loc))
 {}
 
+bool acus::api::impl::Context::blockDispatchMode() const {
+  assert(_assembler);
+  return !_assembler->programStarted() ||
+         _assembler->_program.mode == Program::Mode::BlockDispatch;
+}
+
 bool acus::api::impl::Context::programStarted() const {
   assert(_assembler);
   return _assembler->programStarted();

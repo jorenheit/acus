@@ -9,6 +9,7 @@ namespace acus::error {
   enum class ErrorCode {
     UnexpectedApiCall,
     EmptyProgram,
+    NotAvailableInStraightLineMode,
     DuplicateFunctionParameters,
     DuplicateGlobalReferences,
     FunctionDoesNotExist,

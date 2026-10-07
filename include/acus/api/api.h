@@ -107,6 +107,12 @@ namespace acus::api::impl {
 		  (API_CTX_NAME).file_name(), (API_CTX_NAME).line(), (API_CTX_NAME).column(), \
 		  "called '", (API_CTX_NAME).apiName(), "' outside a function-block.")
 
+#define API_REQUIRE_BLOCK_DISPATCH_MODE() \
+  error::throw_if(not (API_CTX_NAME).blockDispatchMode(),		\
+		  error::ErrorCode::NotAvailableInStraightLineMode,	\
+		  (API_CTX_NAME).file_name(), (API_CTX_NAME).line(), (API_CTX_NAME).column(), \
+		  "function '", (API_CTX_NAME).apiName(), "' is not available in straight line mode.")
+
 #define API_REQUIRE_NO_SCOPE()						\
   error::throw_if((API_CTX_NAME).currentScopeDepth() > 0,		\
 		  error::ErrorCode::ExpectedNoScope,			\

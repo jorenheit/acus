@@ -1,0 +1,385 @@
+diff --git a/include/acus/api/api.h b/include/acus/api/api.h
+--- a/include/acus/api/api.h
++++ b/include/acus/api/api.h
+@@ -108,7 +108,7 @@
+ 		  "called '", (API_CTX_NAME).apiName(), "' outside a function-block.")
+ 
+ #define API_REQUIRE_BLOCK_DISPATCH_MODE() \
+-  error::throw_if((API_CTX_NAME).currentFunction().empty(),		\
++  error::throw_if(not (API_CTX_NAME).blockDispatchMode(),		\
+ 		  error::ErrorCode::NotAvailableInStraightLineMode,	\
+ 		  (API_CTX_NAME).file_name(), (API_CTX_NAME).line(), (API_CTX_NAME).column(), \
+ 		  "function '", (API_CTX_NAME).apiName(), "' is not available in straight line mode.")
+diff --git a/include/acus/api/context.h b/include/acus/api/context.h
+--- a/include/acus/api/context.h
++++ b/include/acus/api/context.h
+@@ -24,6 +24,7 @@
+     Context(Assembler const &a, std::string const &name, std::source_location loc);
+ 
+     bool programStarted() const;
++    bool blockDispatchMode() const;
+     std::string currentFunction() const;
+     int currentScopeDepth() const;
+     bool declaredAsGlobal(std::string const &name) const;
+diff --git a/include/acus/assembler/assembler_public.tpp b/include/acus/assembler/assembler_public.tpp
+--- a/include/acus/assembler/assembler_public.tpp
++++ b/include/acus/assembler/assembler_public.tpp
+@@ -6,6 +6,7 @@
+ 
+ Assembler::FunctionCallBuilder Assembler::callFunctionPointer(auto const &functionPointer, API_FUNC_SOURCE) {
+   API_FUNC_BEGIN();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   return FunctionCallBuilder { *this, rValue(functionPointer, API_FWD), API_FWD };
+ }
+ 
+diff --git a/include/acus/core/program.h b/include/acus/core/program.h
+--- a/include/acus/core/program.h
++++ b/include/acus/core/program.h
+@@ -35,7 +35,7 @@
+   std::unordered_map<std::string, size_t> functionByName;
+   std::vector<Slot> globals;
+   std::vector<Function::Block*> globalBlockOrder;
+-  Mode mode;
++  Mode mode = Mode::BlockDispatch;
+ 
+   inline Function& createFunction(std::string name, types::FunctionType const *type, size_t scopeID) {
+     assert(!functionByName.contains(name)); // TODO: ERROR
+diff --git a/src/api/api.cc b/src/api/api.cc
+--- a/src/api/api.cc
++++ b/src/api/api.cc
+@@ -55,6 +55,12 @@
+   _loc(std::move(loc))
+ {}
+ 
++bool acus::api::impl::Context::blockDispatchMode() const {
++  assert(_assembler);
++  return !_assembler->programStarted() ||
++         _assembler->_program.mode == Program::Mode::BlockDispatch;
++}
++
+ bool acus::api::impl::Context::programStarted() const {
+   assert(_assembler);
+   return _assembler->programStarted();
+diff --git a/src/assembler/assembler_blocks.cc b/src/assembler/assembler_blocks.cc
+--- a/src/assembler/assembler_blocks.cc
++++ b/src/assembler/assembler_blocks.cc
+@@ -6,6 +6,8 @@
+ #include "assembler.ih"
+ 
+ void Assembler::beginBlock(std::string const &name) {
++  assert(_program.mode == Program::Mode::BlockDispatch ||
++         _currentFunction->blocks.empty());
+ 
+   Function::Block &block = _currentFunction->createBlock(name);
+   _program.registerBlock(block);
+@@ -33,6 +35,7 @@
+ 
+ void Assembler::label(std::string const &labelName, API_FUNC) {
+   API_FUNC_BEGIN();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_CHECK_EXPECTED();
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+ 
+@@ -126,6 +129,7 @@
+ 
+ void Assembler::setBlockPriority(int priority, API_FUNC) {
+   API_FUNC_BEGIN();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+ 
+   _blockPriority = priority;
+@@ -134,6 +138,7 @@
+ 
+ void Assembler::setFunctionPriority(int priority, API_FUNC) {
+   API_FUNC_BEGIN();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+   API_REQUIRE(_currentFunction->priority == 0, error::ErrorCode::SettingPriorityTwice,
+               "Function priority was previously set to ", _currentFunction->priority, ".");
+@@ -143,6 +148,7 @@
+ 
+ void Assembler::jump(std::string const &jumpLabel, API_FUNC) {
+   API_FUNC_BEGIN();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_CHECK_EXPECTED();
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+ 
+@@ -162,6 +168,7 @@
+ void Assembler::jumpIfImpl(Expression obj, std::string const &trueLabel,
+                            std::string const &falseLabel, API_CTX) {
+   API_CHECK_EXPECTED();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+   API_REQUIRE_IS_INTEGER(obj.type());
+ 
+@@ -227,6 +234,7 @@
+ 
+ void Assembler::unreachable(API_FUNC) {
+   API_FUNC_BEGIN();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_CHECK_EXPECTED();
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+ 
+diff --git a/src/assembler/assembler_builders.cc b/src/assembler/assembler_builders.cc
+--- a/src/assembler/assembler_builders.cc
++++ b/src/assembler/assembler_builders.cc
+@@ -64,6 +64,7 @@
+     }
+     auto functionType = functionTypeBuilder.done();
+ 
++    API_REQUIRE_BLOCK_DISPATCH_MODE();
+     _assembler.beginFunctionImpl(_functionName, functionType, varNames, API_FWD);
+   }
+ 
+diff --git a/src/assembler/assembler_calls_control.cc b/src/assembler/assembler_calls_control.cc
+--- a/src/assembler/assembler_calls_control.cc
++++ b/src/assembler/assembler_calls_control.cc
+@@ -8,12 +8,14 @@
+ 
+ Assembler::FunctionCallBuilder Assembler::callFunction(std::string const &functionName, API_FUNC) {
+   API_FUNC_BEGIN();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   return FunctionCallBuilder { *this, functionName, API_FWD };
+ }
+ 
+ void Assembler::callFunctionImpl(std::string const &functionName, std::optional<Expression> const &returnSlot,
+                                  std::vector<Expression> const &args, API_CTX) {
+   API_CHECK_EXPECTED();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+ 
+   deferFunctionCallTypeCheck(functionName, args, API_FWD);
+@@ -60,6 +62,7 @@
+ void Assembler::callFunctionImpl(Expression fPtr, std::optional<Expression> const &returnSlot,
+                                  std::vector<Expression> const &args, API_CTX) {
+   API_CHECK_EXPECTED();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+   API_REQUIRE_IS_FUNCTION_POINTER(fPtr.type());
+ 
+@@ -164,6 +167,7 @@
+ 
+ void Assembler::abortProgram(API_FUNC) {
+   API_FUNC_BEGIN();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_CHECK_EXPECTED();
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+ 
+@@ -184,6 +188,7 @@
+ 
+ void Assembler::returnFromFunctionImpl(std::optional<Expression> const &ret, API_CTX) {
+   API_CHECK_EXPECTED();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+ 
+   _currentBlock->returns = true;
+diff --git a/src/assembler/assembler_print.cc b/src/assembler/assembler_print.cc
+--- a/src/assembler/assembler_print.cc
++++ b/src/assembler/assembler_print.cc
+@@ -60,7 +60,8 @@
+   
+   if (types::isInteger(val.type())) {
+     // For literals, inline the printing code
+-    if (val.isLiteral()) return printDecimal(val);
++    if (val.isLiteral() || _program.mode == Program::Mode::StraightLine)
++      return printDecimal(val);
+ 
+     // For slots, call the builtin functions
+     BuiltinFunction const func = [&]{
+diff --git a/src/assembler/assembler_program.cc b/src/assembler/assembler_program.cc
+--- a/src/assembler/assembler_program.cc
++++ b/src/assembler/assembler_program.cc
+@@ -46,8 +46,32 @@
+   assert(_deferredFunctionCallTypeChecks.size() == 0);
+   assert(_metaBlocks.size() == 0);
+ 
++  assert(_ptrStack.empty());
++  assert(_deferredLabelChecks.empty());
++
++  // Final memory is unobservable. Discard dirty entries without writeback.
++  _cache.reset();
++  freeCacheSlots();
++  freeTempSlots();
++
+   auto ctx = constructStraightLineContext();
+-  primitive::Sequence &result = _program.functions[0].blocks[0]->code;
++  primitive::Sequence result;
++  setTargetSequence(&result);
++  // The single local frame starts at tape origin. Pointer kernels still use
++  // its markers; no target block, dispatcher or return frame is needed.
++  _dp.set(0, MacroCell::FrameMarker);
++  inc(Cell{0, MacroCell::FrameMarker});
++  inc(Cell{0, MacroCell::SeekMarker});
++  moveToOrigin();
++  result.append(_program.functions[0].blocks[0]->code);
++
++  _currentBlock = nullptr;
++  _currentFunction = nullptr;
++  _currentScope = nullptr;
++  _blockPriority = 0;
++  _state.begun = false;
++  _state.allowGlobalDeclarations = false;
++  setTargetSequence(nullptr);
+   // Save results
+   _txt[_program.name] = result.dumpText(ctx);
+   _bf[_program.name] = simplifyBrainfuck(result.dumpCode(ctx));  
+@@ -74,6 +98,8 @@
+               "entry function must be of type 'void()', but is of type '", entryFunctionType->str(), "'."); 
+ 	      
+   if (_program.mode == Program::Mode::StraightLine) {
++    API_REQUIRE_INSIDE_FUNCTION_BLOCK();
++    API_REQUIRE_NO_SCOPE();
+     return endStraightLineProgram();
+   }
+   
+@@ -271,6 +297,7 @@
+ 
+ Assembler::FunctionBuilder Assembler::function(std::string const &name, API_FUNC) {
+   API_FUNC_BEGIN();
++  API_REQUIRE_INSIDE_PROGRAM_BLOCK();
+   API_REQUIRE_BLOCK_DISPATCH_MODE();
+   return FunctionBuilder { *this, name, API_FWD };
+ }
+@@ -304,6 +331,7 @@
+ 
+ void Assembler::endFunction(API_FUNC) {
+   API_FUNC_BEGIN();
++  API_REQUIRE_BLOCK_DISPATCH_MODE();
+   API_CHECK_EXPECTED();  
+   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+   API_REQUIRE_NO_SCOPE();
+diff --git a/src/assembler/assembler_rlvalue.cc b/src/assembler/assembler_rlvalue.cc
+--- a/src/assembler/assembler_rlvalue.cc
++++ b/src/assembler/assembler_rlvalue.cc
+@@ -6,7 +6,7 @@
+ #include "assembler.ih"
+ 
+ Expression Assembler::rValue(Expression val, API_CTX) const {
+-  (void)API_CTX_NAME;
++  if (val.isLiteral()) return rValue(val.literal(), API_FWD);
+   return Expression{val};
+ }
+ 
+@@ -20,6 +20,22 @@
+ }
+ 
+ Expression Assembler::rValue(literal::Literal val, API_CTX) const {
++  if (_program.mode == Program::Mode::StraightLine) {
++    auto check = [&](auto &&self, literal::Literal const &value) -> void {
++      if (types::isFunctionPointer(value.type())) {
++        API_REQUIRE_BLOCK_DISPATCH_MODE();
++      } else if (types::isArray(value.type()) || types::isString(value.type())) {
++        auto const array = literal::cast<types::ArrayLike>(value);
++        for (int i = 0; i < types::cast<types::ArrayLike>(value.type())->length(); ++i) self(self, array->element(i));
++      } else if (types::isStruct(value.type())) {
++        auto const type = types::cast<types::StructType>(value.type());
++        auto const fields = literal::cast<types::StructType>(value);
++        for (int i = 0; i < type->fieldCount(); ++i)
++          self(self, fields->field(type->fieldName(i)));
++      }
++    };
++    check(check, val);
++  }
+   return Expression{val};
+ }
+ 
+diff --git a/testsuite/tests/straight_line.h b/testsuite/tests/straight_line.h
+--- /dev/null
++++ b/testsuite/tests/straight_line.h
+@@ -0,0 +1,77 @@
++// Acus - A C++ library for generating Brainfuck programs.
++// Copyright (C) 2026 Joren Heit
++// SPDX-License-Identifier: GPL-3.0-or-later
++#pragma once
++
++namespace bftest {
++inline void addStraightLineTests(std::vector<TestCase> &tests) {
++  tests.push_back(TestCase{
++    .name = "Straight line input, arithmetic and inline decimal printing",
++    .buildProgram = [] {
++      using namespace acus::api;
++      Assembler c; c.program("straight", acus::Program::Mode::StraightLine).begin();
++      c.declareLocal("x", ts::u16()); c.assign("x", literal::u16(0)); c.read("x");
++      c.mulAssign("x", literal::u16(3)); c.print("x");
++      c.print(literal::string("/")); c.divAssign("x", literal::u16(2)); c.print("x");
++      c.declareLocal("s", ts::s16()); c.assign("s", literal::s16(-32768));
++      c.print(literal::string("/")); c.print("s");
++      c.endProgram(); return c.brainfuck("straight");
++    }, .expectedOutput = "21/10/-32768", .input = std::string(1, char(7)),
++    .requireHalt = true, .maxSteps = 200'000'000});
++  tests.push_back(TestCase{
++    .name = "Straight line pointers, dynamic array cache and assembler reuse",
++    .buildProgram = [] {
++      using namespace acus::api;
++      Assembler c; c.program("first", "main").begin(); c.function("main").begin();
++      c.print(literal::string("A")); c.returnFromFunction(); c.endFunction(); c.endProgram();
++      c.program("second", acus::Program::Mode::StraightLine).begin();
++      c.declareLocal("x", ts::u8()); c.declareLocal("p", ts::pointer(ts::u8()));
++      c.assign("x", literal::u8('X')); c.assign("p", c.addressOf("x"));
++      c.write(c.dereferencePointer("p")); c.assign(c.dereferencePointer("p"), literal::u8('Y')); c.write("x");
++      c.declareLocal("arr", ts::array(ts::u8(), 3)); c.declareLocal("i", ts::u8());
++      c.assign("i", literal::u8(1)); c.assign(c.arrayElement("arr", "i"), literal::u8('Z'));
++      c.write(c.arrayElement("arr", "i"));
++      c.scope().begin(); c.declareLocal("local", ts::u8()); c.assign("local", literal::u8('S')); c.write("local"); c.endScope();
++      c.endProgram();
++      c.program("third", "main").begin(); c.function("main").begin();
++      c.print(literal::string("B")); c.returnFromFunction(); c.endFunction(); c.endProgram();
++      if (c.brainfuck("first").empty() || c.brainfuck("third").empty())
++        throw std::runtime_error("dispatched program lost during reuse");
++      return c.brainfuck("second");
++    }, .expectedOutput = "XYZS", .requireHalt = true, .maxSteps = 200'000'000});
++  tests.push_back(TestCase{
++    .name = "Straight line rejects dispatch APIs and unclosed scopes",
++    .buildProgram = [] {
++      using namespace acus::api;
++      auto reject = [](auto action, acus::error::ErrorCode code) {
++        Assembler c; c.program("reject", acus::Program::Mode::StraightLine).begin();
++        try { action(c); } catch (acus::error::Error const &e) {
++          if (e.code() == code) return;
++          throw;
++        }
++        throw std::runtime_error("straight-line API unexpectedly accepted");
++      };
++      auto const code = acus::error::ErrorCode::NotAvailableInStraightLineMode;
++      reject([](Assembler &c){ c.function("f"); }, code);
++      reject([](Assembler &c){ c.callFunction("f"); }, code);
++      reject([](Assembler &c){ c.callFunctionPointer(literal::function_pointer(ts::void_function(), "f")); }, code);
++      reject([](Assembler &c){ c.label("label"); }, code);
++      reject([](Assembler &c){ c.jump("label"); }, code);
++      reject([](Assembler &c){ c.jumpIf(literal::u8(1), "yes", "no"); }, code);
++      reject([](Assembler &c){ c.returnFromFunction(); }, code);
++      reject([](Assembler &c){ c.returnFromFunction(literal::u8(1)); }, code);
++      reject([](Assembler &c){ c.abortProgram(); }, code);
++      reject([](Assembler &c){ c.unreachable(); }, code);
++      reject([](Assembler &c){ c.endFunction(); }, code);
++      reject([](Assembler &c){ c.setBlockPriority(1); }, code);
++      reject([](Assembler &c){ c.setFunctionPriority(1); }, code);
++      reject([](Assembler &c){ c.declareLocal("fp", ts::function_pointer(ts::void_function())); c.assign("fp", literal::function_pointer(ts::void_function(), "f")); }, code);
++      reject([](Assembler &c){ c.scope().begin(); c.endProgram(); }, acus::error::ErrorCode::ExpectedNoScope);
++      Assembler c; c.program("empty", acus::Program::Mode::StraightLine).begin(); c.endProgram();
++      if (c.brainfuck("empty").find('[') != std::string::npos)
++        throw std::runtime_error("empty straight-line program contains dispatch loop");
++      c.program("done", acus::Program::Mode::StraightLine).begin(); c.print(literal::string("OK")); c.endProgram();
++      return c.brainfuck("done");
++    }, .expectedOutput = "OK", .requireHalt = true, .maxSteps = 200'000'000});
++}
++}
+diff --git a/testsuite/testsuite.cc b/testsuite/testsuite.cc
+--- a/testsuite/testsuite.cc
++++ b/testsuite/testsuite.cc
+@@ -455,6 +455,7 @@
+ #define TEST_END c.endProgram(); return c.brainfuck("test");
+ 
+ #include "tests/constant_special_cases.h"
++#include "tests/straight_line.h"
+ #include "tests/constant_comparison_bytes.h"
+ 
+ static std::vector<bftest::TestCase> buildTests() {
+@@ -464,6 +465,7 @@
+   }));
+   bftest::addConstantByteComparisonTests(tests);
+   bftest::addConstantSpecialCaseTests(tests);
++  bftest::addStraightLineTests(tests);
+   tests.push_back(expectOutput("Consumable pointer offset", "ACBCBA2", [] {
+ #include "tests/destroy_rhs_pointer.cc"
+   }));

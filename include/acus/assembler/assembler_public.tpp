@@ -6,6 +6,7 @@
 
 Assembler::FunctionCallBuilder Assembler::callFunctionPointer(auto const &functionPointer, API_FUNC_SOURCE) {
   API_FUNC_BEGIN();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   return FunctionCallBuilder { *this, rValue(functionPointer, API_FWD), API_FWD };
 }
 

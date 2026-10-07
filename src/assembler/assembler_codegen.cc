@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <regex>
+#include <set>
 #include "assembler.ih"
 
 std::string Assembler::defaultOpenTag() {
@@ -71,6 +72,22 @@ void Assembler::constructBuiltinFunctions() {
   _usedBuiltinFunctions.clear();
 }
 
+primitive::Context Assembler::constructStraightLineContext() const {
+  primitive::Context ctx{
+    .fieldCount = MacroCell::FieldCount,
+    .blockIDToDispatchIndex = {},
+    .stackFrameSize = {},
+    .localBaseOffset = {}
+  };
+  
+  for (auto const &function : _program.functions) {
+    ctx.stackFrameSize.emplace(function.name, function.frame.totalLogicalCells());
+    ctx.localBaseOffset.emplace(function.name, function.frame.localBase());
+  }
+
+  return ctx;
+}
+
 primitive::Context Assembler::constructContext(std::vector<Function::Block *> const &dispatchBlocks, int innerSwitchCaseCount) const {
 
   auto const constructBlockIDToDispatchIndexMap = [&]{
@@ -85,8 +102,8 @@ primitive::Context Assembler::constructContext(std::vector<Function::Block *> co
       result[block->id] = dispatchIndex;
 
       if (block->isEntryPoint) {
-	std::string const &functionName = _program.functions[block->parentFunctionIndex].name;
-	result[functionName] = dispatchIndex;
+        std::string const &functionName = _program.functions[block->parentFunctionIndex].name;
+        result[functionName] = dispatchIndex;
       }
     }
     return result;
@@ -140,10 +157,10 @@ void Assembler::mergeSequence(primitive::Sequence &seq) {
       auto n1 = seq.nodes[next];
 
       if (auto mergeResult = n0->merge(n1.get())) {
-	merged.nodes.back() = mergeResult;
+        merged.nodes.back() = mergeResult;
       }
       else {
-	merged.nodes.push_back(n1);
+        merged.nodes.push_back(n1);
       }
     }
 
@@ -172,17 +189,76 @@ std::string Assembler::simplifyBrainfuck(std::string const &bf) {
       if (c == up)   ++count;
       else if (c == down) --count;
       else {
-	flush();
-	result += c;
+        flush();
+        result += c;
       }
     }
     
     flush();
     return result;
   };
+
+  auto cleanHead = [](std::string const &input) -> std::string {
+    // Remove all unnecessary [-] sequences before the state cannot be traced
+    // trivially anymore (at first nontrivial [...])
+    std::set<std::ptrdiff_t> unknown;
+    std::ptrdiff_t current = 0;
+    std::string result;
+    result.reserve(input.size());
+    for (size_t idx = 0; idx < input.size(); ++idx) {
+      switch (input[idx]) {
+        case '<': --current; break;
+        case '>': ++current; break;
+        case '+':
+        case '-':
+        case ',':
+          unknown.insert(current);
+          break;
+        case '[':
+          if (input.compare(idx, 3, "[-]") == 0) {
+            if (unknown.erase(current)) result += "[-]";
+            idx += 2;
+            continue;
+          }
+          // Preserve everything from the first other loop onward.
+          result.append(input, idx, std::string::npos);
+          return result;
+        default:
+          break;
+      }
+      result += input[idx];
+    }
+
+    return result;
+  };
+
+  auto cleanTail = [](std::string const &input) -> std::string {
+    size_t end = input.size();
+
+    while (end > 0) {
+      switch (input[end - 1]) {
+        case '<':
+        case '>':
+        case '+':
+        case '-': --end; break;
+        case ']': {
+          if (end >= 3 && input.compare(end - 3, 3, "[-]") == 0) {
+            end -= 3;
+            break;
+          }
+          // Fall through
+        }
+        default: return input.substr(0, end);
+      }
+    }
+
+    return {};
+  };  
   
   std::string result = cancel(cancel(bf, '>', '<'), '+', '-');
   result = std::regex_replace(result, std::regex(R"(\]\[-\])"), "]");
+  result = cleanHead(result);
+  result = cleanTail(result);
   return result;
 }
 
@@ -206,14 +282,14 @@ void Assembler::checkFunctionFlowValidity(Function &fn, API_CTX) {
       b->reached = true;
   
       if (b->children.size() == 0) {
-	API_REQUIRE(b->returns,
-		    error::ErrorCode::ExecutionPathWithoutReturn,
-		    "function '", fn.name, "' terminates in block labeled '", b->name, "' without a return-statement.");
-	return;
+        API_REQUIRE(b->returns,
+                    error::ErrorCode::ExecutionPathWithoutReturn,
+                    "function '", fn.name, "' terminates in block labeled '", b->name, "' without a return-statement.");
+        return;
       }
 
       for (auto const &child: b->children) {
-	self(self, getBlock(child.blockName));
+        self(self, getBlock(child.blockName));
       }
     };
 
@@ -228,7 +304,7 @@ void Assembler::checkFunctionFlowValidity(Function &fn, API_CTX) {
     if (not b->name.starts_with("__")) { // Skip auto-generated blocks that may be empty
       // TODO: only error when option is active
       API_REQUIRE(b->reached || not b->reachable, error::ErrorCode::UnreachableCodeSection,
-		  "function '", fn.name, "' contains an unreachable code section labeled '", b->name, "'.");
+                  "function '", fn.name, "' contains an unreachable code section labeled '", b->name, "'.");
     }
   }
 }

@@ -36,7 +36,7 @@ class Assembler {
 public:
     
   inline Assembler(): _cache(*this) {}
-    
+
   std::string primitives(std::string const &name, API_FUNC) const;
   std::string brainfuck(std::string const &name, API_FUNC) const;
 
@@ -46,6 +46,7 @@ public:
   struct FunctionCallBuilder;
 
   ProgramBuilder program(std::string const &name, std::string const &entry, API_FUNC);
+  ProgramBuilder program(std::string const &name, Program::Mode mode, API_FUNC);
   FunctionBuilder function(std::string const &name, API_FUNC);
   ScopeBuilder scope(API_FUNC);
 
@@ -160,7 +161,8 @@ private:
   // program name -> brainfuck output:    
   std::unordered_map<std::string, std::string> _bf; 
   std::unordered_map<std::string, std::string> _txt; 
-    
+
+  
   Program _program;
   Function* _currentFunction = nullptr;
   Function::Block* _currentBlock = nullptr;
@@ -305,9 +307,11 @@ private:
   void setNextBlock(Expression obj);
     
   // Implementation functions for public interface
-  void beginProgramImpl(std::string const &name, std::string const &entry, API_CTX);
+  void beginProgramImpl(std::string const &name, std::string const &entry, Program::Mode mode, API_CTX);
   void beginFunctionImpl(std::string const &name, types::TypeHandle type, std::vector<std::string> const &params, API_CTX);
   void beginScopeImpl(API_CTX);
+  void endStraightLineProgram();
+  
 
   types::TypeHandle defineStructImpl(std::string const& name, std::vector<types::NameTypePair> const &fields, API_CTX);
 
@@ -774,7 +778,8 @@ private:
   std::string builtinFunctionName(BuiltinFunction func);
   void constructBuiltinFunctions();    
   void setTargetSequence(primitive::Sequence *seq);
-  primitive::Context constructContext(std::vector<Function::Block *> const &, int) const;    
+  primitive::Context constructContext(std::vector<Function::Block *> const &, int) const;
+  primitive::Context constructStraightLineContext() const;
   primitive::Sequence compilePrimitives(API_CTX);
   static std::string simplifyBrainfuck(std::string const &bf);
   static void mergeSequence(primitive::Sequence &seq);
@@ -947,13 +952,13 @@ private:
 struct Assembler::ProgramBuilder: builder::BuilderBase {
 
   void begin();
-  ProgramBuilder(Assembler &a, std::string const &name, std::string const &entry, api::impl::Context const &ctx);
+  ProgramBuilder(Assembler &a, std::string const &name, std::string const &entry, Program::Mode mode, api::impl::Context const &ctx);
   
 private:
   Assembler& _assembler;
   std::string _name;
   std::string _entry;
-
+  Program::Mode _mode;
 }; // ProgramBuilder
 
   

@@ -455,6 +455,7 @@ using namespace acus::api;
 #define TEST_END c.endProgram(); return c.brainfuck("test");
 
 #include "tests/constant_special_cases.h"
+#include "tests/straight_line.h"
 #include "tests/constant_comparison_bytes.h"
 
 static std::vector<bftest::TestCase> buildTests() {
@@ -464,6 +465,7 @@ static std::vector<bftest::TestCase> buildTests() {
   }));
   bftest::addConstantByteComparisonTests(tests);
   bftest::addConstantSpecialCaseTests(tests);
+  bftest::addStraightLineTests(tests);
   tests.push_back(expectOutput("Consumable pointer offset", "ACBCBA2", [] {
 #include "tests/destroy_rhs_pointer.cc"
   }));

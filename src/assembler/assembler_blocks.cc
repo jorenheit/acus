@@ -6,6 +6,8 @@
 #include "assembler.ih"
 
 void Assembler::beginBlock(std::string const &name) {
+  assert(_program.mode == Program::Mode::BlockDispatch ||
+         _currentFunction->blocks.empty());
 
   Function::Block &block = _currentFunction->createBlock(name);
   _program.registerBlock(block);
@@ -33,6 +35,7 @@ std::string Assembler::generateUniqueBlockName() {
 
 void Assembler::label(std::string const &labelName, API_FUNC) {
   API_FUNC_BEGIN();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
@@ -126,6 +129,7 @@ void Assembler::setNextBlock(Expression obj) {
 
 void Assembler::setBlockPriority(int priority, API_FUNC) {
   API_FUNC_BEGIN();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
   _blockPriority = priority;
@@ -134,6 +138,7 @@ void Assembler::setBlockPriority(int priority, API_FUNC) {
 
 void Assembler::setFunctionPriority(int priority, API_FUNC) {
   API_FUNC_BEGIN();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE(_currentFunction->priority == 0, error::ErrorCode::SettingPriorityTwice,
               "Function priority was previously set to ", _currentFunction->priority, ".");
@@ -143,6 +148,7 @@ void Assembler::setFunctionPriority(int priority, API_FUNC) {
 
 void Assembler::jump(std::string const &jumpLabel, API_FUNC) {
   API_FUNC_BEGIN();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 
@@ -162,6 +168,7 @@ void Assembler::jump(std::string const &jumpLabel, API_FUNC) {
 void Assembler::jumpIfImpl(Expression obj, std::string const &trueLabel,
                            std::string const &falseLabel, API_CTX) {
   API_CHECK_EXPECTED();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_INTEGER(obj.type());
 
@@ -227,6 +234,7 @@ void Assembler::constructMetaBlocks() {
 
 void Assembler::unreachable(API_FUNC) {
   API_FUNC_BEGIN();
+  API_REQUIRE_BLOCK_DISPATCH_MODE();
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
 

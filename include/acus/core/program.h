@@ -23,6 +23,11 @@ namespace acus {
 
 struct Program {
 
+  enum class Mode {
+    BlockDispatch,
+    StraightLine
+  };
+  
   std::string name;
   std::string entryFunctionName;
   
@@ -30,6 +35,7 @@ struct Program {
   std::unordered_map<std::string, size_t> functionByName;
   std::vector<Slot> globals;
   std::vector<Function::Block*> globalBlockOrder;
+  Mode mode = Mode::BlockDispatch;
 
   inline Function& createFunction(std::string name, types::FunctionType const *type, size_t scopeID) {
     assert(!functionByName.contains(name)); // TODO: ERROR
