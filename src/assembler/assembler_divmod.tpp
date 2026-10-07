@@ -6,10 +6,11 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
   pushPtr();
 
   // Bring the denominator into this workspace.
-  if constexpr (N::template knownZero<1>())
+  if constexpr (N::template knownZero<1>()) {
     copyOrMoveFieldToZero(rhsMode, denom, v["D"], v["CopyTemp"], true);
-  else
+  } else {
     copyOrMoveField(rhsMode, denom, v["D"], v["CopyTemp"], true);
+  }
 
   // Reuse the CopyTemp field for DTest and pick a new CopyTemp field
   v.rename("CopyTemp", "DTest");
@@ -23,8 +24,7 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
     zeroCell(v["DTest"]);
     dec(v["ZeroFlag"]);
 
-    auto prepared = ws::promise(v["N"], ws::Layout<
-                                                   ws::Prepared<ws::Role::NumeratorLow>,
+    auto prepared = ws::promise(v["N"], ws::Layout<ws::Prepared<ws::Role::NumeratorLow>,
                                 ws::Prepared<ws::Role::DenominatorLow>,
                                 ws::ScratchCells<5>>{});
 
@@ -51,69 +51,22 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
 
 template <ws::DivModPrepared W>
 Assembler::DivModResult<W> Assembler::divModPreparedDestructive(W const &prep) {
+  auto const [N, D, R, Q, zero1, zero2] = prep.template cells<6>();
 
-  auto const [N, D, Q, CopyTemp, DCopy, RestoreFlag] = prep.template cells<6>();
-
-  pushPtr();
-
-  // Initial layout:
-  //
-  // N | D | Q | CopyTemp | DCopy | RestoreFlag
-  // n | d | 0 |    0     |   0   |     0
-
-  // Preserve D and initialize the restore flag.
-  copyFieldToZero(D, DCopy, Q, true);
-  inc(RestoreFlag);
-
-  // N | D | Q | CopyTemp | DCopy | RestoreFlag
-  // n | d | 0 |    0     |   d   |     1
-
-  loop(N, [&] {
-    // Consume one numerator unit and one denominator unit.
-    // Q is incremented provisionally; the raw fragment undoes that
-    // increment when D has not yet reached zero.
-    dec(N);
-    inc(Q);
+  loop(N, [&]{
+    inc(R);
     dec(D);
-
-    // If D is still nonzero, undo the provisional Q increment.
-    // Both control paths synchronize back on D.
-    literalBf(D,
-              "[>->]"    // D != 0: --Q and land on the zero CopyTemp cell
-              ">>[-<<]"  // D != 0: clear RestoreFlag and return to CopyTemp
-              "<<");     // both paths converge back on D
-
-    // If D reached zero, RestoreFlag is still set.
-    // Restore D from its persistent copy.
-    loop(RestoreFlag, [&] {
-      dec(RestoreFlag);
-      copyFieldToZero(DCopy, D, CopyTemp, true);
-    });
-
-    // Prepare the flag for the next iteration.
-    inc(RestoreFlag);
+    literalBf(D, "[>>>]>[[<+>-]>+>>]<<<<");
+    dec(N);
   });
 
-  // The outer loop has finished; this flag is no longer needed.
-  dec(RestoreFlag);
+  // Workspace:
+  // N |   D   | R | Q | zero1 | zero2
+  // 0 | d - r | r | q |   0   |   0
 
-  // Current layout:
-  //
-  // N | D | Q   | CopyTemp | DCopy | RestoreFlag
-  // 0 | c | n/d |    0     |   d   |     0
-  //
-  // remainder = d - c
-  subDestructive(SingleCell{DCopy}, SingleCell{D});
-
-  // D and N are now both zero, so place the final results there.
-  moveFieldToZero(DCopy, D);
   moveFieldToZero(Q, N);
-
-  // Final layout:
-  //
-  // Q | R | 0 | 0 | 0 | 0
-  popPtr();
-
+  moveField(R, D);
+  
   return prep.template transformed<
     ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
     ws::Replace<1, ws::Prepared<ws::Role::RemainderLow>>
