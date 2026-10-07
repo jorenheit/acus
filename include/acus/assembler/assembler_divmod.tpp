@@ -319,7 +319,7 @@ Assembler::HalfWithParityResult<W, 5>  Assembler::halfWithParityDestructive(W co
 
 template <ws::Half16Operand W>
 Assembler::Data16Result<W> Assembler::half16Destructive(W const &lhs) {
-  auto const [low, high] = lhs.template cells<2>();
+  auto const [low, high, tmp] = lhs.template cells<3>();
 
   // Calculate high/2, store parity bit
   auto highResult = halfWithParityDestructive(lhs.template subset<1>());
@@ -333,7 +333,7 @@ Assembler::Data16Result<W> Assembler::half16Destructive(W const &lhs) {
   Cell const highParity = highResult.template cell<ws::Role::ParityBit>();
   loop(highParity, [&]{
     dec(highParity);
-    addConst(low, 128);
+    addConst(low, tmp, 128); // reuse parity cell as scratch
   });
 
   return lhs;
@@ -354,7 +354,7 @@ Assembler::Half16WithParityResult<W> Assembler::half16WithParityDestructive(W co
   // If parity-high bit set, add 128 to the result of low/2
   loop(parityHigh, [&]{
     dec(parityHigh);
-    addConst(low, 128);
+    addConst(low, _1, 128);
   });
 
   return lhs.template transformed<ws::Replace<5, ws::Prepared<ws::Role::ParityBit>>>();
@@ -427,7 +427,7 @@ Assembler::Data8Result<W> Assembler::modByPowerOfTwoDestructive(W const &lhs, si
     Cell const parity = result.template cell<ws::Role::ParityBit>();
     loop(parity, [&] {
       dec(parity);
-      addConst(rem, 1u << i);
+      addConst(rem, parity, 1u << i);
     });
   }
   moveField(rem, x);
@@ -453,9 +453,9 @@ Assembler::Data16Result<W> Assembler::modByPowerOfTwo16Destructive(W const &lhs,
     loop(parity, [&] {
       dec(parity);
       if (i < 8)
-        addConst(remLow, 1u << i);
+        addConst(remLow, parity, 1u << i);
       else
-        addConst(remHigh, 1u << (i - 8));
+        addConst(remHigh, parity, 1u << (i - 8));
     });
   }
 

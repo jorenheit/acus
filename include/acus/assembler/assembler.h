@@ -194,9 +194,10 @@ private:
   std::vector<MetaBlock> _metaBlocks;
 
   enum class BuiltinFunction {
+    // TODO: optional outlining, also for large 16 bit arithmetic kernels
     PrintUnsigned8, PrintUnsigned16,
     PrintSigned8, PrintSigned16,
-    Mul16, DivMod16
+    Mul16, DivMod16 
   };
   std::unordered_set<BuiltinFunction> _usedBuiltinFunctions;
 
