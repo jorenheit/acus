@@ -31,6 +31,7 @@ struct Function {
     std::string name;
     std::string id;
     primitive::Sequence code;
+    int priority = 0;
 
     bool returns = false;
     bool reached = false;
@@ -53,6 +54,7 @@ struct Function {
   std::string name;
   FrameLayout frame;
   types::FunctionType const *type;
+  int priority = 0;
   
   std::vector<std::unique_ptr<Block>> blocks;
   std::unordered_map<std::string, size_t> blockByName;

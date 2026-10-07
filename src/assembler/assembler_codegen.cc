@@ -31,10 +31,11 @@ void Assembler::setTargetSequence(primitive::Sequence *seq) {
 
 std::string Assembler::builtinFunctionName(BuiltinFunction func) {
   switch (func) {
-  case BuiltinFunction::PrintUnsigned8:   return "__print_u8";
-  case BuiltinFunction::PrintUnsigned16:  return "__print_u16";
-  case BuiltinFunction::PrintSigned8:     return "__print_s8";
-  case BuiltinFunction::PrintSigned16:    return "__print_s16";
+    case BuiltinFunction::PrintUnsigned8:   return "__print_u8";
+    case BuiltinFunction::PrintUnsigned16:  return "__print_u16";
+    case BuiltinFunction::PrintSigned8:     return "__print_s8";
+    case BuiltinFunction::PrintSigned16:    return "__print_s16";
+    default: std::unreachable(); return "";
   }
   std::unreachable();
 }
@@ -45,12 +46,13 @@ void Assembler::constructBuiltinFunctions() {
 
   for (auto func: _usedBuiltinFunctions) {
 
-    types::TypeHandle const paramType = [&] {
+    types::TypeHandle const paramType = [&] -> types::TypeHandle {
       switch (func) {
-      case BuiltinFunction::PrintUnsigned8:  return ts::u8();
-      case BuiltinFunction::PrintUnsigned16: return ts::u16();
-      case BuiltinFunction::PrintSigned8:    return ts::s8();
-      case BuiltinFunction::PrintSigned16:   return ts::s16();
+        case BuiltinFunction::PrintUnsigned8:  return ts::u8();
+        case BuiltinFunction::PrintUnsigned16: return ts::u16();
+        case BuiltinFunction::PrintSigned8:    return ts::s8();
+        case BuiltinFunction::PrintSigned16:   return ts::s16();
+        default: std::unreachable(); return types::null;
       }
       std::unreachable();
     }();

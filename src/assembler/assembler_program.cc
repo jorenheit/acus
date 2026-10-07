@@ -70,6 +70,14 @@ void Assembler::endProgram(API_FUNC) {
     }
   }
 
+  // Order blocks by priority, making declared hot paths easier to reach
+  std::stable_sort(dispatchBlocks.begin(), dispatchBlocks.end(),
+                   [&](Function::Block const *a, Function::Block const *b) {
+                     long long const ap = static_cast<long long>(a->priority) + _program.functions[a->parentFunctionIndex].priority;
+                     long long const bp = static_cast<long long>(b->priority) + _program.functions[b->parentFunctionIndex].priority;
+                     return ap > bp;
+                   });
+
   API_REQUIRE(dispatchBlocks.size() <= 0xfeff, error::ErrorCode::TooManyBlocks,
               "Number of blocks exceeds maximum (0xfeff)");
 
@@ -124,7 +132,6 @@ void Assembler::endProgram(API_FUNC) {
       assert(caseCount > 0);
       assert(caseIndex >= 0 && caseIndex < caseCount);
 
-      
       loop(value, [&]{
         if (caseIndex + 1 == caseCount) {
           // Default case: abort program	  
@@ -156,15 +163,9 @@ void Assembler::endProgram(API_FUNC) {
     dec(outerValue);
 
     // Outer switch
-    impl(impl,
-         outerValue,
-         outerFlag,
-         outerSwitchCaseCount,
-         0,
+    impl(impl, outerValue, outerFlag, outerSwitchCaseCount, 0,
          [&](int outerCaseIndex){
-
-           int const thisInnerSwitchCaseCount =
-             (outerCaseIndex + 1) < outerSwitchCaseCount
+           int const thisInnerSwitchCaseCount = (outerCaseIndex + 1) < outerSwitchCaseCount
              ? innerSwitchCaseCount
              : ((dispatchBlocks.size() - 1) % innerSwitchCaseCount + 1);	   
 	   
@@ -172,11 +173,7 @@ void Assembler::endProgram(API_FUNC) {
            inc(innerFlag);
 
            // Inner switch
-           impl(impl,
-                innerValue,
-                innerFlag,
-                thisInnerSwitchCaseCount,
-                0,
+           impl(impl, innerValue, innerFlag, thisInnerSwitchCaseCount, 0,
                 [&](int innerCaseIndex) {
                   // Insert block body
                   size_t const dispatchIndex = outerCaseIndex * innerSwitchCaseCount + innerCaseIndex;
@@ -272,6 +269,7 @@ void Assembler::beginFunctionImpl(std::string const &name, types::TypeHandle typ
     declareLocal(name, fType->paramTypes()[i]);
   }
 
+  _blockPriority = 0;
   beginBlock(generateUniqueBlockName());
 }
 

@@ -31,6 +31,7 @@ void Assembler::callFunctionImpl(std::string const &functionName, std::optional<
                           .callee = functionName,
                           .returnSlot = returnSlot ? std::optional<SlotProxy>(returnSlot->slot()) : std::nullopt,
                           .nextBlockName = nextBlockName,
+                          .priority = _currentBlock->priority
   });
 
   setNextBlock(_currentFunction->name, metaBlockName);
@@ -80,6 +81,7 @@ void Assembler::callFunctionImpl(Expression fPtr, std::optional<Expression> cons
                           .callee = functionType,
                           .returnSlot = returnSlot ? std::optional<SlotProxy>(returnSlot->slot()) : std::nullopt,
                           .nextBlockName = nextBlockName,
+                          .priority = _currentBlock->priority
   });
 
   // Prepare frame (set target, copy args) and push next frame onto the stack

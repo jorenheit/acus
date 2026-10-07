@@ -13,6 +13,7 @@ namespace acus::error {
     DuplicateGlobalReferences,
     FunctionDoesNotExist,
     LabelDoesNotExist,
+    SettingPriorityTwice,
     TakingAddressOfTemporary,
     ReadOnlyExpression,
     IncompatibleOperands,

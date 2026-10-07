@@ -303,7 +303,8 @@ auto Assembler::halfWithParityDestructive(W const &lhs) {
 template <ws::HalfWithParityOperand2 W> // gapped
 Assembler::HalfWithParityResult<W, 5>  Assembler::halfWithParityDestructive(W const &lhs) {
   auto const [x, _, remaining, zero, sync, parity] = lhs.template cells<6>();
-  addDestructive(SingleCell{remaining}, x); // remaining is zero in this version
+
+  moveFieldToZero(x, remaining);
   inc(sync);
   loop(remaining, [&]{
     inc(parity);
@@ -348,7 +349,7 @@ Assembler::Half16WithParityResult<W> Assembler::half16WithParityDestructive(W co
   // Calculate low/2, this parity bit will be returned at index 5
   halfWithParityDestructive(lhs.template transformed<ws::Replace<1, ws::Untouched>,
                             ws::Replace<6, ws::Untouched>
-                            >()); // make sure result and parity are not touched
+                            >()); // make sure high/2 result and parity are not touched
 
   // If parity-high bit set, add 128 to the result of low/2
   loop(parityHigh, [&]{

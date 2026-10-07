@@ -147,7 +147,7 @@ void Assembler::twiceDestructive(Cell x, Cell tmp) {
     dec(x);
     inc(tmp, 2);
   });
-  addDestructive(SingleCell{x}, tmp);
+  moveFieldToZero(tmp, x);
 }
 
 void Assembler::mulByPowerOfTwoDestructive(Cell x, Cell p, Cell tmp) {

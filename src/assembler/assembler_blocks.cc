@@ -13,8 +13,9 @@ void Assembler::beginBlock(std::string const &name) {
   if (_currentFunction->blocks.size() == 1) {
     _currentFunction->entryBlockIndex = block.globalBlockIndex;
   }
-
+  
   _currentBlock = &block;
+  _currentBlock->priority = _blockPriority;
   setTargetSequence(&block.code);
   moveToOrigin();
 }
@@ -123,6 +124,23 @@ void Assembler::setNextBlock(Expression obj) {
   }
 }
 
+void Assembler::setBlockPriority(int priority, API_FUNC) {
+  API_FUNC_BEGIN();
+  API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+
+  _blockPriority = priority;
+  _currentBlock->priority = priority;
+}
+
+void Assembler::setFunctionPriority(int priority, API_FUNC) {
+  API_FUNC_BEGIN();
+  API_REQUIRE_INSIDE_FUNCTION_BLOCK();
+  API_REQUIRE(_currentFunction->priority == 0, error::ErrorCode::SettingPriorityTwice,
+              "Function priority was previously set to ", _currentFunction->priority, ".");
+  
+  _currentFunction->priority = priority;
+}
+
 void Assembler::jump(std::string const &jumpLabel, API_FUNC) {
   API_FUNC_BEGIN();
   API_CHECK_EXPECTED();
@@ -142,7 +160,7 @@ void Assembler::jump(std::string const &jumpLabel, API_FUNC) {
 }
 
 void Assembler::jumpIfImpl(Expression obj, std::string const &trueLabel,
-		       std::string const &falseLabel, API_CTX) {
+                           std::string const &falseLabel, API_CTX) {
   API_CHECK_EXPECTED();
   API_REQUIRE_INSIDE_FUNCTION_BLOCK();
   API_REQUIRE_IS_INTEGER(obj.type());
@@ -175,67 +193,30 @@ void Assembler::constructMetaBlocks() {
   for (size_t idx = 0; idx != _metaBlocks.size(); ++idx) {
     MetaBlock const &m = _metaBlocks[idx];
     types::TypeHandle returnType = std::holds_alternative<std::string>(m.callee)
-      ? _program.function(std::get<std::string>(m.callee)).type->returnType()
-      : std::get<types::FunctionType const *>(m.callee)->returnType();
+                                   ? _program.function(std::get<std::string>(m.callee)).type->returnType()
+                                   : std::get<types::FunctionType const *>(m.callee)->returnType();
 
     // Set current function to caller (owner of metablock) and construct block
     _currentFunction = &_program.function(m.caller);    
+    _blockPriority = m.priority;
+    
     beginBlock(m.name); {
-
       if (returnType == ts::void_t() || not m.returnSlot){
-	//	fetchReturnData();
+        //	fetchReturnData();
       }
       else {
-	assert(m.returnSlot.has_value());
-	SlotProxy returnSlot = *m.returnSlot;
-	assert(returnType == returnSlot.type());
+        assert(m.returnSlot.has_value());
+        SlotProxy returnSlot = *m.returnSlot;
+        assert(returnType == returnSlot.type());
 
-	_cache.write(returnSlot, [&](Slot const &slot){
-	  fetchReturnData(slot);
-	});
-	_cache.controlBoundary();
+        _cache.write(returnSlot, [&](Slot const &slot){
+          fetchReturnData(slot);
+        });
+        _cache.controlBoundary();
       }
-
 
       // Set next block
       setNextBlock(m.caller, m.nextBlockName);
-      
-      // Check if the run-state has become 0. If so, unwind the stack
-      // moveTo(FrameLayout::TargetBlock, MacroCell::Value1);
-      // notConstructive(Cell{FrameLayout::TargetBlock, MacroCell::Scratch0},
-      // 		      Temps<1>::select(_dp.current().offset, MacroCell::Scratch1));
-      // moveTo(FrameLayout::TargetBlock, MacroCell::Scratch0);
-      // loopOpen(); {
-      // 	dec();
-      // 	popFrame();
-      // } loopClose();
-      // moveToOrigin();
-
-      
-      
-      
-      
-      // moveTo(FrameLayout::RunState, MacroCell::Value0);
-      // copyField(Cell{FrameLayout::RunState, MacroCell::Scratch0},
-      // 		Temps<1>::select(_dp.current().offset, MacroCell::Scratch1)); 
-      // moveTo(FrameLayout::RunState, MacroCell::Scratch1);
-      // setToValue(1);
-      
-      // switchField(MacroCell::Scratch0);
-      // loopOpen(); { // if run: sync globals and set next block
-      // 	zeroCell();
-      // 	switchField(MacroCell::Scratch1);
-      // 	zeroCell();
-      // 	setNextBlock(m.caller, m.nextBlockName);
-      // 	switchField(MacroCell::Scratch0);	
-      // } loopClose();
-      
-      // switchField(MacroCell::Scratch1);
-      // loopOpen(); { // else: pop frame
-      // 	zeroCell();
-      // 	popFrame(); // This leaves us at the Scratch1 cell in another frame: guaranteed 0
-      // } loopClose();
-      // switchField(MacroCell::Value0);
     } endBlock();
   }
 

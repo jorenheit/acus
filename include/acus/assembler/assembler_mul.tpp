@@ -136,8 +136,8 @@ Assembler::Data8Result<W>  Assembler::squareDestructive(W const &lhs) {
     });
 
     // next term: a_{i+1} = 1 + a_i
+    moveFieldToZero(term_copy, term);
     inc(term);
-    addDestructive(SingleCell{term}, term_copy);
   });
 
   zeroCell(term);

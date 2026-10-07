@@ -36,11 +36,11 @@ struct Program {
     size_t idx = functions.size();
     functionByName[name] = idx;
     functions.push_back(Function{
-	.functionIndex = idx,
-	.name   = std::move(name),
-	.frame  = FrameLayout{type->returnType()->size()},
-	.type   = type
-      });
+                          .functionIndex = idx,
+                          .name   = std::move(name),
+                          .frame  = FrameLayout{type->returnType()->size()},
+                          .type   = type
+                        });
     functions.back().createScope(nullptr, scopeID);
     return functions.back();
   }

@@ -52,6 +52,8 @@ public:
   void endProgram(API_FUNC);
   void endFunction(API_FUNC);
   void endScope(API_FUNC);
+  void setBlockPriority(int priority, API_FUNC);
+  void setFunctionPriority(int priority, API_FUNC);
 
   Expression declareLocal(std::string const &name, types::TypeHandle type, API_FUNC);
   void declareGlobal(std::string const &name, types::TypeHandle type, API_FUNC);
@@ -166,7 +168,8 @@ private:
   primitive::Sequence* _currentSeq = nullptr; 
   std::stack<Cell> _ptrStack;
   DataPointer _dp;
-    
+  int _blockPriority = 0;
+  
   struct {
     bool begun = false;
     bool allowGlobalDeclarations = true;
@@ -186,12 +189,14 @@ private:
     types::TypeHandle returnType;
     std::optional<SlotProxy> returnSlot;
     std::string nextBlockName;
+    int priority;
   };
   std::vector<MetaBlock> _metaBlocks;
 
   enum class BuiltinFunction {
     PrintUnsigned8, PrintUnsigned16,
-    PrintSigned8, PrintSigned16
+    PrintSigned8, PrintSigned16,
+    Mul16, DivMod16
   };
   std::unordered_set<BuiltinFunction> _usedBuiltinFunctions;
 
@@ -926,14 +931,14 @@ private:
   static std::string defaultCloseTag();  
 }; // Assembler
 
-#include "../../../src/assembler/assembler_add.tpp"
-#include "../../../src/assembler/assembler_sub.tpp"
-#include "../../../src/assembler/assembler_mul.tpp"
-#include "../../../src/assembler/assembler_divmod.tpp"
-#include "../../../src/assembler/assembler_algorithms.tpp"
-#include "../../../src/assembler/assembler_unary.tpp"
-#include "../../../src/assembler/assembler_logical.tpp"
-#include "../../../src/assembler/assembler_comparisons.tpp"
+#include "assembler_add.tpp"
+#include "assembler_sub.tpp"
+#include "assembler_mul.tpp"
+#include "assembler_divmod.tpp"
+#include "assembler_algorithms.tpp"
+#include "assembler_unary.tpp"
+#include "assembler_logical.tpp"
+#include "assembler_comparisons.tpp"
 
 
 // Builder objects for programs, functions, blocks, and calls
