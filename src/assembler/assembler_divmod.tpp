@@ -3,8 +3,6 @@ template <ws::DivModNum N>
 Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell const &denom, TransferMode rhsMode) {
   auto v = num.view("N", "D", "CopyTemp", "", "", "", "ZeroFlag");
 
-  pushPtr();
-
   // Bring the denominator into this workspace.
   if constexpr (N::template knownZero<1>()) {
     copyOrMoveFieldToZero(rhsMode, denom, v["D"], v["CopyTemp"], true);
@@ -40,8 +38,6 @@ Assembler::DivModResult<N> Assembler::divModDestructive(N const &num, SingleCell
     zeroCell(v["Q"]); dec(v["Q"]);
     zeroCell(v["R"]);
   });
-
-  popPtr();
 
   return num.template transformed<
     ws::Replace<0, ws::Prepared<ws::Role::QuotientLow>>,
@@ -86,8 +82,6 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
   auto const dec17 = [&](Dec17Operand const &op) -> Dec17Operand {
     auto const [low, high, guard, sentinel, _, highBorrow, lowBorrow] = op.cells();
     
-    pushPtr();
-
     // Start by assuming that both lower bytes will borrow.
     // These flags are cleared below when that assumption proves false.
     inc(highBorrow);
@@ -107,11 +101,8 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
 
     zeroCell(highBorrow);
     zeroCell(lowBorrow);
-    popPtr();
     return op;
   };
-
-  pushPtr();
 
   [[maybe_unused]] auto const [Rlo, Rhi, G, scratch, Qinitial, Qfinal] = num.template cells<6>();
   auto const [Dlo, Dhi, DloCopy, DhiCopy, CopyTemp] = den.template cells<5>();
@@ -157,8 +148,7 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
   moveFieldToZero(Qinitial, Qfinal);
   
   auto currentRemainder =
-    ws::promise(Rlo, ws::Layout<
-                                ws::Prepared<ws::Role::RemainderLow>,
+    ws::promise(Rlo, ws::Layout<ws::Prepared<ws::Role::RemainderLow>,
                 ws::Prepared<ws::Role::RemainderHigh>,
                 ws::ScratchCells<3>,
                 ws::Untouched // Q
@@ -167,8 +157,6 @@ Assembler::DivMod16DigitResult<N> Assembler::divMod16Digit(N const &num, D const
   // The subtraction loop deliberately overshot by one denominator,
   // so add D back to the remainder.  
   add16Destructive(currentRemainder, den);
-  popPtr();
-
 
   return num.template transformed<
     ws::Replace<0, ws::Prepared<ws::Role::RemainderLow>>,
@@ -182,8 +170,6 @@ template <ws::DivMod16Num N, ws::DivMod16Den D>
 Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D const &den) {
   Slot const tmpSlot = getTemp(ts::raw(1), allocHint(num[0], den[0]));
   auto const tmp = ws::promiseClean16(tmpSlot);
-
-  pushPtr();
 
   auto nv = num.view("Nlo", "Nhi", "CopyTemp");
   auto dv = den.view("Dlo", "Dhi", "CopyTemp");
@@ -254,7 +240,6 @@ Assembler::DivMod16Result<N> Assembler::divMod16Destructive(N const &num, D cons
     });
   });
 
-  popPtr();
   freeSlot(tmpSlot);
 
   return num.template transformed<

@@ -121,7 +121,6 @@ Assembler::Data8Result<W>  Assembler::squareDestructive(W const &lhs) {
   //
   // Raw: [>>+<<-]>>[>+[<<<+>>>>+<-]+>[<+>-]<<-]>[-]<<<
 
-  pushPtr();
   moveFieldToZero(value, copy);
   loop(copy, [&]{
     dec(copy);
@@ -142,8 +141,6 @@ Assembler::Data8Result<W>  Assembler::squareDestructive(W const &lhs) {
   });
 
   zeroCell(term);
-  popPtr();
-
   return lhs;
 }
 
@@ -159,8 +156,6 @@ Assembler::Data16Result<W> Assembler::square16Destructive(W const &lhs) {
   // restore   : temporary used to preserve high_copy/addend
   // addend    : copy of the original low byte
   // count     : second copy of the original low byte
-
-  pushPtr();
 
   // First calculate the cross term:
   //   high = 2 * original_low * original_high
@@ -246,8 +241,6 @@ Assembler::Data16Result<W> Assembler::square16Destructive(W const &lhs) {
 
   // addend was restored after the final iteration as well.
   zeroCell(addend);
-
-  popPtr();
 
   return lhs;
 }

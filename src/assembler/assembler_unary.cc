@@ -156,10 +156,10 @@ void Assembler::negateSlot(Slot rhs) {
 
   // rhs = 0 - original
   if (rhs.type()->usesValue1()) {
-    sub16Destructive(ws::promise(rhs, ws::Layout<ws::ScratchCells<7>>{}),
+    sub16Destructive(ws::promise(rhs, ws::Layout<ws::Data<0>, ws::Data<0>, ws::ScratchCells<5>>{}),
                      ws::promiseClean16(copy));
   } else {
-    subDestructive(ws::promise(rhs, ws::Layout<ws::Scratch> {}),
+    subDestructive(ws::promise(rhs, ws::Layout<ws::Data<0>, ws::Data<>, ws::ScratchCells<5>>{}),
                    ws::promiseClean8(copy));
   }
 

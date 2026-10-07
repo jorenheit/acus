@@ -27,6 +27,11 @@ void Assembler::mulSlotByConst(Slot lhs, int factor) {
     if (negate) negateSlot(lhs);
     return;
   }
+  if ((types::isU8(lhs.type())  && factor == 0xff) ||
+      (types::isU16(lhs.type()) && factor == 0xffff)) {
+    negateSlot(lhs);
+    return;
+  }
   if (util::math::isPowerOfTwo(factor)) {
     mulSlotByPowerOfTwo(lhs, util::math::getPowerOfTwo(factor));
     if (negate) negateSlot(lhs);
